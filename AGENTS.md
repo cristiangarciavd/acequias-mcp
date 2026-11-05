@@ -7,6 +7,8 @@
 
 - Dependencies are added in `pyproject.toml`. Do not add one without
   asking
+- "Do task N" means the full cycle in `_docs/process.md`: branch, implement,
+  test, PR, merge, then a separate docs review
 
 # Documents
 
