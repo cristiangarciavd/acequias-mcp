@@ -66,9 +66,13 @@ On your turn you take **one action**, either:
 **A. Place a piece.**
 1. You pick a piece from the market, and it is replenished from the bag.
 2. You place it connected to the existing network and slot in your owner token.
-3. If your move connects a vineyard to the river, you claim it with your grape cluster.
+3. If your move connects an unclaimed vineyard to the river, you claim it with your grape cluster.
 
 **B. Bribe (coima).** See the Bribe section below.
+
+### Claims and watering
+
+A claim is permanent: once your grape cluster is on a vineyard, nobody else can claim it, even if its water is later cut off. But a vineyard only scores if it is **watered** (connected to the river) on the final board. A claimed vineyard that ends the game dry scores 0 and pays no water rights. Its owner can water it again during the game by reconnecting it, or by bribing away the floodgate that blocks it.
 
 ### Turn order (turnos de riego)
 
@@ -77,6 +81,14 @@ The start player rotates each round, like the real watering turns of Mendoza's a
 ### Water rights
 
 If the water reaching your vineyard passes through other players' canals, you pay **1 point to each distinct other player** whose canals are on that path (not per canal, and capped at the number of rivals). Water rights are settled **at the end of the game**, computed from the final board state.
+
+When a vineyard can be reached by more than one path, the water takes the **cheapest path for the vineyard's owner**:
+
+1. Fewest distinct rival owners on the path (that is, the fewest points paid).
+2. Tie: the shortest path, counted in canals.
+3. Still tied: a fixed deterministic order (for example, the lexicographic order of the hex coordinates), so scoring is always reproducible.
+
+This rewards building your own bypass: if you lay your own longer route to the river, you stop paying water rights. Under a "shortest path" rule, the same move would change nothing.
 
 ### Floodgate
 
@@ -112,6 +124,8 @@ Flash shortens the game two ways: fewer rounds and a denser board, so vineyards 
 When the last round ends, each player's score is:
 
 **vineyard values + bodega bonus − water rights paid + water rights collected − bribe debt.**
+
+Only watered vineyards count toward vineyard values, the bodega bonus, and water rights.
 
 ## Physical pieces and 3D printing
 
