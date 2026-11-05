@@ -2,7 +2,7 @@
 
 Acequias is a competitive board game for 2 to 5 players with 3D-printed hex pieces. Players build canals to carry water from the mountains to the vineyards of Mendoza. This repo holds an MCP server that generates balanced boards, scores games, simulates them with bots to tune the rules, and outputs printable STL pieces for a Bambu Lab A1.
 
-> **Status:** design phase. The rules and the plan are written; no code yet. Progress is tracked in the [GitHub issues](../../issues) and [milestones](../../milestones).
+> **Status:** early development. The rules and the plan are written, and the project scaffolding is in place; game logic comes next. Progress is tracked in the [GitHub issues](../../issues) and [milestones](../../milestones).
 
 ## MCP tools (planned)
 
