@@ -170,6 +170,8 @@ QA checks for these pieces: closed mesh, minimum printable thickness (0.4 mm noz
 
 Python server with FastMCP (official SDK), build123d for the models, and pytest for the tests. The board is represented with axial hex coordinates.
 
+Hex convention (`acequias/hex.py`): hexes are **pointy-top**, so east and west are direct neighbors and the river runs along the west edge. `q` grows to the east and `r` to the south (`s = -q - r`). Pixel/mm positions put the origin hex at `(0, 0)`, with `x` east and `y` south. Hexes sort by `(q, r)`, which is the deterministic tie-break used by the water-path rule.
+
 ### Tech stack
 
 | Layer | Tool |
