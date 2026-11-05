@@ -11,4 +11,6 @@
 
 # Documents
 
+- `_docs/plan.md` - game and MCP specification (design and decisions)
+- `_docs/tasks.md` - task backlog, mirrors the GitHub issues
 - `_docs/process.md` - how work is organized
