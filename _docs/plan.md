@@ -27,7 +27,10 @@ No deadline: progress at under 1 hour per day.
 | Vineyards | Neutral, with value by varietal |
 | Canals | Mixed: water rights |
 | Getting pieces | Open market |
-| End of game | Harvest (fixed rounds) |
+| End of game | Harvest, fixed rounds; two length modes: **Normal** and **Flash** |
+| Turn order | Rotating start player each round (_turnos de riego_) |
+| Floodgate | Can be removed/moved via the **bribe** action (at a die-rolled cost) |
+| External component | One standard **d6** (player-provided), used by the bribe action |
 | Modeling engine | build123d (Python, OpenCASCADE kernel) |
 | MCP server | Python with FastMCP (official SDK) |
 | Environment and dependencies | uv (fallback: conda-forge if OpenCASCADE fails on Windows) |
@@ -35,7 +38,7 @@ No deadline: progress at under 1 hour per day.
 
 ## Game rules
 
-Whoever scores the most points when the harvest ends, after a fixed number of rounds, wins.
+Whoever scores the most points when the harvest ends, after a fixed number of rounds, wins. The game ships with two length modes, **Normal** and **Flash** (see below), that share the same rules and engine.
 
 ### Components
 
@@ -46,41 +49,92 @@ Whoever scores the most points when the harvest ends, after a fixed number of ro
 | Canal pieces (neutral) | Straight, gentle curve, sharp curve, Y-junction, floodgate |
 | Owner tokens | One per placed canal, in each player's color |
 | Grape clusters | Mark the claimed vineyard, in each player's color |
+| Debt tokens | Track each player's accumulated bribe debt |
+| Die (external) | One standard d6, provided by the players — used by the bribe action |
 
 ### Setup
 
-1. The MCP generates a balanced map based on the number of players.
+1. The MCP generates a balanced map based on the number of players and the mode.
 2. The west edge is the river (the mountains); all water flows from there.
 3. Four canal pieces are placed face up: the market.
+4. A start player is chosen; turn order rotates each round.
 
 ### Turn
 
+On your turn you take **one action**, either:
+
+**A. Place a piece.**
 1. You pick a piece from the market, and it is replenished from the bag.
 2. You place it connected to the existing network and slot in your owner token.
 3. If your move connects a vineyard to the river, you claim it with your grape cluster.
 
+**B. Bribe (coima).** See the Bribe section below.
+
+### Turn order (turnos de riego)
+
+The start player rotates each round, like the real watering turns of Mendoza's acequias. This keeps any single seat from hoarding the turn-order advantage and helps the ≤10% balance target.
+
 ### Water rights
 
-If the water reaching your vineyard passes through another player's canals, you pay 1 point to each owner of those canals.
+If the water reaching your vineyard passes through other players' canals, you pay **1 point to each distinct other player** whose canals are on that path (not per canal, and capped at the number of rivals). Water rights are settled **at the end of the game**, computed from the final board state.
 
 ### Floodgate
 
-Blocks or diverts water: it is the attack-and-defense piece.
+Blocks or diverts water: it is the attack-and-defense piece. It is placed as a normal canal piece, and can later be removed or moved only through the bribe action.
+
+### Bribe (coima)
+
+To bend the system, on your turn (instead of placing a piece) you may **bribe** to remove or move one floodgate already on the board — yours or an opponent's:
+
+1. Roll the external **d6**. The result is added to your **debt** (public).
+2. **Remove:** the floodgate returns to the supply. **Move:** relocate it to another legal, connected position.
+3. Water re-flows immediately based on the new board.
+
+The debt is subtracted from your final score, so a bribe is a gamble: it may cost as little as 1 or as much as 6. The accumulating cost is what keeps floodgate wars in check.
+
+### Bodega bonus (varietal blend)
+
+At scoring, a player who has claimed at least one vineyard of **each** varietal (Malbec + Bonarda + Torrontés) earns a **+2 bonus** — a winery wants its blend. In Flash mode this bonus is reduced (see modes).
+
+### Game modes
+
+Both modes use the same engine; the mode is a preset of board size and round count.
+
+| Mode | Rounds | Board | Target time |
+| --- | --- | --- | --- |
+| **Normal** | ~12 | ~12 hexes/player (2p 24 · 3p 36 · 4p 48 · 5p 60) | ~45–60 min |
+| **Flash** | ~5 | ~7 hexes/player, river one row closer to the vineyards | ~10–20 min |
+
+Flash shortens the game two ways: fewer rounds and a denser board, so vineyards connect in 1–2 pieces instead of 3–4. Its bodega bonus is reduced (+1, or only 2 varietals required) because collecting all three in ~5 rounds is hard. All round/board/bonus values are provisional and tuned by the simulation per mode.
 
 ### End and scoring
 
-When the last round ends, each player adds up the value of their vineyards and subtracts the water rights paid (and adds those collected).
+When the last round ends, each player's score is:
+
+**vineyard values + bodega bonus − water rights paid + water rights collected − bribe debt.**
 
 ## Physical pieces and 3D printing
 
-All pieces are modeled parametrically in build123d (Python, on the OpenCASCADE kernel) and printed on the Bambu Lab A1, with a 256 × 256 mm build plate. The decorative relief (meshes from height maps and elevation data) is built with trimesh and numpy.
+All pieces are modeled parametrically in build123d (Python, on the OpenCASCADE kernel) and printed on the Bambu Lab A1, with a 256 × 256 mm build plate. The decorative relief (meshes from height maps and elevation data) is built with trimesh and numpy. The d6 is an external component and is not printed.
 
 - **Terrain hexes:** hexagonal prism with relief depending on type (water, vineyard, stone).
 - **Canal pieces:** hexagon with a groove; neutral, single-color.
 - **Owner tokens:** small marker that fits into a central hole in the canal; printed in each player's color.
 - **Grape clusters:** figure that rests on the claimed vineyard.
+- **Debt tokens:** small markers to track bribe debt; printed in small batches.
 
-Initial parameters to define: hexagon side, height, groove width and depth, fit tolerance.
+### Geometry profile (Compact)
+
+To keep print cost, time, and board size down, the starting profile is:
+
+| Parameter | Value |
+| --- | --- |
+| Hex side | 16 mm (~32 mm corner-to-corner); fallback 18 mm if the groove/fit gets too tight |
+| Tile height (functional) | 4 mm (+ decorative relief on top) |
+| Board footprint (4p) | ~18–20 cm across |
+| Print estimate (4p set, ~50–70 hexes) | ~150–200 g PLA, ~8–12 h — rough, confirmed when slicing the real STL |
+
+The bag of canal pieces is sized to the board's canalizable capacity (not rounds × players), which caps how many canals need printing. Groove width/depth and fit tolerance are still to be set and validated in CAD against the 0.4 mm nozzle.
 
 ### Aesthetics: so it doesn't look "all vectors"
 
@@ -119,21 +173,21 @@ Python server with FastMCP (official SDK), build123d for the models, and pytest 
 
 | Tool | Input | Output |
 | --- | --- | --- |
-| `generate_board` | Number of players, seed | Balanced map and assembly instructions |
-| `calculate_score` | Final board state | Points per player with water rights |
-| `simulate_game` | Rules, number of games | Balance statistics (turn-order advantage, varietals) |
+| `generate_board` | Number of players, seed, mode (normal/flash) | Balanced map and assembly instructions |
+| `calculate_score` | Final board state | Points per player (vineyards + bodega bonus − water rights − bribe debt) |
+| `simulate_game` | Rules (incl. mode), number of games | Balance statistics (turn-order advantage, varietals) |
 | `generate_piece_stl` | Piece type, parameters | STL files |
 | `build_plate` | List of pieces | Print plates for the A1 |
 
-The game logic lives in a module independent from the server, so it can be tested without MCP.
+The game logic lives in a module independent from the server, so it can be tested without MCP. Randomness (dice, board generation, bots) runs through a seeded RNG so games are reproducible.
 
 ## Phased plan
 
 The full project takes 4 to 6 weeks at under 1 hour per day.
 
-1. **Game logic (~1 week):** hex model, `generate_board` and `calculate_score`, with tests.
+1. **Game logic (~1 week):** hex model, `generate_board` (with modes) and `calculate_score` (with bodega bonus and bribe debt), with tests.
 2. **MCP server (a few days):** expose those tools with FastMCP and test them from Claude.
-3. **Simulation (~1 week):** `simulate_game` with bots to tune points, rounds, and market.
+3. **Simulation (~1 week):** `simulate_game` with bots to tune points, rounds, market, dice, and both modes.
 4. **build123d (1 to 2 weeks):** `generate_piece_stl`, with real elevation relief and height maps for the aesthetics.
 5. **Plate and printing (a few days):** `build_plate` and the first print on the A1.
 
@@ -141,15 +195,19 @@ The full project takes 4 to 6 weeks at under 1 hour per day.
 
 - [ ] Each tool has unit tests with pytest.
 - [ ] Every generated board has at least one vineyard reachable per player.
-- [ ] The simulation shows no more than 10% advantage for any turn order.
+- [ ] Turn-order advantage is no more than 10%, checked separately for Normal and Flash.
+- [ ] A Normal game lands around 45–60 min and a Flash game around 10–20 min (by turn count).
 - [ ] Each STL is a closed solid and fits with the other pieces.
 
 ## Open questions
 
-- [ ] How many rounds does the harvest last? Tuned by the simulation.
-- [ ] How many hexes does the board have per number of players?
-- [ ] How many pieces of each type does the bag hold?
-- [ ] Can the floodgate be removed or moved after it is placed?
-- [ ] Are water rights paid once when claiming the vineyard, or at the end of the game?
-- [ ] Is 1 point paid to each owner of a used canal, or 1 point total per vineyard?
-- [ ] What hex size balances playability and print time?
+Provisional defaults are set so work can start; the simulation (and CAD for the physical ones) refines them.
+
+- [ ] Normal rounds — default 12. Tuned by the simulation.
+- [ ] Flash rounds per player count — default ~5, to land in 10–20 min. Tuned by the simulation.
+- [ ] Hexes per player — Normal ~12, Flash ~7. Tuned by the simulation.
+- [ ] Bag mix — straight 40% · gentle curve 20% · sharp curve 15% · Y-junction 15% · floodgate 10%, sized to board capacity. Tuned by the simulation.
+- [ ] Die size — d6 default. Is the average bribe cost (3.5) balanced against vineyard values, or should it move to d8 / a success threshold? Tuned by the simulation.
+- [ ] Bodega bonus in Flash — +1, or require only 2 varietals? Tuned by the simulation.
+- [ ] Hex side — 16 mm default, fallback 18 mm if the groove/fit gets too tight. Validated in CAD.
+- [ ] Flash race-end variant ("first to claim a 2nd vineyard ends the round, then score") — evaluate in the simulation before committing.
