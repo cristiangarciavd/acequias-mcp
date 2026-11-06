@@ -8,7 +8,10 @@ an update always produces a new value. Collections are stored in a
 canonical order (by hex), so two values with the same contents are equal
 whatever order they were given in.
 
-This module depends on nothing in ``acequias`` except ``acequias.hex``.
+This module depends on nothing in ``acequias`` except ``acequias.hex`` at
+import time. ``GameState.preset`` is a ``acequias.config.Preset``, but
+``config`` imports this module, so ``Preset`` is imported only for type
+checking and, lazily, inside ``GameState.__post_init__``.
 """
 
 from __future__ import annotations
@@ -17,8 +20,12 @@ from dataclasses import dataclass, field
 from enum import Enum
 from types import MappingProxyType
 from collections.abc import Iterable, Mapping
+from typing import TYPE_CHECKING
 
 from acequias.hex import Direction, Hex
+
+if TYPE_CHECKING:
+    from acequias.config import Preset
 
 MIN_PLAYERS = 2
 MAX_PLAYERS = 5
@@ -317,7 +324,11 @@ class GameState:
     """Everything that describes a game at one moment.
 
     ``start_player`` and ``current_player`` are player ids. ``market`` and
-    ``bag`` hold piece kinds, floodgates included.
+    ``bag`` hold piece kinds, floodgates included; ``bag[0]`` is the next
+    piece drawn. ``preset`` is the preset the game was built with (its mode
+    must be ``mode``); ``None`` means the shipped preset for ``mode``. It
+    takes part in equality but not in the hash, since a ``Preset`` holds
+    read-only mappings and is not hashable.
     """
 
     board: Board
@@ -328,6 +339,7 @@ class GameState:
     current_player: str
     market: tuple[PieceKind, ...] = ()
     bag: tuple[PieceKind, ...] = ()
+    preset: Preset | None = field(default=None, hash=False)
 
     def __post_init__(self) -> None:
         _check_type("GameState.board", self.board, Board)
@@ -339,6 +351,15 @@ class GameState:
         _set(self, "players", players)
         _set(self, "market", market)
         _set(self, "bag", bag)
+        if self.preset is not None:
+            from acequias.config import Preset  # local: config imports this module
+
+            _check_type("GameState.preset", self.preset, Preset)
+            if self.preset.mode is not self.mode:
+                raise ValueError(
+                    f"GameState.preset is for mode {self.preset.mode.name}, "
+                    f"but the game mode is {self.mode.name}"
+                )
 
         if not MIN_PLAYERS <= len(players) <= MAX_PLAYERS:
             raise ValueError(
