@@ -2,7 +2,7 @@
 
 Acequias is a competitive board game for 2 to 5 players with 3D-printed hex pieces. Players build canals to carry water from the mountains to the vineyards of Mendoza. This repo holds an MCP server that generates balanced boards, scores games, simulates them with bots to tune the rules, and outputs printable STL pieces for a Bambu Lab A1.
 
-> **Status:** early development. The project scaffolding and the hex coordinate model are in place; the game logic comes next. Progress is tracked in the [GitHub issues](../../issues) and [milestones](../../milestones).
+> **Status:** early development. The hex model, domain model, game config, water reach, and board generator are in place; scoring and the turn engine come next. Progress is tracked in the [GitHub issues](../../issues) and [milestones](../../milestones).
 
 This README is the project's specification: game rules, design decisions, architecture, and roadmap. Task details live in the GitHub issues.
 
@@ -74,9 +74,9 @@ If the water reaching your vineyard passes through other players' canals, you pa
 
 When a vineyard can be reached by more than one path, the water takes the **cheapest path for the vineyard's owner**:
 
-1. Fewest distinct rival owners on the path.
+1. Fewest distinct rival owners on the path (on an unclaimed vineyard, every owner counts as a rival).
 2. Tie: the shortest path, counted in canals.
-3. Still tied: a fixed deterministic order (hex coordinate order), so scoring is reproducible.
+3. Still tied: the path whose hexes, from the river end, come first in hex coordinate order, so scoring is reproducible.
 
 This rewards building your own bypass: a longer route of your own canals stops you paying water rights.
 
@@ -188,6 +188,14 @@ A Python server with FastMCP (official SDK). The game logic lives in `acequias/`
 ### Game config
 
 `acequias/config.py`: every number the game needs, as one immutable `Preset` per mode, fetched with `preset(mode)`. Board generation, setup, scoring, the round loop, and the simulation read their values from it and hard-code none. Tuning changes the shipped values there; experiments build variants with `with_overrides`, which validates them like the shipped presets. Shares (stone hexes, bag mix) are whole-number percentages, and rounds are set per player count so they can differ later.
+
+### Water reach
+
+`acequias/flow.py`: `water(board)` maps every watered vineyard, claimed or not, to the one `WaterPath` its water takes; dry vineyards are absent. A path's `canals` run from the river end to the vineyard, and its `owners` include the claimant's own id, so scoring removes the claimant when it counts water rights. Path choice uses the vineyard's claimant on the board. The module is pure and deterministic.
+
+### Board generator
+
+`acequias/board.py`: `generate_board(players, seed, mode, *, preset=None)` returns a `Board` with tiles only. Equal arguments give an equal board, in any process; all randomness comes from one `random.Random(seed)`. `preset` (from `with_overrides`) replaces the shipped one for the simulation, and must have the same mode. Each row is a river hex on the west followed by an unbroken run of hexes east, and the river zigzags south as one chain, so a hex `k` steps east of its river hex is `k` from the river. Vineyards are placed in the preset's distance range and a layout is kept only if at least as many vineyards as players are reachable through empty hexes; a preset that cannot be met (e.g. a distance range the rows cannot hold, or no layout within the retry cap) raises `ValueError`.
 
 ### Tech stack
 
