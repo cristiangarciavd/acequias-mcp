@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from acequias.config import FLASH, NORMAL, with_overrides
 from acequias.hex import Direction, Hex
 from acequias.model import (
     Board,
@@ -446,6 +447,35 @@ def test_game_state_rejects_unknown_claim_owner():
         state(board=board)
 
 
+def test_game_state_preset_defaults_to_none():
+    assert state().preset is None
+
+
+def test_game_state_keeps_its_preset():
+    assert state(preset=NORMAL).preset is NORMAL
+
+
+def test_game_state_rejects_a_preset_for_another_mode():
+    with pytest.raises(ValueError):
+        state(mode=Mode.NORMAL, preset=FLASH)
+    with pytest.raises(ValueError):
+        state(mode=Mode.FLASH, preset=NORMAL)
+
+
+def test_game_state_rejects_a_non_preset():
+    with pytest.raises(TypeError):
+        state(preset="normal")
+
+
+def test_game_state_preset_is_in_equality_but_not_in_the_hash():
+    tuned = with_overrides(NORMAL, bodega_points=9)
+    assert state(preset=NORMAL) == state(preset=NORMAL)
+    assert state(preset=NORMAL) == state(preset=with_overrides(NORMAL))
+    assert state(preset=NORMAL) != state(preset=tuned)
+    assert state(preset=NORMAL) != state()
+    assert hash(state(preset=NORMAL)) == hash(state(preset=tuned)) == hash(state())
+
+
 # --- Immutability ----------------------------------------------------------
 
 
@@ -506,10 +536,10 @@ def test_board_does_not_share_the_input_list():
 # --- Dependencies ----------------------------------------------------------
 
 
-def test_model_imports_only_hex_from_acequias():
+def test_model_imports_only_hex_from_acequias_at_module_level():
     source = Path(__file__).resolve().parent.parent.joinpath("acequias", "model.py")
     tree = ast.parse(source.read_text("utf-8"))
-    for node in ast.walk(tree):
+    for node in tree.body:
         if isinstance(node, ast.ImportFrom) and node.module:
             if node.module.startswith("acequias"):
                 assert node.module == "acequias.hex"
@@ -520,7 +550,30 @@ def test_model_imports_only_hex_from_acequias():
                     "dataclasses",
                     "enum",
                     "types",
+                    "typing",
                 }
         elif isinstance(node, ast.Import):
             for alias in node.names:
                 assert not alias.name.startswith("acequias")
+
+
+def test_model_imports_config_only_for_type_checking_or_lazily():
+    # config imports model, so model may import config only under
+    # TYPE_CHECKING or inside a function, never when it is loaded.
+    source = Path(__file__).resolve().parent.parent.joinpath("acequias", "model.py")
+    tree = ast.parse(source.read_text("utf-8"))
+    allowed = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.FunctionDef):
+            allowed.update(id(n) for n in ast.walk(node))
+        elif isinstance(node, ast.If) and getattr(node.test, "id", None) == "TYPE_CHECKING":
+            allowed.update(id(n) for n in ast.walk(node))
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom):
+            names = [node.module or ""]
+        elif isinstance(node, ast.Import):
+            names = [alias.name for alias in node.names]
+        else:
+            continue
+        if any(n.startswith("acequias") and n != "acequias.hex" for n in names):
+            assert id(node) in allowed

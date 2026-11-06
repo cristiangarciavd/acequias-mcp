@@ -425,6 +425,19 @@ def test_a_preset_passed_in_is_used_instead():
         assert_rights_balance(scores)
 
 
+def test_no_preset_uses_the_state_preset_and_an_explicit_preset_wins():
+    # All three varietals: Normal gives 2 bodega points, the state's preset 5.
+    five = with_overrides(NORMAL, bodega_points=5)
+    state = dataclasses.replace(make_state(all_three()), preset=five)
+    assert terms(calculate_score(state)["a"]) == (6, 5, 0, 0, 0, 11)
+    explicit = with_overrides(NORMAL, bodega_points=7)
+    assert calculate_score(state, explicit)["a"].bodega == 7
+    assert calculate_score(state, NORMAL)["a"].bodega == 2
+    unset = make_state(all_three())
+    assert unset.preset is None
+    assert calculate_score(unset)["a"].bodega == NORMAL.bodega_points
+
+
 def test_debt_is_subtracted_in_full():
     state = make_state([lane(0, ["a"], MALBEC, "a")], debts={"a": 7, "b": 3})
     scores = calculate_score(state)

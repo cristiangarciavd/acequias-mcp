@@ -70,12 +70,13 @@ def calculate_score(state: GameState, preset: Preset | None = None) -> Mapping[s
     """Every player's score on ``state``, keyed by player id, in seat order.
 
     The state is scored as given, whatever its round. With ``preset=None``
-    the bodega values come from ``preset(state.mode)``.
+    the bodega values come from ``state.preset`` when it is set, and from
+    ``preset(state.mode)`` otherwise; an explicit ``preset`` always wins.
     """
     if not isinstance(state, GameState):
         raise TypeError(f"calculate_score needs a GameState, got {state!r}")
     if preset is None:
-        preset = preset_for(state.mode)
+        preset = state.preset if state.preset is not None else preset_for(state.mode)
     elif not isinstance(preset, Preset):
         raise TypeError(f"preset must be a Preset or None, got {preset!r}")
 
