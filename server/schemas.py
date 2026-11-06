@@ -9,10 +9,26 @@ String mappings (`acequias` enum -> JSON string):
 - `Varietal`: its lowercase enum name, ASCII only: `"malbec"`, `"bonarda"`,
   `"torrontes"` (not the display name `"Torrontés"`)
 - `Mode`: its value, `"normal"` or `"flash"`
+- `PieceKind` (canal shapes only): its lowercase enum name, ASCII only:
+  `"straight"`, `"gentle_curve"`, `"sharp_curve"`, `"symmetric_y"`,
+  `"t_branch"`, `"claw"` (not the values `"gentle curve"` or `"T branch"`).
+  The floodgate is not a canal kind and has no string here
+- `Direction`: its name, case-sensitive: `"E"`, `"NE"`, `"NW"`, `"W"`,
+  `"SW"`, `"SE"`
 
 A hex is `{"q": int, "r": int, "terrain": str, "varietal": str | null}`, where
 `varietal` is a string only on vineyards. `board_to_hexes` writes one per
 `Board.tiles` entry, in the board's order; `hexes_to_board` reads them back.
+
+The other shapes, read and written by `calculate_score`:
+
+- canal: `{"q", "r", "kind", "rotation", "owner"}`, one `PlacedCanal`
+- floodgate: `{"q", "r", "direction"}`, a `Floodgate` on the canal at `q`,
+  `r`, closing its opening `direction`
+- claim: `{"q", "r", "player"}`, one vineyard claim
+- player: `{"id", "debt"}`; the list order is the seat order (seats 1 to N)
+- score: one `Score`, its `watered_vineyards` each with the canal path in the
+  canal shape
 
 Reading JSON back leaves the checks to the model: `Hex`, `Tile`, and `Board`
 raise `ValueError` or `TypeError` on a bad hex, and the `*_from_json`
@@ -28,18 +44,34 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from acequias.assembly import AssemblyStep
-from acequias.hex import Hex
-from acequias.model import Board, Mode, Terrain, Tile, Varietal
+from acequias.hex import Direction, Hex
+from acequias.model import (
+    ROTATIONS,
+    Board,
+    Floodgate,
+    Mode,
+    PieceKind,
+    PlacedCanal,
+    Player,
+    Terrain,
+    Tile,
+    Varietal,
+)
+from acequias.scoring import Score, WateredVineyard
 
 TerrainName = Literal["river", "vineyard", "stone", "empty"]
 VarietalName = Literal["malbec", "bonarda", "torrontes"]
 ModeName = Literal["normal", "flash"]
+KindName = Literal["straight", "gentle_curve", "sharp_curve", "symmetric_y", "t_branch", "claw"]
+DirectionName = Literal["E", "NE", "NW", "W", "SW", "SE"]
 
 HEX_KEYS = frozenset({"q", "r", "terrain", "varietal"})
 
 _TERRAIN_BY_NAME = {terrain.value: terrain for terrain in Terrain}
 _VARIETAL_BY_NAME = {varietal.name.lower(): varietal for varietal in Varietal}
 _MODE_BY_NAME = {mode.value: mode for mode in Mode}
+_KIND_BY_NAME = {kind.name.lower(): kind for kind in PieceKind if kind.is_canal}
+_DIRECTION_BY_NAME = {direction.name: direction for direction in Direction}
 
 
 # --- String mappings --------------------------------------------------------
@@ -75,6 +107,31 @@ def mode_to_json(mode: Mode) -> str:
 def mode_from_json(name: object) -> Mode:
     """The `Mode` for a JSON string; `ValueError` if it is not one."""
     return _lookup("mode", name, _MODE_BY_NAME)
+
+
+def kind_to_json(kind: PieceKind) -> str:
+    """The JSON string for a canal `kind`: its lowercase ASCII name, e.g. `"t_branch"`.
+
+    Raises `ValueError` for the floodgate, which is not a canal kind.
+    """
+    if not kind.is_canal:
+        raise ValueError("the floodgate is not a canal kind")
+    return kind.name.lower()
+
+
+def kind_from_json(name: object) -> PieceKind:
+    """The canal `PieceKind` for a JSON string; `ValueError` if it is not one."""
+    return _lookup("kind", name, _KIND_BY_NAME)
+
+
+def direction_to_json(direction: Direction) -> str:
+    """The JSON string for `direction`: its name, e.g. `"NE"`."""
+    return direction.name
+
+
+def direction_from_json(name: object) -> Direction:
+    """The `Direction` for a JSON string (case-sensitive); `ValueError` otherwise."""
+    return _lookup("direction", name, _DIRECTION_BY_NAME)
 
 
 def _lookup(field: str, name: object, table: Mapping[str, Any]) -> Any:
@@ -114,6 +171,90 @@ class AssemblyStepJSON(BaseModel):
         description="The grape on a vineyard (lowercase ASCII); null on every other terrain."
     )
     text: str = Field(description='The step to read aloud, e.g. "Row 2, hex 3: vineyard, Malbec".')
+
+
+class CanalJSON(BaseModel):
+    """A canal piece on an empty hex: its shape, rotation, and owner."""
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    q: int = Field(description="Axial q coordinate of the hex the canal is on.")
+    r: int = Field(description="Axial r coordinate of the hex the canal is on.")
+    kind: KindName = Field(
+        description="The canal shape (lowercase ASCII); a floodgate is not a canal."
+    )
+    rotation: int = Field(
+        ge=0,
+        le=ROTATIONS - 1,
+        description="Rotation, 0 to 5; each step turns the shape 60 degrees counterclockwise.",
+    )
+    owner: str = Field(description="Id of the player who owns the canal.")
+
+
+class FloodgateJSON(BaseModel):
+    """A floodgate closing one opening of a canal."""
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    q: int = Field(description="Axial q coordinate of the canal the floodgate sits on.")
+    r: int = Field(description="Axial r coordinate of the canal the floodgate sits on.")
+    direction: DirectionName = Field(
+        description="The canal opening the floodgate closes (case-sensitive)."
+    )
+
+
+class ClaimJSON(BaseModel):
+    """A player's claim on a vineyard."""
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    q: int = Field(description="Axial q coordinate of the vineyard.")
+    r: int = Field(description="Axial r coordinate of the vineyard.")
+    player: str = Field(description="Id of the player who claimed it.")
+
+
+class PlayerJSON(BaseModel):
+    """A player and the bribe debt they carry."""
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    id: str = Field(min_length=1, description="Player id, a non-empty string.")
+    debt: int = Field(ge=0, description="Bribe debt, 0 or more.")
+
+
+class WateredVineyardJSON(BaseModel):
+    """One watered claimed vineyard and the water rights it causes."""
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    q: int = Field(description="Axial q coordinate of the vineyard.")
+    r: int = Field(description="Axial r coordinate of the vineyard.")
+    varietal: VarietalName = Field(description="The grape (lowercase ASCII).")
+    path: list[CanalJSON] = Field(
+        description="The canals the water runs through, from the river end to the vineyard."
+    )
+    pays: list[str] = Field(
+        description="Rival ids the claimant pays 1 point each (owners on the path), in seat order."
+    )
+
+
+class ScoreJSON(BaseModel):
+    """One player's final score, by term."""
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    player: str = Field(description="Player id.")
+    seat: int = Field(description="Seat number, 1 to N in the order of the input players.")
+    vineyards: int = Field(description="Points from the player's watered claimed vineyards.")
+    bodega: int = Field(description="Bodega bonus for watering enough different varietals.")
+    rights_paid: int = Field(description="Water rights paid to rivals, 1 point per rival per vineyard.")
+    rights_collected: int = Field(description="Water rights collected from rivals.")
+    debt: int = Field(description="Bribe debt.")
+    total: int = Field(description="vineyards + bodega - rights_paid + rights_collected - debt.")
+    watered: int = Field(description="Number of watered claimed vineyards (the tie-break).")
+    watered_vineyards: list[WateredVineyardJSON] = Field(
+        description="The player's watered claimed vineyards, by hex."
+    )
 
 
 # --- Board <-> JSON ---------------------------------------------------------
@@ -190,3 +331,81 @@ def assembly_to_json(steps: Iterable[AssemblyStep]) -> list[dict[str, Any]]:
         }
         for step in steps
     ]
+
+
+# --- Pieces, players, and scores <-> JSON -----------------------------------
+#
+# The `*_from_json` functions take a mapping or the matching Pydantic model.
+# A mapping is checked against the model first (pydantic's `ValidationError`
+# is a `ValueError`); where pieces may sit is left to `Board` and `GameState`.
+
+
+def canal_to_json(canal: PlacedCanal) -> dict[str, Any]:
+    """The canal JSON object for one `PlacedCanal`."""
+    return {
+        "q": canal.hex.q,
+        "r": canal.hex.r,
+        "kind": kind_to_json(canal.kind),
+        "rotation": canal.rotation,
+        "owner": canal.owner,
+    }
+
+
+def canal_from_json(item: Mapping[str, Any] | CanalJSON) -> PlacedCanal:
+    """The `PlacedCanal` for one canal JSON object."""
+    item = CanalJSON.model_validate(item)
+    return PlacedCanal(
+        hex=Hex(item.q, item.r),
+        kind=kind_from_json(item.kind),
+        rotation=item.rotation,
+        owner=item.owner,
+    )
+
+
+def floodgate_from_json(item: Mapping[str, Any] | FloodgateJSON) -> Floodgate:
+    """The `Floodgate` for one floodgate JSON object."""
+    item = FloodgateJSON.model_validate(item)
+    return Floodgate(hex=Hex(item.q, item.r), direction=direction_from_json(item.direction))
+
+
+def claim_from_json(item: Mapping[str, Any] | ClaimJSON) -> tuple[Hex, str]:
+    """The `(hex, player id)` claim pair for one claim JSON object."""
+    item = ClaimJSON.model_validate(item)
+    return (Hex(item.q, item.r), item.player)
+
+
+def players_from_json(items: Iterable[Mapping[str, Any] | PlayerJSON]) -> tuple[Player, ...]:
+    """The `Player`s for a players list, with seats 1 to N in list order."""
+    if isinstance(items, (str, bytes, Mapping)) or not isinstance(items, Iterable):
+        raise TypeError(f"players must be a list of player objects, got {items!r}")
+    return tuple(
+        Player(id=item.id, seat=seat, debt=item.debt)
+        for seat, item in enumerate((PlayerJSON.model_validate(i) for i in items), start=1)
+    )
+
+
+def watered_vineyard_to_json(vineyard: WateredVineyard) -> dict[str, Any]:
+    """The JSON object for one `WateredVineyard`: hex, varietal, path, and pays."""
+    return {
+        "q": vineyard.hex.q,
+        "r": vineyard.hex.r,
+        "varietal": varietal_to_json(vineyard.varietal),
+        "path": [canal_to_json(canal) for canal in vineyard.path.canals],
+        "pays": list(vineyard.pays),
+    }
+
+
+def score_to_json(score: Score) -> dict[str, Any]:
+    """The score JSON object for one `Score`, every term copied as is."""
+    return {
+        "player": score.player,
+        "seat": score.seat,
+        "vineyards": score.vineyards,
+        "bodega": score.bodega,
+        "rights_paid": score.rights_paid,
+        "rights_collected": score.rights_collected,
+        "debt": score.debt,
+        "total": score.total,
+        "watered": score.watered,
+        "watered_vineyards": [watered_vineyard_to_json(v) for v in score.watered_vineyards],
+    }
