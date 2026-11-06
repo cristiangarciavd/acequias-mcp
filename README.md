@@ -291,7 +291,7 @@ uv run pytest    # run the test suite
 
 `uv run acequias-server` starts the server over stdio (`server/app.py`). For now it exposes one tool, `ping`, which returns `"pong"`.
 
-Claude Code, from the repo root:
+Claude Code (replace the path with your checkout):
 
 ```sh
 claude mcp add acequias -- uv run --directory /path/to/ProyAcequiasMCP acequias-server
