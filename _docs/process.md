@@ -8,6 +8,10 @@
 
 - Tasks are GitHub issues, one at a time
 - Milestones follow the phases in the README roadmap; work through them in order
+- Milestones 1 to 5 are the MVP (README, Roadmap > MVP). Milestone 6, "After
+  the MVP", is lower priority: start its issues only once milestones 1 to 5
+  are closed, unless the user asks for one by number
+- A new idea outside the MVP goes into an issue in milestone 6
 - Check an issue's "Depends on" list before starting it
 - Read the acceptance criteria before starting and before closing
 
