@@ -79,11 +79,11 @@ async def test_ping_listed_and_returns_pong():
         assert text_of(result) == "pong"
 
 
-async def test_real_server_lists_only_ping():
+async def test_real_server_lists_only_its_own_tools():
     failing_server()  # building a test server must not touch the real one
     async with Client(app) as client:
         tools = (await client.list_tools()).tools
-        assert [tool.name for tool in tools] == ["ping"]
+        assert sorted(tool.name for tool in tools) == ["generate_board", "ping"]
 
 
 @pytest.mark.parametrize(

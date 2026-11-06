@@ -19,6 +19,7 @@ from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 
 import acequias
+from server.tools import board as board_tools
 
 F = TypeVar("F", bound=Callable[..., Any])
 
@@ -70,6 +71,10 @@ app = create_server()
 def ping() -> str:
     """Check that the Acequias server is running; returns "pong"."""
     return "pong"
+
+
+# Each tool lives in `server.tools`; registering it here keeps every tool on `app`.
+generate_board = app.tool()(tool_errors(board_tools.generate_board))
 
 
 def main() -> None:
