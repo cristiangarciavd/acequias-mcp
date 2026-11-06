@@ -111,7 +111,7 @@ A player whose watered vineyards include **each** varietal (Malbec, Bonarda, Tor
 | **Normal** | ~12 | ~12 hexes/player (2p 24 · 3p 36 · 4p 48 · 5p 60) | ~45–60 min |
 | **Flash** | ~5 | ~7 hexes/player, river one row closer to the vineyards | ~10–20 min |
 
-Flash is shorter in two ways: fewer rounds, and a denser board where vineyards connect in 1–2 pieces instead of 3–4. Its bodega bonus is reduced to +1. Both modes start with 2 vineyards per player and 10% stone hexes. All values are provisional and tuned by the simulation.
+Flash is shorter in two ways: fewer rounds, and a denser board where vineyards connect in 1–2 pieces instead of 3–4. Its bodega bonus is reduced to +1. Both modes start with 2 vineyards per player and 10% stone hexes. All values are provisional and tuned by the simulation; they live in `acequias/config.py` (see [Game config](#game-config)).
 
 ### End and scoring
 
@@ -184,6 +184,10 @@ A Python server with FastMCP (official SDK). The game logic lives in `acequias/`
 ### Domain model
 
 `acequias/model.py`: types and their invariants, no game logic. Every value is immutable, so an update builds a new one, and collections are kept in hex order, so two boards with the same contents are equal whatever order they were built in. Players are referenced by string id: canal owners, claims, and the start and current player. Claims live on the board as vineyard hex → player id; a vineyard with no claim is unclaimed. A canal's openings at a rotation (0 to 5, each 60° counterclockwise) are a `frozenset` of `Direction`s, so rotations that open the same edges compare equal. A floodgate sits on an edge, not a hex: it is identified by that edge, so the same gate given from either side is equal, and an edge holds at most one. `Board` checks where pieces may sit; `GameState` checks that every id belongs to one of its 2 to 5 players.
+
+### Game config
+
+`acequias/config.py`: every number the game needs, as one immutable `Preset` per mode, fetched with `preset(mode)`. Board generation, setup, scoring, the round loop, and the simulation read their values from it and hard-code none. Tuning changes the shipped values there; experiments build variants with `with_overrides`, which validates them like the shipped presets. Shares (stone hexes, bag mix) are whole-number percentages, and rounds are set per player count so they can differ later.
 
 ### Tech stack
 
