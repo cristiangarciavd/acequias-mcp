@@ -6,7 +6,7 @@ of ``acequias.game``) that returns one element of
 calls, never change the state they are given, and draw random numbers only
 from ``rng``.
 
-Two policies for the MVP:
+Three policies for the MVP:
 
 - ``random_bot``: ``rng.choice`` over every legal action, bribes and
   floodgates included.
@@ -17,8 +17,16 @@ Two policies for the MVP:
   floodgate on a rival's canal if it can, any floodgate otherwise. It never
   bribes. Ties go to ``rng.choice`` over the tied candidates in
   ``legal_actions`` order, with no draw when only one is left.
+- ``saboteur_bot``: places floodgates and bribes on purpose. Every legal
+  action but ``Pass`` gets a swing: the change in watered vineyard points
+  claimed by the player minus the change in those claimed by rivals,
+  measured with ``flow.water`` before and after ``apply``. A bribe's value
+  is its swing minus the die's expected roll, ``(die_faces + 1) / 2``;
+  values are exact ``Fraction``s. It plays the highest value above 0 (ties
+  by one ``rng.choice``) and falls back to ``greedy_bot`` when nothing is
+  worth more than 0.
 
-Greedy counts only vineyard points: water rights, the bodega bonus, and
+Greedy and saboteur count only vineyard points: water rights, the bodega bonus, and
 debt are left out on purpose for the MVP. Claims come from
 ``acequias.turn.apply``, so no rule is reimplemented here.
 
@@ -30,14 +38,17 @@ from __future__ import annotations
 
 import random
 from collections.abc import Sequence
+from fractions import Fraction
 from types import MappingProxyType
 from typing import TypeVar
 
+from acequias.config import preset as shipped_preset
+from acequias.flow import water
 from acequias.game import Bot
-from acequias.model import GameState, Terrain
-from acequias.turn import Action, Pass, PlaceCanal, PlaceFloodgate, apply, legal_actions
+from acequias.model import Board, GameState, Terrain
+from acequias.turn import Action, Bribe, Pass, PlaceCanal, PlaceFloodgate, apply, legal_actions
 
-__all__ = ["random_bot", "greedy_bot", "POLICIES", "policy"]
+__all__ = ["random_bot", "greedy_bot", "saboteur_bot", "POLICIES", "policy"]
 
 T = TypeVar("T")
 
@@ -63,7 +74,43 @@ def greedy_bot(state: GameState, player: str, rng: random.Random) -> Action:
     return Pass()
 
 
-POLICIES = MappingProxyType({"random": random_bot, "greedy": greedy_bot})
+def saboteur_bot(state: GameState, player: str, rng: random.Random) -> Action:
+    """The action with the best vineyard swing, floodgates and bribes included.
+
+    See the module docstring. Raises ``ValueError`` for a ``player`` that is
+    not in the game. Each action is evaluated with its own fresh
+    ``random.Random(0)`` (only a bribe draws from it, and that roll changes
+    debt, not the board), so evaluation never draws from ``rng``.
+    """
+    actions = legal_actions(state, player)
+    if actions == (Pass(),):
+        return Pass()
+    die_faces = (state.preset or shipped_preset(state.mode)).die_faces
+    bribe_cost = Fraction(die_faces + 1, 2)
+    own_before, rivals_before = _balance(state.board, player)
+
+    candidates: list[Action] = []
+    values: list[Fraction] = []
+    for action in actions:
+        if isinstance(action, Pass):
+            continue
+        after = apply(state, player, action, random.Random(0)).board
+        own_after, rivals_after = _balance(after, player)
+        value = Fraction((own_after - own_before) - (rivals_after - rivals_before))
+        if isinstance(action, Bribe):
+            value -= bribe_cost
+        if value > 0:
+            candidates.append(action)
+            values.append(value)
+    if not candidates:
+        return greedy_bot(state, player, rng)
+    best = max(values)
+    return _pick([a for a, v in zip(candidates, values) if v == best], rng)
+
+
+POLICIES = MappingProxyType(
+    {"random": random_bot, "greedy": greedy_bot, "saboteur": saboteur_bot}
+)
 """Every bot policy by name, read-only."""
 
 
@@ -123,6 +170,27 @@ def _touches_rival_canal(state: GameState, player: str, gate: PlaceFloodgate) ->
         if canal is not None and canal.owner != player:
             return True
     return False
+
+
+# --- Saboteur ----------------------------------------------------------------
+
+
+def _balance(board: Board, player: str) -> tuple[int, int]:
+    """``(own, rivals)``: points of watered vineyards claimed by ``player``, and by anyone else.
+
+    Unclaimed vineyards count in neither.
+    """
+    own = rivals = 0
+    for hex in water(board):
+        claimant = board.claimant(hex)
+        if claimant is None:
+            continue
+        points = board.tile_at(hex).varietal.points
+        if claimant == player:
+            own += points
+        else:
+            rivals += points
+    return own, rivals
 
 
 def _pick(candidates: Sequence[T], rng: random.Random) -> T:

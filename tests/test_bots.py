@@ -1,8 +1,9 @@
 import random
+from dataclasses import replace
 
 import pytest
 
-from acequias.bots import POLICIES, greedy_bot, policy, random_bot
+from acequias.bots import POLICIES, greedy_bot, policy, random_bot, saboteur_bot
 from acequias.game import game_over, game_rngs, play_game
 from acequias.hex import Direction, Hex
 from acequias.model import (
@@ -18,6 +19,7 @@ from acequias.model import (
     Varietal,
 )
 from acequias.config import preset as shipped_preset
+from acequias.config import with_overrides
 from acequias.setup import new_game
 from acequias.turn import Bribe, Pass, PlaceCanal, PlaceFloodgate, legal_actions
 
@@ -25,6 +27,7 @@ E, NE, NW, W, SW, SE = list(Direction)
 STRAIGHT, GENTLE, SHARP, Y, T, CLAW, GATE = list(PieceKind)
 MALBEC, BONARDA, TORRONTES = Varietal.MALBEC, Varietal.BONARDA, Varietal.TORRONTES
 BOTS = (random_bot, greedy_bot)
+ALL_BOTS = (random_bot, greedy_bot, saboteur_bot)
 SEEDS = range(40)
 
 R = Hex(0, 0)  # the river
@@ -85,7 +88,9 @@ def seating(state, name):
 
 
 def test_policies_maps_names_to_bots_and_is_read_only():
-    assert dict(POLICIES) == {"random": random_bot, "greedy": greedy_bot}
+    assert dict(POLICIES) == {
+        "random": random_bot, "greedy": greedy_bot, "saboteur": saboteur_bot,
+    }
     with pytest.raises(TypeError):
         POLICIES["other"] = random_bot
     with pytest.raises(TypeError):
@@ -95,12 +100,13 @@ def test_policies_maps_names_to_bots_and_is_read_only():
 def test_policy_looks_up_a_name():
     assert policy("random") is random_bot
     assert policy("greedy") is greedy_bot
+    assert policy("saboteur") is saboteur_bot
 
 
 def test_unknown_policy_lists_the_valid_names():
     with pytest.raises(ValueError) as error:
         policy("smart")
-    for name in POLICIES:
+    for name in ("greedy", "random", "saboteur"):
         assert repr(name) in str(error.value)
 
 
@@ -110,7 +116,7 @@ def test_non_str_policy_name_is_a_type_error(name):
         policy(name)
 
 
-@pytest.mark.parametrize("bot", BOTS)
+@pytest.mark.parametrize("bot", ALL_BOTS)
 @pytest.mark.parametrize("player", ["z", "", None])
 def test_unknown_player_is_a_value_error(bot, player):
     with pytest.raises(ValueError):
@@ -128,11 +134,18 @@ def test_bots_return_a_legal_action_and_leave_the_state_and_global_random_alone(
         assert action in legal_actions(state, player)
 
 
-@pytest.mark.parametrize("bot", BOTS)
+@pytest.mark.parametrize("bot", ALL_BOTS)
 def test_only_pass_legal_gives_pass(bot):
     state = make_state(market=())
     assert legal_actions(state, "a") == (Pass(),)
     assert bot(state, "a", random.Random(0)) == Pass()
+
+
+def test_saboteur_with_only_pass_legal_makes_no_draw():
+    state = make_state(market=())
+    action, rng = decide_quietly(saboteur_bot, state)
+    assert action == Pass()
+    assert rng.getstate() == random.Random(0).getstate()
 
 
 # --- Random ------------------------------------------------------------------
@@ -325,3 +338,280 @@ def test_same_state_and_seed_give_the_same_action(bot):
     assert len(states) > 40
     for i, (state, player) in enumerate(states):
         assert bot(state, player, random.Random(i)) == bot(state, player, random.Random(i))
+
+
+# --- Saboteur: helpers -------------------------------------------------------
+
+
+def canal(hex, owner, *directions):
+    """A canal on ``hex`` opening exactly ``directions``, whatever shape that takes."""
+    wanted = frozenset(directions)
+    for kind in PieceKind:
+        if kind.is_canal:
+            for rotation in range(6):
+                if kind.edges(rotation) == wanted:
+                    return PlacedCanal(hex, kind, rotation, owner)
+    raise AssertionError(f"no canal shape opens {directions}")
+
+
+def with_die(state, faces):
+    """``state`` with the shipped preset for its mode, but a die of ``faces`` faces."""
+    return replace(state, preset=with_overrides(shipped_preset(state.mode), die_faces=faces))
+
+
+def saboteur_picks(state, seeds=SEEDS):
+    """Every action the saboteur picks over ``seeds``, checking it repeats per seed."""
+    picks = set()
+    for seed in seeds:
+        first, _ = decide_quietly(saboteur_bot, state, seed=seed)
+        again, _ = decide_quietly(saboteur_bot, state, seed=seed)
+        assert first == again
+        picks.add(first)
+    return picks
+
+
+def assert_plays_greedy(state):
+    """The saboteur's pick and its draws are greedy's, for every seed."""
+    for seed in SEEDS:
+        action, rng = decide_quietly(saboteur_bot, state, seed=seed)
+        twin = random.Random(seed)
+        assert action == greedy_bot(state, "a", twin)
+        assert rng.getstate() == twin.getstate()
+
+
+# A T branch on EAST opens W (the river), E, and NE.
+EAST_E, EAST_NE = EAST.neighbor(E), EAST.neighbor(NE)
+
+
+# --- Saboteur: interface -----------------------------------------------------
+
+
+def test_saboteur_evaluation_never_draws_from_rng_when_one_candidate_is_best():
+    # Removing the floodgate waters a's Malbec and Torrontés: swing 4 > 3.5.
+    state = make_state(canals=[canal(EAST, "a", W, E, NE)], floodgates=[Floodgate(EAST, W)],
+                       vineyards=[(EAST_E, MALBEC), (EAST_NE, TORRONTES)],
+                       claims=[(EAST_E, "a"), (EAST_NE, "a")], market=())
+    global_before = random.getstate()
+    snapshot = repr(state)
+    action, rng = decide_quietly(saboteur_bot, state)
+    assert action == Bribe(EAST, W)
+    assert rng.getstate() == random.Random(0).getstate()
+    assert random.getstate() == global_before
+    assert repr(state) == snapshot
+
+
+# --- Saboteur: floodgates ----------------------------------------------------
+
+
+def test_saboteur_dries_a_rival_malbec_before_a_rival_torrontes():
+    state = make_state(empties=(EAST, WEST),
+                       canals=[straight(EAST, "b"), straight(WEST, "b")],
+                       vineyards=[(Hex(2, 0), MALBEC), (Hex(-2, 0), TORRONTES)],
+                       claims=[(Hex(2, 0), "b"), (Hex(-2, 0), "b")], market=(GATE,))
+    assert saboteur_picks(state) == {PlaceFloodgate(EAST, E), PlaceFloodgate(EAST, W)}
+
+
+def test_saboteur_skips_a_floodgate_that_dries_more_own_points_than_rival_points():
+    # EAST (T: W, E, NE) and its NE neighbour (claw: SW, SE, E) both water b's
+    # Bonarda; a's Malbec hangs off the claw. Only the river edge EAST|W dries
+    # both (swing 2 - 3 = -1); every other floodgate dries nothing or a's Malbec.
+    claw_hex = EAST_NE
+    bonarda, malbec = EAST_E, claw_hex.neighbor(E)
+    state = make_state(empties=(EAST, claw_hex, WEST),
+                       canals=[canal(EAST, "a", W, E, NE), canal(claw_hex, "a", SW, SE, E)],
+                       vineyards=[(bonarda, BONARDA), (malbec, MALBEC)],
+                       claims=[(bonarda, "b"), (malbec, "a")], market=(GATE, STRAIGHT))
+    assert PlaceFloodgate(EAST, W) in legal_actions(state, "a")
+    assert_plays_greedy(state)
+    assert saboteur_picks(state) == {PlaceCanal(STRAIGHT, WEST, 0)}
+
+
+def test_saboteur_skips_a_floodgate_that_dries_only_unclaimed_vineyards():
+    state = make_state(canals=[straight(EAST, "b")], vineyards=[(Hex(2, 0), MALBEC)],
+                       market=(GATE,))
+    assert legal_actions(state, "a") == (PlaceFloodgate(EAST, E), PlaceFloodgate(EAST, W))
+    assert_plays_greedy(state)
+
+
+def test_saboteur_weighs_floodgates_against_canals():
+    # A floodgate on EAST dries b's Malbec (3).
+    base = dict(empties=(EAST, WEST), canals=[straight(EAST, "b")],
+                claims=[(Hex(2, 0), "b")])
+    gates = {PlaceFloodgate(EAST, E), PlaceFloodgate(EAST, W)}
+    # A straight on WEST claims a Bonarda (2): the floodgate wins.
+    state = make_state(**base, vineyards=[(Hex(2, 0), MALBEC), (Hex(-2, 0), BONARDA)],
+                       market=(GATE, STRAIGHT))
+    assert PlaceCanal(STRAIGHT, WEST, 0) in legal_actions(state, "a")
+    assert saboteur_picks(state) == gates
+    # A T on WEST claims a Malbec (W) and a Torrontés (NE): 4 beats the floodgate.
+    state = make_state(**base, vineyards=[(Hex(2, 0), MALBEC), (Hex(-2, 0), MALBEC),
+                                          (WEST.neighbor(NE), TORRONTES)],
+                       market=(GATE, T))
+    assert saboteur_picks(state) == {PlaceCanal(T, WEST, 0)}
+
+
+# --- Saboteur: bribes --------------------------------------------------------
+
+
+@pytest.mark.parametrize("faces, bribes", [(6, False), (5, False), (4, True)])
+def test_saboteur_bribes_only_when_the_swing_beats_the_expected_roll(faces, bribes):
+    # Removing the floodgate waters a's Malbec again: swing 3, against (faces + 1) / 2.
+    state = with_die(make_state(canals=[straight(EAST, "a")], floodgates=[Floodgate(EAST, W)],
+                                vineyards=[(Hex(2, 0), MALBEC)], claims=[(Hex(2, 0), "a")],
+                                market=()), faces)
+    action, rng = decide_quietly(saboteur_bot, state)
+    assert action == (Bribe(EAST, W) if bribes else Pass())
+    assert rng.getstate() == random.Random(0).getstate()
+
+
+def test_saboteur_uses_the_shipped_die_when_the_state_has_no_preset():
+    state = make_state(canals=[straight(EAST, "a")], floodgates=[Floodgate(EAST, W)],
+                       vineyards=[(Hex(2, 0), MALBEC)], claims=[(Hex(2, 0), "a")], market=())
+    assert state.preset is None
+    assert saboteur_bot(state, "a", random.Random(0)) == Pass()  # 3 < 3.5
+    assert saboteur_bot(with_die(state, 6), "a", random.Random(0)) == Pass()
+
+
+def test_saboteur_bribes_for_a_swing_of_four_with_the_d6():
+    state = make_state(canals=[canal(EAST, "a", W, E, NE)], floodgates=[Floodgate(EAST, W)],
+                       vineyards=[(EAST_E, MALBEC), (EAST_NE, TORRONTES)],
+                       claims=[(EAST_E, "a"), (EAST_NE, "a")], market=())
+    assert saboteur_picks(state) == {Bribe(EAST, W)}
+
+
+def test_saboteur_does_not_bribe_to_water_a_rival_again():
+    # Removing the floodgate waters a's Malbec (E) and b's Bonarda (NE): swing 1.
+    state = make_state(canals=[canal(EAST, "a", W, E, NE)], floodgates=[Floodgate(EAST, W)],
+                       vineyards=[(EAST_E, MALBEC), (EAST_NE, BONARDA)],
+                       claims=[(EAST_E, "a"), (EAST_NE, "b")], market=())
+    assert saboteur_picks(state) == {Pass()}
+    # With a cheap die, moving the floodgate onto the Bonarda's edge (swing 3)
+    # is worth it, but removing it (swing 1 < 1.5) still is not.
+    assert saboteur_picks(with_die(state, 2)) == {Bribe(EAST, W, (EAST, NE))}
+
+
+def test_saboteur_moves_a_floodgate_onto_a_rival_before_removing_it():
+    # Freeing a's Malbec is swing 3; also drying b's Bonarda on WEST makes it 5.
+    state = make_state(empties=(EAST, WEST),
+                       canals=[straight(EAST, "a"), straight(WEST, "b")],
+                       floodgates=[Floodgate(EAST, W)],
+                       vineyards=[(Hex(2, 0), MALBEC), (Hex(-2, 0), BONARDA)],
+                       claims=[(Hex(2, 0), "a"), (Hex(-2, 0), "b")], market=())
+    assert Bribe(EAST, W) in legal_actions(state, "a")
+    assert saboteur_picks(state) == {Bribe(EAST, W, (WEST, E)), Bribe(EAST, W, (WEST, W))}
+
+
+def test_saboteur_counts_an_unclaimed_vineyard_a_bribe_waters_as_a_gain():
+    # Removing the floodgate lets a claim the Malbec and the Torrontés: swing 4.
+    state = make_state(canals=[canal(EAST, "b", W, E, NE)], floodgates=[Floodgate(EAST, W)],
+                       vineyards=[(EAST_E, MALBEC), (EAST_NE, TORRONTES)], market=())
+    assert saboteur_picks(state) == {Bribe(EAST, W)}
+
+
+# --- Saboteur: ties ----------------------------------------------------------
+
+
+def test_saboteur_breaks_a_tie_with_one_rng_choice():
+    # Any of the four floodgates dries one of b's two Malbecs.
+    state = make_state(empties=(EAST, WEST),
+                       canals=[straight(EAST, "b"), straight(WEST, "b")],
+                       vineyards=[(Hex(2, 0), MALBEC), (Hex(-2, 0), MALBEC)],
+                       claims=[(Hex(2, 0), "b"), (Hex(-2, 0), "b")], market=(GATE,))
+    tied = list(legal_actions(state, "a"))
+    assert len(tied) == 4 and all(isinstance(a, PlaceFloodgate) for a in tied)
+    for seed in SEEDS:
+        action, rng = decide_quietly(saboteur_bot, state, seed=seed)
+        twin = random.Random(seed)
+        assert action == twin.choice(tied)
+        assert rng.getstate() == twin.getstate()
+    assert saboteur_picks(state) == set(tied)
+
+
+# --- Saboteur: full games and determinism ------------------------------------
+
+# The saboteur evaluates every legal action with apply and flow.water, so a
+# 5-player Normal game takes seconds. One seed per combination keeps every
+# (player count, mode, seating) and the saboteur tests under a minute.
+SABOTEUR_SEEDS = range(1)
+SABOTEUR_SEATINGS = ("saboteur", "alternating")
+SAMPLED_STATES = 80
+
+
+def saboteur_seating(state, name):
+    """All saboteur, or saboteur and greedy alternating from seat 1."""
+    seats = sorted(state.players, key=lambda p: p.seat)
+    if name == "alternating":
+        return {p.id: (saboteur_bot, greedy_bot)[i % 2] for i, p in enumerate(seats)}
+    return {p.id: saboteur_bot for p in seats}
+
+
+@pytest.fixture(scope="module")
+def saboteur_games():
+    """Every batch game as ``(players, mode, state, bots, final, log)``, plus sampled states.
+
+    States are recorded from the 2- and 3-player games, where a decision is cheap.
+    """
+    games, states = [], []
+    for players in range(2, 6):
+        for mode in Mode:
+            for seats in SABOTEUR_SEATINGS:
+                for seed in SABOTEUR_SEEDS:
+                    state = new_game(players, seed, mode)
+                    bots = saboteur_seating(state, seats)
+                    played = bots
+                    if players <= 3:
+                        played = {pid: _recording(bot, states) for pid, bot in bots.items()}
+                    final, log = play_game(state, played, *game_rngs(seed))
+                    games.append((players, mode, state, bots, final, log))
+    step = max(1, len(states) // SAMPLED_STATES)
+    return games, states[::step]
+
+
+def test_saboteur_full_games_finish_with_every_move_legal(saboteur_games):
+    games, _ = saboteur_games
+    assert len(games) == 4 * len(Mode) * len(SABOTEUR_SEATINGS) * len(SABOTEUR_SEEDS)
+    for players, mode, state, _, final, log in games:
+        assert game_over(final)
+        assert len(log) == shipped_preset(mode).rounds_for(players) * players
+
+
+def test_saboteur_places_floodgates_in_full_games(saboteur_games):
+    games, _ = saboteur_games
+    assert any(
+        isinstance(record.action, PlaceFloodgate) and bots[record.player] is saboteur_bot
+        for *_, bots, _, log in games for record in log
+    )
+
+
+def test_saboteur_bribes_with_a_cheap_die():
+    bribes = 0
+    for seed in range(4):
+        mode = (Mode.NORMAL, Mode.FLASH)[seed % 2]
+        state = new_game(2, seed, mode, preset=with_overrides(shipped_preset(mode), die_faces=2))
+        bots = saboteur_seating(state, "alternating")
+        _, log = play_game(state, bots, *game_rngs(seed))
+        bribes += sum(isinstance(r.action, Bribe) and bots[r.player] is saboteur_bot
+                      for r in log)
+    assert bribes > 0
+
+
+def test_saboteur_same_game_identity_gives_the_same_game():
+    def play():
+        state = new_game(3, 5, Mode.FLASH)
+        return play_game(state, saboteur_seating(state, "alternating"), *game_rngs(5))
+
+    assert play() == play()
+
+
+def test_saboteur_returns_a_legal_action_and_is_deterministic_over_seeded_states(saboteur_games):
+    _, states = saboteur_games
+    assert len(states) >= 40
+    assert any(s.board.floodgates for s, _ in states)
+    for i, (state, player) in enumerate(states):
+        snapshot = repr(state)
+        global_before = random.getstate()
+        action = saboteur_bot(state, player, random.Random(i))
+        assert random.getstate() == global_before
+        assert repr(state) == snapshot
+        assert action in legal_actions(state, player)
+        assert saboteur_bot(state, player, random.Random(i)) == action
