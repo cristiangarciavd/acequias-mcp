@@ -190,7 +190,7 @@ def test_stdout_carries_only_mcp_messages():
         send(initialized)
         send(ping)
         assert response_to(2)["result"]["content"][0]["text"] == "pong"
-        process.stdin.close()
+        # communicate() closes stdin (EOF) and waits for the server to exit.
         rest, stderr = process.communicate(timeout=60)
     finally:
         if process.poll() is None:
