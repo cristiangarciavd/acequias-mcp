@@ -4,7 +4,7 @@
 
 Acequias is a competitive board game for 2 to 5 players with 3D-printed hex pieces. Players build canals to carry water from the mountains to the vineyards of Mendoza. This repo holds an MCP server that generates balanced boards, scores games, simulates them with bots to tune the rules, and outputs printable STL pieces for a Bambu Lab A1.
 
-> **Status:** early development. The hex model, domain model, game config, water reach, board generator, assembly instructions, and scoring are in place; the turn engine comes next. Progress is tracked in the [GitHub issues](../../issues) and [milestones](../../milestones).
+> **Status:** early development. Milestones 1 (game logic) and 2 (MCP server) are done: the server exposes `generate_board` and `calculate_score`. The simulation (turn engine, bots, `simulate_game`) comes next. Progress is tracked in the [GitHub issues](../../issues) and [milestones](../../milestones).
 
 This README is the project's specification: game rules, design decisions, architecture, and roadmap. Task details live in the GitHub issues.
 
@@ -173,8 +173,8 @@ A Python server built on `MCPServer` from the official `mcp` SDK (formerly FastM
 
 | Tool | Input | Output |
 | --- | --- | --- |
-| `generate_board` | Number of players, seed, mode | Balanced map and assembly instructions |
-| `calculate_score` | Final board state | Points per player (vineyards + bodega − rights paid + rights collected − debt) |
+| `generate_board` | `players` (2 to 5), `mode`, optional `seed` | `players`, `mode`, the `seed` used, `hexes`, and `assembly` instructions |
+| `calculate_score` | `mode`, `hexes`, `players` (id and debt), optional `canals`, `floodgates`, `claims` | `mode`, `scores` per player by term (vineyards + bodega − rights paid + rights collected − debt) with the watered vineyards and their paths, and `winners` |
 | `simulate_game` | Rules (incl. mode), number of games | Balance statistics (turn-order advantage, varietals) |
 | `generate_piece_stl` | Piece type, parameters | STL files |
 | `build_plate` | List of pieces | Print plates for the A1 |
@@ -206,6 +206,10 @@ A Python server built on `MCPServer` from the official `mcp` SDK (formerly FastM
 ### Scoring
 
 `acequias/scoring.py`: `calculate_score(state, preset=None)` scores a `GameState` as given, whatever its round, and changes nothing; with `preset=None` the bodega values come from `preset(state.mode)`, and a preset from `with_overrides` replaces them. It returns a read-only mapping of player id → `Score`, in seat order, with the terms `vineyards`, `bodega`, `rights_paid`, `rights_collected`, `debt`, and `total` (the names the MCP tool exposes), plus `watered` (the tie-break count) and `watered_vineyards`: each watered claimed vineyard in hex order, with its varietal, its `WaterPath`, and the rivals it `pays` in seat order. `winners(scores)` returns the winning ids in seat order: highest `total`, then highest `watered`, otherwise a shared win. Debt is only read from `Player.debt`; bribes add to it.
+
+### Board JSON
+
+`server/schemas.py`: the JSON shapes every tool shares, so a board means the same JSON everywhere. A hex is `q`, `r`, `terrain`, and `varietal` (null except on vineyards). Enum strings are lowercase ASCII: terrain `"river"`, `"vineyard"`, `"stone"`, `"empty"`; varietal `"malbec"`, `"bonarda"`, `"torrontes"`; canal `kind` `"straight"`, `"gentle_curve"`, `"sharp_curve"`, `"symmetric_y"`, `"t_branch"`, `"claw"` (the floodgate is not a kind). Directions are the case-sensitive names `"E"`, `"NE"`, `"NW"`, `"W"`, `"SW"`, `"SE"`. A canal is `q`, `r`, `kind`, `rotation` (0 to 5), `owner`; a floodgate is the canal's `q`, `r` and the `direction` it closes; a claim is `q`, `r`, `player`; a player is `id` and `debt`, and the list order gives seats 1 to N. From a `generate_board` result only `mode` and `hexes` carry over to `calculate_score`: its `players` is a count, not a list, and `seed` and `assembly` are not inputs. Inputs are strict (`"3"`, `3.0`, or `true` is not an int), and the server only maps JSON to `acequias` types; every check comes from the model.
 
 ### Tech stack
 
@@ -289,7 +293,7 @@ uv run pytest    # run the test suite
 
 ### Running the MCP server
 
-`uv run acequias-server` starts the server over stdio (`server/app.py`). For now it exposes one tool, `ping`, which returns `"pong"`.
+`uv run acequias-server` starts the server over stdio (`server/app.py`). It exposes `generate_board`, `calculate_score`, and `ping`, which returns `"pong"` as a connection check.
 
 Claude Code (replace the path with your checkout):
 
@@ -310,9 +314,9 @@ Claude Desktop, in `claude_desktop_config.json`:
 }
 ```
 
-Then ask Claude to "call the acequias ping tool"; it should answer `pong`. In Claude Code, `/mcp` shows whether the server is connected.
+Then ask Claude to "call the acequias ping tool"; it should answer `pong`. Next, ask it to generate a 3-player Flash board and score it with no pieces placed: every player scores 0 and shares the win. In Claude Code, `/mcp` shows whether the server is connected.
 
-New tools go in `server/app.py` on the module-level `app`, as `@app.tool()` over `@tool_errors`: a `ValueError` or `TypeError` from `acequias` comes back as a tool error with its message, and any other exception as a tool error with a generic message. Tests connect `mcp.Client(app)` in-process (`tests/test_server.py`).
+Each tool lives in `server/tools/` and is registered in `server/app.py` on the module-level `app`, as `app.tool()` over `tool_errors`: a `ValueError` or `TypeError` from `acequias` comes back as a tool error with its message, and any other exception as a tool error with a generic message. Tests connect `mcp.Client(app)` in-process (`tests/test_server.py`).
 
 ## Documents
 
