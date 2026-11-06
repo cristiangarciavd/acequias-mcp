@@ -145,33 +145,59 @@ def test_importing_the_app_does_not_start_the_server():
 
 
 def test_stdout_carries_only_mcp_messages():
-    # One real stdio session (initialize, then ping): every stdout line is a
-    # JSON-RPC message, and the server exits when stdin closes.
-    requests = [
-        {
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "initialize",
-            "params": {
-                "protocolVersion": "2025-06-18",
-                "capabilities": {},
-                "clientInfo": {"name": "test", "version": "0"},
-            },
+    # One real stdio session (initialize, then ping). Each request waits for its
+    # response, so closing stdin cannot cut the ping short; then every stdout
+    # line must be a JSON-RPC message and the server must exit on EOF.
+    initialize = {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {
+            "protocolVersion": "2025-06-18",
+            "capabilities": {},
+            "clientInfo": {"name": "test", "version": "0"},
         },
-        {"jsonrpc": "2.0", "method": "notifications/initialized"},
-        {"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {"name": "ping", "arguments": {}}},
-    ]
-    completed = subprocess.run(
+    }
+    initialized = {"jsonrpc": "2.0", "method": "notifications/initialized"}
+    ping = {"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {"name": "ping", "arguments": {}}}
+
+    process = subprocess.Popen(
         [sys.executable, "-m", "server.app"],
-        input="".join(json.dumps(request) + "\n" for request in requests),
-        capture_output=True,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
         text=True,
         encoding="utf-8",
-        timeout=60,
     )
-    assert completed.returncode == 0, completed.stderr
-    messages = [json.loads(line) for line in completed.stdout.splitlines() if line.strip()]
+    lines = []
+
+    def send(message):
+        process.stdin.write(json.dumps(message) + "\n")
+        process.stdin.flush()
+
+    def response_to(request_id):
+        while True:
+            line = process.stdout.readline()
+            assert line, "server closed stdout before answering"
+            lines.append(line)
+            message = json.loads(line)
+            if message.get("id") == request_id:
+                return message
+
+    try:
+        send(initialize)
+        assert response_to(1)["result"]["serverInfo"]["name"] == "acequias"
+        send(initialized)
+        send(ping)
+        assert response_to(2)["result"]["content"][0]["text"] == "pong"
+        process.stdin.close()
+        rest, stderr = process.communicate(timeout=60)
+    finally:
+        if process.poll() is None:
+            process.kill()
+            process.communicate()
+
+    assert process.returncode == 0, stderr
+    lines.extend(rest.splitlines())
+    messages = [json.loads(line) for line in lines if line.strip()]
     assert all(message["jsonrpc"] == "2.0" for message in messages)
-    by_id = {message["id"]: message for message in messages if "id" in message}
-    assert by_id[1]["result"]["serverInfo"]["name"] == "acequias"
-    assert by_id[2]["result"]["content"][0]["text"] == "pong"
