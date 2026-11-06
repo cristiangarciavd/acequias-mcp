@@ -159,7 +159,7 @@ Each piece has two layers, so it doesn't look "all vectors":
 - **Functional** (hexagon, groove, fit): build123d, precise and repeatable.
 - **Decorative** (mountain, water, vineyard): mesh relief with trimesh + numpy on top of the functional base; Blender later for organic shapes.
 
-Relief comes from real elevation data (SRTM / Copernicus DEM) for mountain hexes, and from height maps generated in code for water ripples, vineyard furrows, and stones. QA checks: closed mesh, minimum printable thickness, and no relief in the fit area.
+Relief comes from real elevation data (SRTM / Copernicus DEM) for mountain hexes, and from height maps generated in code for water ripples, vineyard furrows, and stones. QA checks: closed mesh, minimum printable thickness, and no relief in the fit area. The decorative layer comes after the MVP (see [MVP](#mvp)); MVP pieces are functional only.
 
 ### Plate layout
 
@@ -195,13 +195,40 @@ A Python server with FastMCP (official SDK). The game logic lives in `acequias/`
 
 ## Roadmap
 
-One milestone per phase, worked in order; 4 to 6 weeks at under 1 hour per day.
+One milestone per phase, worked in order; 4 to 6 weeks at under 1 hour per day. Milestones 1 to 5 are the MVP; milestone 6 holds everything after it.
 
 1. **Game logic:** hex model, board generation with modes, scoring with bodega bonus and bribe debt.
 2. **MCP server:** expose those tools with FastMCP and test them from Claude.
 3. **Simulation:** bots and `simulate_game` to tune points, rounds, market, dice, and both modes.
-4. **build123d pieces:** `generate_piece_stl`, with elevation relief and height maps.
-5. **Plate and printing:** `build_plate` and the first print on the A1.
+4. **build123d pieces:** `generate_piece_stl` for plain functional pieces: terrain hexes, the six canal shapes, floodgates, and tokens.
+5. **Plate and printing:** `build_plate`, 3MF plates, and the first print on the A1.
+6. **After the MVP (lower priority):** decorative relief, variants, and extras; started only once milestones 1 to 5 are closed.
+
+### MVP
+
+The MVP is a **playable, printable Acequias set** for 2 to 5 players, in Normal and Flash, run from Claude through the 5 MCP tools, with rules balanced by simulation.
+
+It is done when:
+
+- [ ] All 5 MCP tools work from Claude: `generate_board`, `calculate_score`, `simulate_game`, `generate_piece_stl`, `build_plate`
+- [ ] The full rules above play end to end in the engine, in both modes, with bots
+- [ ] Turn-order advantage is at most 10% in both modes, and the tuned values are recorded here
+- [ ] Every piece needed to play (terrain hexes, six canal shapes, floodgates, owner tokens, grape clusters, debt tokens) is generated as a closed STL and laid out on A1 plates as 3MF
+- [ ] The first test print passes its fit check (#34)
+- [ ] CI runs the whole suite on every pull request (#44)
+
+**In the MVP** (milestones 1–5): #3–#15, #17–#22, #28–#31, #33, #34, #44, #45.
+
+**After the MVP** (milestone 6, lower priority), each with its own issue:
+
+| Area | Issues |
+| --- | --- |
+| Looks | Height-map relief #16, real elevation relief #32, Blender shapes #36 |
+| Rule variants | Drought #23 and its marker #40, Flash race end #35 |
+| Tooling | STEP/3MF per piece #37, board picture #39, faster simulation #43, lookahead bot #42 |
+| Product | Full game-set piece list #38, rulebook, packaging, and cost #41 |
+
+MVP pieces are plain and functional; the decorative layer below comes after the MVP.
 
 ### Quality criteria
 

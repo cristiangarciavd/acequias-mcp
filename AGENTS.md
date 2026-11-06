@@ -9,6 +9,8 @@
   asking
 - "Do task N" means the full cycle in `_docs/process.md`: branch, implement,
   test, PR, merge, then a separate docs review
+- MVP first: milestones 1 to 5 are the MVP (`README.md`, Roadmap > MVP).
+  Do not pick up milestone 6 ("After the MVP") unless the user asks for it
 
 # Documents
 
