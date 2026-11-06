@@ -4,7 +4,12 @@ version = "0.1.0"
 description = "MCP server for Acequias, a 3D-printed hex board game about water and Mendoza vineyards"
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+    "mcp>=2.3,<3",
+]
+
+[project.scripts]
+acequias-server = "server.app:main"
 
 [dependency-groups]
 dev = [
