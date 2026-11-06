@@ -179,7 +179,7 @@ A Python server with FastMCP (official SDK). The game logic lives in `acequias/`
 
 ### Hex convention
 
-`acequias/hex.py`: hexes are **pointy-top**, so east and west are direct neighbors and the river runs along the west edge. `q` grows east and `r` south (`s = -q - r`). Pixel/mm positions put the origin hex at `(0, 0)`, with `x` east and `y` south. Hexes sort by `(q, r)`, the deterministic tie-break of the water-path rule.
+`acequias/hex.py`: hexes are **pointy-top**, so east and west are direct neighbors and the river runs along the west edge. `q` grows east and `r` south (`s = -q - r`). Pixel/mm positions put the origin hex at `(0, 0)`, with `x` east and `y` south. Hexes sort by `(q, r)`, the deterministic tie-break of the water-path rule. Sizes must be finite and greater than 0, or the conversions raise `ValueError`. `Direction.rotated(steps)` turns a direction `steps` × 60° counterclockwise, in `Direction` order (E → NE → NW → W → SW → SE); negative steps turn clockwise. `Hex.corners(size)` gives the 6 corner points in the same plane, counterclockwise from just below east (ESE, ENE, N, WNW, WSW, S), so the edge from corner `i` to `i + 1` faces the `i`-th `Direction`.
 
 ### Tech stack
 

@@ -1,4 +1,5 @@
 import ast
+import math
 import dataclasses
 import itertools
 from pathlib import Path
@@ -142,6 +143,156 @@ def test_pixel_spacing_matches_pointy_top_geometry():
 def test_point_near_a_center_maps_to_that_hex():
     x, y = Hex(2, -1).to_pixel(16.0)
     assert Hex.from_pixel(x + 3.0, y - 2.0, 16.0) == Hex(2, -1)
+
+
+# --- Size checks ------------------------------------------------------------
+
+BAD_SIZES = [0, 0.0, -1.0, -16]
+NON_FINITE_SIZES = [math.nan, math.inf, -math.inf]
+
+
+@pytest.mark.parametrize("size", BAD_SIZES)
+def test_to_pixel_rejects_non_positive_size(size):
+    with pytest.raises(ValueError, match="size"):
+        Hex(1, 2).to_pixel(size)
+
+
+@pytest.mark.parametrize("size", BAD_SIZES)
+def test_from_pixel_rejects_non_positive_size(size):
+    with pytest.raises(ValueError, match="size"):
+        Hex.from_pixel(3.0, 4.0, size)
+
+
+@pytest.mark.parametrize("size", BAD_SIZES)
+def test_corners_rejects_non_positive_size(size):
+    with pytest.raises(ValueError, match="size"):
+        Hex(1, 2).corners(size)
+
+
+@pytest.mark.parametrize("size", NON_FINITE_SIZES)
+def test_non_finite_size_is_rejected_everywhere(size):
+    with pytest.raises(ValueError, match="size"):
+        Hex(1, 2).to_pixel(size)
+    with pytest.raises(ValueError, match="size"):
+        Hex.from_pixel(3.0, 4.0, size)
+    with pytest.raises(ValueError, match="size"):
+        Hex(1, 2).corners(size)
+
+
+# --- Rotation ---------------------------------------------------------------
+
+DIRECTION_ORDER = [Direction.E, Direction.NE, Direction.NW, Direction.W, Direction.SW, Direction.SE]
+
+
+def test_rotating_one_step_follows_direction_order():
+    for i, d in enumerate(DIRECTION_ORDER):
+        assert d.rotated(1) == DIRECTION_ORDER[(i + 1) % 6]
+    assert Direction.E.rotated(1) == Direction.NE
+    assert Direction.SE.rotated(1) == Direction.E
+
+
+@pytest.mark.parametrize("d", list(Direction))
+def test_rotating_zero_steps_keeps_direction(d):
+    assert d.rotated(0) == d
+
+
+def test_negative_steps_turn_clockwise():
+    assert Direction.E.rotated(-1) == Direction.SE
+    assert Direction.NE.rotated(-1) == Direction.E
+    assert Direction.E.rotated(-2) == Direction.SW
+    for d in Direction:
+        assert d.rotated(1).rotated(-1) == d
+
+
+@pytest.mark.parametrize("d", list(Direction))
+@pytest.mark.parametrize("k", [-12, -6, 6, 12, 60])
+def test_multiples_of_six_give_the_same_direction(d, k):
+    assert d.rotated(k) == d
+    assert d.rotated(k + 2) == d.rotated(2)
+
+
+@pytest.mark.parametrize("d", list(Direction))
+def test_rotating_three_steps_is_the_opposite(d):
+    assert d.rotated(3) == d.opposite()
+
+
+@pytest.mark.parametrize("bad", [1.5, True, False, "1", None, 1.0])
+def test_rotated_rejects_non_int_steps(bad):
+    with pytest.raises(TypeError):
+        Direction.E.rotated(bad)
+
+
+# --- Corners ----------------------------------------------------------------
+
+SIZE = 16.0
+
+
+@pytest.mark.parametrize("h", SAMPLE)
+def test_corners_are_size_away_from_center(h):
+    cx, cy = h.to_pixel(SIZE)
+    corners = h.corners(SIZE)
+    assert len(corners) == 6
+    for x, y in corners:
+        assert math.hypot(x - cx, y - cy) == pytest.approx(SIZE)
+
+
+@pytest.mark.parametrize("h", SAMPLE)
+def test_neighboring_corners_are_size_apart(h):
+    corners = h.corners(SIZE)
+    for i in range(6):
+        (x1, y1), (x2, y2) = corners[i], corners[(i + 1) % 6]
+        assert math.hypot(x2 - x1, y2 - y1) == pytest.approx(SIZE)
+
+
+@pytest.mark.parametrize("h", SAMPLE)
+def test_hex_is_pointy_top(h):
+    cx, cy = h.to_pixel(SIZE)
+    corners = h.corners(SIZE)
+    north = min(corners, key=lambda p: p[1])
+    south = max(corners, key=lambda p: p[1])
+    assert north == pytest.approx((cx, cy - SIZE))
+    assert south == pytest.approx((cx, cy + SIZE))
+
+
+def test_corner_order_is_fixed():
+    s = SIZE
+    half = s / 2
+    w = s * math.sqrt(3) / 2
+    expected = [
+        (w, half),    # 0: ESE
+        (w, -half),   # 1: ENE
+        (0.0, -s),    # 2: N
+        (-w, -half),  # 3: WNW
+        (-w, half),   # 4: WSW
+        (0.0, s),     # 5: S
+    ]
+    for got, want in zip(ORIGIN.corners(s), expected, strict=True):
+        assert got == pytest.approx(want, abs=1e-9)
+
+
+@pytest.mark.parametrize("h", SAMPLE)
+@pytest.mark.parametrize("i, d", list(enumerate(Direction)))
+def test_edge_facing_a_direction_is_shared_with_that_neighbor(h, i, d):
+    # Edge i (corners i and i+1) faces list(Direction)[i]; on the neighbor it
+    # is the edge facing back, d.opposite(), with its two corners swapped.
+    mine = h.corners(SIZE)
+    edge = (mine[i], mine[(i + 1) % 6])
+    j = list(Direction).index(d.opposite())
+    theirs = h.neighbor(d).corners(SIZE)
+    their_edge = (theirs[(j + 1) % 6], theirs[j])
+    for (x1, y1), (x2, y2) in zip(edge, their_edge):
+        assert abs(x1 - x2) <= 1e-9 and abs(y1 - y2) <= 1e-9
+
+
+@pytest.mark.parametrize("d", list(Direction))
+def test_neighbor_shares_exactly_two_corners(d):
+    def close(p, q):
+        return abs(p[0] - q[0]) <= 1e-9 and abs(p[1] - q[1]) <= 1e-9
+
+    mine = ORIGIN.corners(SIZE)
+    theirs = ORIGIN.neighbor(d).corners(SIZE)
+    shared = [p for p in mine if any(close(p, q) for q in theirs)]
+    assert len(shared) == 2
 
 
 # --- Purity -----------------------------------------------------------------

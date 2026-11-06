@@ -78,6 +78,7 @@ class Hex:
         The origin hex is at ``(0, 0)``; ``x`` grows east and ``y`` grows
         south, in the same units as ``size`` (e.g. mm).
         """
+        _check_size(size)
         x = size * (SQRT3 * self.q + SQRT3 / 2 * self.r)
         y = size * (1.5 * self.r)
         return (x, y)
@@ -85,9 +86,33 @@ class Hex:
     @classmethod
     def from_pixel(cls, x: float, y: float, size: float) -> Hex:
         """The hex containing point ``(x, y)``, for hexes of side ``size``."""
+        _check_size(size)
         q = (SQRT3 / 3 * x - y / 3) / size
         r = (2 / 3 * y) / size
         return _round(q, r)
+
+    def corners(self, size: float) -> tuple[tuple[float, float], ...]:
+        """The 6 corner points of this hex, for hexes of side ``size``.
+
+        Points are in the same plane and units as ``to_pixel`` (``x`` east,
+        ``y`` south). The hex is pointy-top, so one corner points straight
+        north and one straight south.
+
+        Corners go counterclockwise (as seen on the board, north up),
+        starting just below east: corner ``i`` sits at ``60 * i - 30``
+        degrees counterclockwise from east. So the order is ESE, ENE, N,
+        WNW, WSW, S, and the edge from corner ``i`` to corner ``i + 1``
+        (mod 6) faces ``list(Direction)[i]``: corners 0-1 face E, 1-2 NE,
+        2-3 NW, 3-4 W, 4-5 SW, 5-0 SE.
+        """
+        _check_size(size)
+        cx, cy = self.to_pixel(size)
+        points = []
+        for i in range(6):
+            angle = math.radians(60 * i - 30)
+            # y grows south, so counterclockwise on the board means -sin.
+            points.append((cx + size * math.cos(angle), cy - size * math.sin(angle)))
+        return tuple(points)
 
 
 class Direction(Enum):
@@ -108,6 +133,24 @@ class Direction(Enum):
         """The direction pointing the other way (E <-> W, NE <-> SW, NW <-> SE)."""
         members = list(Direction)
         return members[(members.index(self) + 3) % 6]
+
+    def rotated(self, steps: int) -> Direction:
+        """This direction turned ``steps`` x 60 degrees counterclockwise.
+
+        Counterclockwise follows ``Direction`` order (E -> NE -> NW -> W ->
+        SW -> SE -> E); negative ``steps`` turn clockwise, and any multiple
+        of 6 gives the same direction.
+        """
+        if not isinstance(steps, int) or isinstance(steps, bool):
+            raise TypeError(f"steps must be an int, got {steps!r}")
+        members = list(Direction)
+        return members[(members.index(self) + steps) % 6]
+
+
+def _check_size(size: float) -> None:
+    """Reject a hex size that is not a finite positive number."""
+    if not (math.isfinite(size) and size > 0):
+        raise ValueError(f"size must be a finite number > 0, got {size!r}")
 
 
 def _round(q: float, r: float) -> Hex:
