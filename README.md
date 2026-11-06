@@ -4,7 +4,7 @@
 
 Acequias is a competitive board game for 2 to 5 players with 3D-printed hex pieces. Players build canals to carry water from the mountains to the vineyards of Mendoza. This repo holds an MCP server that generates balanced boards, scores games, simulates them with bots to tune the rules, and outputs printable STL pieces for a Bambu Lab A1.
 
-> **Status:** early development. Milestones 1 (game logic) and 2 (MCP server) are done: the server exposes `generate_board` and `calculate_score`. The simulation (turn engine, bots, `simulate_game`) comes next. Progress is tracked in the [GitHub issues](../../issues) and [milestones](../../milestones).
+> **Status:** early development. Milestones 1 (game logic) and 2 (MCP server) are done: the server exposes `generate_board` and `calculate_score`. Milestone 3 (simulation) is under way: game setup and the turn engine are done; the round loop, bots, and `simulate_game` come next. Progress is tracked in the [GitHub issues](../../issues) and [milestones](../../milestones).
 
 This README is the project's specification: game rules, design decisions, architecture, and roadmap. Task details live in the GitHub issues.
 
@@ -31,7 +31,7 @@ Whoever scores the most points when the harvest ends, after a fixed number of ro
 
 1. The MCP generates a balanced map for the number of players and the mode. No vineyard is ever next to the river: each needs at least one canal to be watered.
 2. The west edge is the river (the mountains); all water flows from there.
-3. Four pieces from the bag (canals and floodgates) are placed face up: the market.
+3. The bag holds one piece per empty hex (the board's canalizable capacity), split by the bag mix. It is shuffled and four pieces are placed face up: the market. There is no redraw, even if the market holds only floodgates.
 4. A start player is chosen; the start player rotates each round.
 
 ### Turn
@@ -39,10 +39,12 @@ Whoever scores the most points when the harvest ends, after a fixed number of ro
 On your turn you take **one action**:
 
 - **A. Place a piece.** Take a piece from the market (it is refilled from the bag; when the bag is empty the market shrinks).
-  - A **canal** goes on an empty hex, with your owner token. At least one of its openings must line up with the river or with an opening of any canal already on the board, even a dry one. Its other openings may face anything: dead ends are allowed.
+  - A **canal** goes on an empty hex, with your owner token. At least one of its openings must line up with the river or with an opening of any canal already on the board, even a dry one or one closed by a floodgate. Its other openings may face anything: dead ends are allowed.
   - A **floodgate** goes on any open opening of any canal on the board, yours or a rival's (see [Floodgate](#floodgate)).
 - **B. Bribe (_coima_).** See [Bribe](#bribe-coima).
 - **Pass**, only when you have nothing you can place. Bribing is never forced.
+
+Rules note: a small board can lock up. Once every canal opening faces another canal, stone, a vineyard, or the board edge, no canal can be placed anywhere; if no floodgate can be placed or bribed either, **Pass** is the only legal action for the rest of the game. This follows the rules as written; the round loop still ends at its round count.
 
 ### Water flow
 
@@ -205,7 +207,15 @@ A Python server built on `MCPServer` from the official `mcp` SDK (formerly FastM
 
 ### Scoring
 
-`acequias/scoring.py`: `calculate_score(state, preset=None)` scores a `GameState` as given, whatever its round, and changes nothing; with `preset=None` the bodega values come from `preset(state.mode)`, and a preset from `with_overrides` replaces them. It returns a read-only mapping of player id → `Score`, in seat order, with the terms `vineyards`, `bodega`, `rights_paid`, `rights_collected`, `debt`, and `total` (the names the MCP tool exposes), plus `watered` (the tie-break count) and `watered_vineyards`: each watered claimed vineyard in hex order, with its varietal, its `WaterPath`, and the rivals it `pays` in seat order. `winners(scores)` returns the winning ids in seat order: highest `total`, then highest `watered`, otherwise a shared win. Debt is only read from `Player.debt`; bribes add to it.
+`acequias/scoring.py`: `calculate_score(state, preset=None)` scores a `GameState` as given, whatever its round, and changes nothing; with `preset=None` the bodega values come from `state.preset`, or `preset(state.mode)` when that is `None`, and an explicit preset from `with_overrides` replaces them. It returns a read-only mapping of player id → `Score`, in seat order, with the terms `vineyards`, `bodega`, `rights_paid`, `rights_collected`, `debt`, and `total` (the names the MCP tool exposes), plus `watered` (the tie-break count) and `watered_vineyards`: each watered claimed vineyard in hex order, with its varietal, its `WaterPath`, and the rivals it `pays` in seat order. `winners(scores)` returns the winning ids in seat order: highest `total`, then highest `watered`, otherwise a shared win. Debt is only read from `Player.debt`; bribes add to it.
+
+### Game setup
+
+`acequias/setup.py`: `new_game(players, seed, mode, *, preset=None)` returns the starting `GameState`: the board from `generate_board` with the same arguments, players `"p1"` to `"pN"` in seats 1 to N with no debt, round 1, and `current_player` equal to `start_player`. It always sets `GameState.preset` to the preset it used (the shipped one when none is passed); every later step (turn engine, round loop, scoring, simulation) reads the game's numbers from `state.preset` and keeps it in every state it builds. `GameState.preset` may be `None` only on hand-built states, which then fall back to `preset(state.mode)`. `bag_counts(total, preset)` splits the bag by `bag_mix` with the largest remainder method (ties in `PieceKind` order). One `random.Random(seed)` shuffles the pieces and then picks the start player; the market is the first `market_size` pieces and the bag the rest, with `bag[0]` the next piece drawn.
+
+### Turn engine
+
+`acequias/turn.py`: the actions are frozen dataclasses `PlaceCanal(kind, hex, rotation)`, `PlaceFloodgate(hex, direction)`, `Bribe(hex, direction, to=None)` (`to=(hex, direction)` moves the floodgate, `None` removes it), and `Pass()`. `apply(state, player, action, rng)` returns a new state and never changes its input; it leaves `current_player`, `start_player`, and `round` untouched, since turn order belongs to the round loop. The caller owns `rng`: only a legal bribe draws from it, with exactly one `rng.randint(1, die_faces)` after every check, so replaying a game needs the same `rng` stream. A placement takes the first copy of its kind from the market and appends `bag[0]`. An illegal action raises `IllegalAction` (a `ValueError`) naming the broken rule; an unknown player raises `ValueError` and a non-action `TypeError`. `legal_actions(state, player)` returns every legal action once, in a fixed order (canals, floodgates, bribes, then pass), in a canonical spelling: the smallest rotation that opens the same edges, and a floodgate edge named from the canal side with the smaller hex. `apply` accepts any equivalent spelling and gives the same state.
 
 ### Board JSON
 
