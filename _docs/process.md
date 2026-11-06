@@ -25,7 +25,9 @@
    (the whole suite, so earlier tasks are not broken)
 4. Push the branch and open a PR whose body includes `Closes #<issue>`;
    give the PR the issue's milestone
-5. Merge on GitHub with a merge commit, delete the branch, and update `main`
+5. Wait for CI (the `Tests` workflow) to finish on the PR. Merge only when
+   every job is green; if one fails, fix it on the branch first. Then merge on
+   GitHub with a merge commit, delete the branch, and update `main`
 6. Review the documentation (`README.md`, `AGENTS.md`, `_docs/`) against what
    the task changed or decided. If something needs updating, do it as a
    separate change: its own `docs-<slug>` branch, commit, PR, and merge
@@ -33,5 +35,6 @@
 ## Git rules
 
 - Never commit straight to `main`; every change goes through a pull request
+- A pull request is merged only when CI is green
 - Documentation changes not tied to the task go on their own branch and PR
   (step 6), never mixed into the task's PR
