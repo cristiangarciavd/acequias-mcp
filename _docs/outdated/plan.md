@@ -1,3 +1,5 @@
+> **OUTDATED — do not use as context.** This file is kept only for history. `README.md` (specification) and the GitHub issues (tasks) replace it. Agents: do not read further unless the user asked for this file by name.
+
 # Acequias — Game and MCP Specification
 
 _Updated: 2026-11-05_

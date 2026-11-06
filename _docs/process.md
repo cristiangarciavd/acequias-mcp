@@ -1,9 +1,13 @@
 # Process
 
+## Roles
+
+- PM - grooms a task before anyone implements it, follows `_docs/team/pm.md`
+
 ## Tasks
 
 - Tasks are GitHub issues, one at a time
-- Milestones follow the phases in `plan.md`; work through them in order
+- Milestones follow the phases in the README roadmap; work through them in order
 - Check an issue's "Depends on" list before starting it
 - Read the acceptance criteria before starting and before closing
 
