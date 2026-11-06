@@ -167,7 +167,9 @@ def test_same_board_in_a_fresh_process_with_another_hash_seed():
     )
     outputs = []
     for hash_seed in ("1", "12345"):
-        env = dict(os.environ, PYTHONHASHSEED=hash_seed)
+        # The child writes UTF-8 whatever the platform or the inherited
+        # environment says, so it matches the parent's decoding below.
+        env = dict(os.environ, PYTHONHASHSEED=hash_seed, PYTHONIOENCODING="utf-8")
         result = subprocess.run(
             [sys.executable, "-c", script],
             capture_output=True,
