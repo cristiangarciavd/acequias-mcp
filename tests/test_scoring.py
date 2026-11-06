@@ -124,11 +124,14 @@ def test_every_player_gets_a_breakdown_with_every_field():
         ):
             assert isinstance(getattr(s, name), int)
     assert_total_formula(scores)
+    assert_rights_balance(scores)
 
 
 def test_scores_are_listed_in_seat_order():
     state = make_state(players=("a", "b", "c"), seats={"a": 2, "b": 0, "c": 1})
-    assert list(calculate_score(state)) == ["b", "c", "a"]
+    scores = calculate_score(state)
+    assert list(scores) == ["b", "c", "a"]
+    assert_rights_balance(scores)
 
 
 def test_breakdown_lists_each_watered_vineyard_with_path_and_rivals_paid():
@@ -153,10 +156,12 @@ def test_breakdown_lists_each_watered_vineyard_with_path_and_rivals_paid():
 
 def test_a_player_with_nothing_scores_zero_on_every_term():
     state = make_state([lane(0, ["a"], claimant="a")])
-    b = calculate_score(state)["b"]
+    scores = calculate_score(state)
+    b = scores["b"]
     assert terms(b) == (0, 0, 0, 0, 0, 0)
     assert b.watered == 0
     assert b.watered_vineyards == ()
+    assert_rights_balance(scores)
 
 
 def test_totals_can_be_negative():
@@ -177,6 +182,7 @@ def test_a_state_with_no_canals_scores_only_debt_whatever_the_round():
         assert terms(scores["b"]) == (0, 0, 0, 0, 0, 0)
         assert terms(scores["c"]) == (0, 0, 0, 0, 5, -5)
         assert all(s.watered == 0 for s in scores.values())
+        assert_rights_balance(scores)
 
 
 def test_the_state_is_not_changed_and_calls_are_repeatable():
@@ -217,7 +223,9 @@ def test_rejects_a_non_state_and_a_non_preset():
 def test_the_highest_total_wins():
     # a: Malbec 3. b: Bonarda 2. c: nothing.
     state = make_state([lane(0, ["a"], MALBEC, "a"), lane(1, ["b"], BONARDA, "b")])
-    assert winners(calculate_score(state)) == ("a",)
+    scores = calculate_score(state)
+    assert winners(scores) == ("a",)
+    assert_rights_balance(scores)
 
 
 def test_a_tie_on_total_goes_to_more_watered_vineyards():
@@ -232,6 +240,7 @@ def test_a_tie_on_total_goes_to_more_watered_vineyards():
     scores = calculate_score(state)
     assert scores["a"].total == scores["b"].total == 3
     assert winners(scores) == ("b",)
+    assert_rights_balance(scores)
 
 
 def test_a_full_tie_is_a_shared_win_in_seat_order():
@@ -240,11 +249,15 @@ def test_a_full_tie_is_a_shared_win_in_seat_order():
         [lane(0, ["a"], BONARDA, "a"), lane(1, ["c"], BONARDA, "c")],
         seats={"a": 2, "b": 1, "c": 0},
     )
-    assert winners(calculate_score(state)) == ("c", "a")
+    scores = calculate_score(state)
+    assert winners(scores) == ("c", "a")
+    assert_rights_balance(scores)
 
 
 def test_everyone_with_nothing_shares_the_win():
-    assert winners(calculate_score(make_state())) == ("a", "b", "c")
+    scores = calculate_score(make_state())
+    assert winners(scores) == ("a", "b", "c")
+    assert_rights_balance(scores)
 
 
 # --- Vineyards ---------------------------------------------------------------
@@ -260,9 +273,10 @@ def test_vineyard_values_add_the_varietal_points_of_watered_claims():
             lane(3, ["a"], MALBEC, "a"),
         ]
     )
-    a = calculate_score(state)["a"]
-    assert a.vineyards == 9
-    assert a.watered == 4
+    scores = calculate_score(state)
+    assert scores["a"].vineyards == 9
+    assert scores["a"].watered == 4
+    assert_rights_balance(scores)
 
 
 def test_a_dry_claimed_vineyard_scores_nothing():
@@ -363,6 +377,7 @@ def test_normal_bodega_bonus_for_three_varietals():
     # 3 + 2 + 1 = 6, plus the bonus of 2.
     assert terms(scores["a"]) == (6, 2, 0, 0, 0, 8)
     assert scores["b"].bodega == 0
+    assert_rights_balance(scores)
 
 
 def test_flash_bodega_bonus_for_three_varietals():
@@ -370,6 +385,7 @@ def test_flash_bodega_bonus_for_three_varietals():
     scores = calculate_score(make_state(all_three(), mode=Mode.FLASH))
     # 3 + 2 + 1 = 6, plus the bonus of 1.
     assert terms(scores["a"]) == (6, 1, 0, 0, 0, 7)
+    assert_rights_balance(scores)
 
 
 def test_duplicate_varietals_count_once():
@@ -381,23 +397,32 @@ def test_duplicate_varietals_count_once():
             lane(2, ["a"], BONARDA, "a"),
         ]
     )
-    assert terms(calculate_score(state)["a"]) == (8, 0, 0, 0, 0, 8)
+    scores = calculate_score(state)
+    assert terms(scores["a"]) == (8, 0, 0, 0, 0, 8)
+    assert_rights_balance(scores)
 
 
 def test_no_preset_uses_the_mode_preset():
     state = make_state(all_three(), mode=Mode.FLASH)
-    assert calculate_score(state) == calculate_score(state, preset(Mode.FLASH))
-    assert calculate_score(state) != calculate_score(state, NORMAL)
+    scores = calculate_score(state)
+    assert scores == calculate_score(state, preset(Mode.FLASH))
+    assert scores != calculate_score(state, NORMAL)
+    assert_rights_balance(scores)
 
 
 def test_a_preset_passed_in_is_used_instead():
     # Malbec + Bonarda: no bonus by default, +2 when two varietals are enough.
     state = make_state([lane(0, ["a"], MALBEC, "a"), lane(1, ["a"], BONARDA, "a")])
-    assert calculate_score(state)["a"].bodega == 0
+    default = calculate_score(state)
+    assert default["a"].bodega == 0
     two = with_overrides(NORMAL, bodega_varietals=2)
-    assert terms(calculate_score(state, two)["a"]) == (5, 2, 0, 0, 0, 7)
+    with_two = calculate_score(state, two)
+    assert terms(with_two["a"]) == (5, 2, 0, 0, 0, 7)
     three_points = with_overrides(NORMAL, bodega_varietals=2, bodega_points=3)
-    assert calculate_score(state, three_points)["a"].bodega == 3
+    with_three = calculate_score(state, three_points)
+    assert with_three["a"].bodega == 3
+    for scores in (default, with_two, with_three):
+        assert_rights_balance(scores)
 
 
 def test_debt_is_subtracted_in_full():
@@ -405,6 +430,7 @@ def test_debt_is_subtracted_in_full():
     scores = calculate_score(state)
     assert terms(scores["a"]) == (3, 0, 0, 0, 7, -4)
     assert terms(scores["b"]) == (0, 0, 0, 0, 3, -3)
+    assert_rights_balance(scores)
 
 
 # --- A full hand-worked game -------------------------------------------------
