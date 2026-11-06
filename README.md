@@ -4,7 +4,7 @@
 
 Acequias is a competitive board game for 2 to 5 players with 3D-printed hex pieces. Players build canals to carry water from the mountains to the vineyards of Mendoza. This repo holds an MCP server that generates balanced boards, scores games, simulates them with bots to tune the rules, and outputs printable STL pieces for a Bambu Lab A1.
 
-> **Status:** early development. Milestones 1 (game logic) and 2 (MCP server) are done: the server exposes `generate_board` and `calculate_score`. Milestone 3 (simulation) is under way: game setup and the turn engine are done; the round loop, bots, and `simulate_game` come next. Progress is tracked in the [GitHub issues](../../issues) and [milestones](../../milestones).
+> **Status:** early development. Milestones 1 (game logic) and 2 (MCP server) are done: the server exposes `generate_board` and `calculate_score`. Milestone 3 (simulation) is under way: game setup, the turn engine, the round loop, and the random and greedy bots are done; the floodgate-and-bribe bot and `simulate_game` come next. Progress is tracked in the [GitHub issues](../../issues) and [milestones](../../milestones).
 
 This README is the project's specification: game rules, design decisions, architecture, and roadmap. Task details live in the GitHub issues.
 
@@ -70,7 +70,7 @@ After **any** action (a placement or a bribe), the acting player claims **every*
 
 ### Turn order (_turnos de riego_)
 
-The start player rotates each round, like the real watering turns of Mendoza's acequias, so no seat keeps the turn-order advantage (target: at most 10%).
+Each round, every player takes one turn in seat order, starting with the start player and wrapping around. The start player moves to the next seat each round, like the real watering turns of Mendoza's acequias, so no seat keeps the turn-order advantage (target: at most 10%).
 
 ### Water rights
 
@@ -216,6 +216,14 @@ A Python server built on `MCPServer` from the official `mcp` SDK (formerly FastM
 ### Turn engine
 
 `acequias/turn.py`: the actions are frozen dataclasses `PlaceCanal(kind, hex, rotation)`, `PlaceFloodgate(hex, direction)`, `Bribe(hex, direction, to=None)` (`to=(hex, direction)` moves the floodgate, `None` removes it), and `Pass()`. `apply(state, player, action, rng)` returns a new state and never changes its input; it leaves `current_player`, `start_player`, and `round` untouched, since turn order belongs to the round loop. The caller owns `rng`: only a legal bribe draws from it, with exactly one `rng.randint(1, die_faces)` after every check, so replaying a game needs the same `rng` stream. A placement takes the first copy of its kind from the market and appends `bag[0]`. An illegal action raises `IllegalAction` (a `ValueError`) naming the broken rule; an unknown player raises `ValueError` and a non-action `TypeError`. `legal_actions(state, player)` returns every legal action once, in a fixed order (canals, floodgates, bribes, then pass), in a canonical spelling: the smallest rotation that opens the same edges, and a floodgate edge named from the canal side with the smaller hex. `apply` accepts any equivalent spelling and gives the same state.
+
+### Round loop
+
+`acequias/game.py`: a turn is one action, through `act(state, player, action, rng)`, which checks that it is `state.current_player`'s turn and that the game is not over (before `apply`, so `rng` is untouched on a refusal), then advances the turn. `turn_order(state, round)` gives the acting order of any round: seat order (by `Player.seat`, wrapping), from that round's start player, which moves to the next seat each round. The round count is `rounds_for(len(players))` from `state.preset` (or `preset(state.mode)`); after the last turn the state has `round == rounds + 1`, which is what `game_over(state)` checks, so no `GameState` field marks the end. `play_game(state, bots, dice_rng, bot_rng)` plays to the end and returns the final state and a log of `TurnRecord(round, player, action)`; a bot's illegal action raises, it never becomes a pass. Dice and bots draw from separate RNGs, so the dice stream does not depend on how many numbers the bots draw: `replay(state, log, dice_rng)` rebuilds the final state from the log with a same-seeded `dice_rng` and no bots. `game_rngs(seed)` returns `(dice_rng, bot_rng)`, seeded from strings so both differ from `new_game`'s `random.Random(seed)`; a game is identified by `new_game`'s arguments, the seed, and the bot policies.
+
+### Bots
+
+`acequias/bots.py`: a bot is a plain function `decide(state, player, rng)` (the `Bot` type in `game.py`) that returns one element of `legal_actions(state, player)`, keeps no state, and draws only from `rng`. `POLICIES` maps names to bots (read-only) and `policy(name)` looks one up, listing the valid names when it is unknown. `random` picks with one `rng.choice` over every legal action. `greedy` weighs only this move and only vineyard points, with no lookahead: the canal that claims the most points now, else the one nearest the most valuable unclaimed vineyard, else a floodgate on a rival's canal; it never bribes, passing instead, and breaks ties with `rng.choice`.
 
 ### Board JSON
 
