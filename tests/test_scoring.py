@@ -139,7 +139,9 @@ def test_breakdown_lists_each_watered_vineyard_with_path_and_rivals_paid():
     ]
     state = make_state(lanes)
     paths = water(state.board)
-    a = calculate_score(state)["a"]
+    scores = calculate_score(state)
+    a = scores["a"]
+    assert_rights_balance(scores)
 
     assert a.watered == 2
     # Listed in hex order: (2, 2) before (4, 0).
@@ -185,6 +187,7 @@ def test_the_state_is_not_changed_and_calls_are_repeatable():
     second = calculate_score(state)
     assert state == copy
     assert first == second
+    assert_rights_balance(first)
 
 
 def test_results_are_immutable():
