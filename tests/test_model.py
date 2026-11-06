@@ -536,13 +536,30 @@ def test_board_does_not_share_the_input_list():
 # --- Dependencies ----------------------------------------------------------
 
 
-def test_model_imports_only_hex_from_acequias_at_module_level():
+def _lazy_or_type_checking_nodes(tree):
+    """Ids of every node inside a function or an ``if TYPE_CHECKING:`` block."""
+    nodes = set()
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) or (
+            isinstance(node, ast.If) and getattr(node.test, "id", None) == "TYPE_CHECKING"
+        ):
+            nodes.update(id(n) for n in ast.walk(node))
+    return nodes
+
+
+def test_model_imports_only_hex_from_acequias():
+    # config imports model, so model may import acequias.config only under
+    # TYPE_CHECKING or inside a function, never when it is loaded.
     source = Path(__file__).resolve().parent.parent.joinpath("acequias", "model.py")
     tree = ast.parse(source.read_text("utf-8"))
-    for node in tree.body:
+    lazy = _lazy_or_type_checking_nodes(tree)
+    for node in ast.walk(tree):
         if isinstance(node, ast.ImportFrom) and node.module:
             if node.module.startswith("acequias"):
-                assert node.module == "acequias.hex"
+                if node.module == "acequias.config":
+                    assert id(node) in lazy
+                else:
+                    assert node.module == "acequias.hex"
             else:
                 assert node.module.split(".")[0] in {
                     "__future__",
@@ -555,25 +572,3 @@ def test_model_imports_only_hex_from_acequias_at_module_level():
         elif isinstance(node, ast.Import):
             for alias in node.names:
                 assert not alias.name.startswith("acequias")
-
-
-def test_model_imports_config_only_for_type_checking_or_lazily():
-    # config imports model, so model may import config only under
-    # TYPE_CHECKING or inside a function, never when it is loaded.
-    source = Path(__file__).resolve().parent.parent.joinpath("acequias", "model.py")
-    tree = ast.parse(source.read_text("utf-8"))
-    allowed = set()
-    for node in ast.walk(tree):
-        if isinstance(node, ast.FunctionDef):
-            allowed.update(id(n) for n in ast.walk(node))
-        elif isinstance(node, ast.If) and getattr(node.test, "id", None) == "TYPE_CHECKING":
-            allowed.update(id(n) for n in ast.walk(node))
-    for node in ast.walk(tree):
-        if isinstance(node, ast.ImportFrom):
-            names = [node.module or ""]
-        elif isinstance(node, ast.Import):
-            names = [alias.name for alias in node.names]
-        else:
-            continue
-        if any(n.startswith("acequias") and n != "acequias.hex" for n in names):
-            assert id(node) in allowed
