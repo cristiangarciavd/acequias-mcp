@@ -18,7 +18,8 @@ Whoever scores the most points when the harvest ends, after a fixed number of ro
 | --- | --- |
 | Terrain hexes | River, vineyard, stone, empty |
 | Vineyards | Neutral, valued by varietal: Malbec 3 pts, Bonarda 2 pts, Torrontés 1 pt |
-| Canal pieces (neutral) | Straight, gentle curve, sharp curve, Y-junction, floodgate |
+| Canal pieces (neutral) | Six shapes: straight, gentle curve, sharp curve, symmetric Y, T branch, claw (see [Water flow](#water-flow)) |
+| Floodgates | Small gates that close one opening of a canal piece (see [Floodgate](#floodgate)) |
 | Owner tokens | One per placed canal, in each player's color |
 | Grape clusters | Mark a claimed vineyard, in each player's color |
 | Debt tokens | Track each player's accumulated bribe debt |
@@ -26,21 +27,42 @@ Whoever scores the most points when the harvest ends, after a fixed number of ro
 
 ### Setup
 
-1. The MCP generates a balanced map for the number of players and the mode.
+1. The MCP generates a balanced map for the number of players and the mode. No vineyard is ever next to the river: each needs at least one canal to be watered.
 2. The west edge is the river (the mountains); all water flows from there.
-3. Four canal pieces are placed face up: the market.
+3. Four pieces from the bag (canals and floodgates) are placed face up: the market.
 4. A start player is chosen; the start player rotates each round.
 
 ### Turn
 
 On your turn you take **one action**:
 
-- **A. Place a piece.** Take a piece from the market (it is refilled from the bag), place it connected to the existing network, and slot in your owner token. If the move connects an unclaimed vineyard to the river, claim it with your grape cluster.
+- **A. Place a piece.** Take a piece from the market (it is refilled from the bag; when the bag is empty the market shrinks).
+  - A **canal** goes on an empty hex, with your owner token. At least one of its openings must line up with the river or with an opening of any canal already on the board, even a dry one. Its other openings may face anything: dead ends are allowed.
+  - A **floodgate** goes on any open opening of any canal on the board, yours or a rival's (see [Floodgate](#floodgate)).
 - **B. Bribe (_coima_).** See [Bribe](#bribe-coima).
+- **Pass**, only when you have nothing you can place. Bribing is never forced.
+
+### Water flow
+
+- Water enters a canal through an opening that faces the river.
+- Water crosses between two neighbouring canals only where **both** have an opening facing each other.
+- Inside a piece, water reaches all of its openings.
+- A vineyard is watered when a canal carrying water has an opening facing it. Vineyards are **end points**: water does not pass through them.
+
+Canal shapes, by the hex edges they open (pointy-top hexes, so the edges face E, NE, NW, W, SW, SE; rotate a piece to point it any way):
+
+| Shape | Openings at rotation 0 |
+| --- | --- |
+| Straight | E, W (opposite edges) |
+| Gentle curve | E, NW (two edges apart) |
+| Sharp curve | E, NE (neighbouring edges) |
+| Symmetric Y | E, NW, SW (every other edge) |
+| T branch | E, W, NE (a straight line with one side branch) |
+| Claw | E, NE, NW (three neighbouring edges) |
 
 ### Claims and watering
 
-A claim is permanent: once your grape cluster is on a vineyard, nobody else can claim it, even if its water is later cut off. But a vineyard only scores if it is **watered** (connected to the river) on the final board. A claimed vineyard that ends dry scores 0 and pays no water rights. Its owner can water it again by reconnecting it, or by bribing away the floodgate that blocks it.
+After **any** action (a placement or a bribe), the acting player claims **every** unclaimed vineyard that is now watered. A claim is permanent: once your grape cluster is on a vineyard, nobody else can claim it, even if its water is later cut off. But a vineyard only scores if it is **watered** (connected to the river) on the final board. A claimed vineyard that ends dry scores 0 and pays no water rights. Its owner can water it again by reconnecting it, or by bribing away the floodgate that blocks it.
 
 ### Turn order (_turnos de riego_)
 
@@ -48,7 +70,7 @@ The start player rotates each round, like the real watering turns of Mendoza's a
 
 ### Water rights
 
-If the water reaching your vineyard passes through other players' canals, you pay **1 point to each distinct other player** whose canals are on that path (not per canal). Water rights are settled **at the end of the game**, from the final board.
+If the water reaching your vineyard passes through other players' canals, you pay **1 point to each distinct other player** whose canals are on that path (not per canal). Each vineyard pays separately: two of your vineyards fed through the same rival pay that rival 2. Water rights are settled **at the end of the game**, from the final board.
 
 When a vineyard can be reached by more than one path, the water takes the **cheapest path for the vineyard's owner**:
 
@@ -60,21 +82,27 @@ This rewards building your own bypass: a longer route of your own canals stops y
 
 ### Floodgate
 
-The attack-and-defense piece: it blocks or diverts water. It is placed like any canal piece and can later be removed or moved only by a bribe.
+The attack-and-defense piece. A floodgate is a small gate placed on **one opening** of a canal piece (any player's), and water cannot cross that edge in either direction:
+
+- On a piece's **entrance**, it blocks all the water coming in, so that piece and everything downstream go dry.
+- On one **exit**, it blocks only that way onward; the piece's other exits keep flowing.
+- On an opening facing the river it closes that intake; on one facing a vineyard it cuts that vineyard off.
+
+Only one floodgate fits on an edge. Once placed, it can be removed or moved only by a bribe.
 
 ### Bribe (coima)
 
 Instead of placing a piece, you may bribe to remove or move one floodgate on the board, yours or an opponent's:
 
 1. Roll the d6 and add the result to your public **debt**.
-2. **Remove** the floodgate (back to the supply) or **move** it to another legal, connected position.
+2. **Remove** the floodgate (it leaves the game for good) or **move** it to another open edge of a canal.
 3. Water re-flows immediately.
 
 Debt is subtracted from your final score, so a bribe is a gamble (it costs 1 to 6), and the growing cost keeps floodgate wars in check.
 
 ### Bodega bonus
 
-A player whose watered vineyards include **each** varietal (Malbec, Bonarda, Torrontés) earns **+2**: a winery wants its blend. Flash reduces it (see Game modes).
+A player whose watered vineyards include **each** varietal (Malbec, Bonarda, Torrontés) earns **+2**: a winery wants its blend. In Flash it is **+1**, still for all three.
 
 ### Game modes
 
@@ -83,7 +111,7 @@ A player whose watered vineyards include **each** varietal (Malbec, Bonarda, Tor
 | **Normal** | ~12 | ~12 hexes/player (2p 24 · 3p 36 · 4p 48 · 5p 60) | ~45–60 min |
 | **Flash** | ~5 | ~7 hexes/player, river one row closer to the vineyards | ~10–20 min |
 
-Flash is shorter in two ways: fewer rounds, and a denser board where vineyards connect in 1–2 pieces instead of 3–4. Its bodega bonus is reduced (+1, or only 2 varietals required). All values are provisional and tuned by the simulation.
+Flash is shorter in two ways: fewer rounds, and a denser board where vineyards connect in 1–2 pieces instead of 3–4. Its bodega bonus is reduced to +1. Both modes start with 2 vineyards per player and 10% stone hexes. All values are provisional and tuned by the simulation.
 
 ### End and scoring
 
@@ -93,12 +121,22 @@ After the last round, each player scores:
 
 Only watered vineyards count toward vineyard values, the bodega bonus, and water rights.
 
+The highest score wins. On a tie, the tied player with more watered vineyards wins; if that is tied too, the win is shared.
+
+### Variants (under evaluation)
+
+Optional rules, off by default, kept only if the simulation shows they help:
+
+- **Flash race end:** the first player to claim a 2nd vineyard ends the round; then score.
+- **Drought (_sequía_):** in some mid-game rounds part of the river runs dry. It never falls on the last round, so final scoring always uses the full river.
+
 ## Physical pieces
 
 All pieces are parametric build123d models printed on the Bambu Lab A1 (256 × 256 mm plate, 0.4 mm nozzle, PLA). The d6 is not printed.
 
 - **Terrain hexes:** hexagonal prism, with relief depending on type
 - **Canal pieces:** hexagon with a groove; neutral, single-color
+- **Floodgates:** small gates that slot into the groove at one opening
 - **Owner tokens:** small marker that fits a hole in the canal; in each player's color
 - **Grape clusters:** figure that rests on the claimed vineyard
 - **Debt tokens:** small markers, printed in small batches
@@ -170,7 +208,7 @@ One milestone per phase, worked in order; 4 to 6 weeks at under 1 hour per day.
 - [ ] Each tool has unit tests with pytest
 - [ ] Every generated board has at least one reachable vineyard per player
 - [ ] Turn-order advantage is at most 10%, in Normal and in Flash separately
-- [ ] A Normal game takes about 45–60 min and a Flash game 10–20 min (by turn count)
+- [ ] A Normal game takes about 45–60 min and a Flash game 10–20 min, estimated at 1 minute per turn
 - [ ] Each STL is a closed solid and fits with the other pieces
 
 ### Open questions
@@ -180,11 +218,14 @@ Provisional defaults let work start; the simulation (or CAD, for physical values
 - [ ] Normal rounds: default 12
 - [ ] Flash rounds per player count: default ~5, aiming at 10–20 min
 - [ ] Hexes per player: Normal ~12, Flash ~7
-- [ ] Bag mix: straight 40% · gentle curve 20% · sharp curve 15% · Y-junction 15% · floodgate 10%, sized to board capacity
+- [ ] Bag mix: straight 40% · gentle curve 20% · sharp curve 15% · symmetric Y 5% · T branch 5% · claw 5% · floodgate 10%, sized to board capacity
+- [ ] Vineyards per player: default 2, both modes
+- [ ] Stone hexes: default 10% of the non-river hexes
+- [ ] Vineyard distance from the river: Normal 4–5 hexes (3–4 canals), Flash 2–3 (1–2 canals)
 - [ ] Die: is the d6 (average bribe cost 3.5) balanced against vineyard values, or should it be a d8 or a success threshold?
-- [ ] Flash bodega bonus: +1, or only 2 varietals required?
+- [ ] Flash bodega bonus: default +1 for all three varietals
 - [ ] Hex side: 16 mm, or the 18 mm fallback (validated in CAD and by printing)
-- [ ] Flash race-end variant ("first to claim a 2nd vineyard ends the round, then score"): evaluate in the simulation before committing
+- [ ] Flash race-end variant: evaluate in the simulation before committing (see [Variants](#variants-under-evaluation))
 
 ## Development
 
