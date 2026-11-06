@@ -12,6 +12,18 @@
 
 # Documents
 
-- `_docs/plan.md` - game and MCP specification (design and decisions)
+- `README.md` - the specification: game rules, design decisions,
+  architecture, and roadmap
 - `_docs/process.md` - how work is organized
-- Task backlog: GitHub issues, grouped by milestone (one per plan phase)
+- `_docs/task-template.md` - the shape every issue follows
+- `_docs/team/` - role instructions (e.g. `pm.md` for grooming)
+- Task backlog: GitHub issues, grouped by milestone (one per roadmap phase)
+
+# Outdated documents
+
+- Do not read anything in `_docs/outdated/` or use it as context. It holds
+  superseded documents kept only for history; `README.md` and the GitHub
+  issues replace them
+- Open those files only when the user explicitly asks for them by name
+- Never update them or cite them as the source of a rule; if something
+  there seems missing from `README.md`, ask the user
