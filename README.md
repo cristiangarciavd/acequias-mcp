@@ -169,7 +169,7 @@ Pieces are placed on a deterministic hex grid on the 256 × 256 mm plate, spilli
 
 ## MCP architecture
 
-A Python server with FastMCP (official SDK). The game logic lives in `acequias/`, independent of the server in `server/`, so it can be tested without MCP. All randomness (dice, board generation, bots) goes through a seeded RNG, so games are reproducible.
+A Python server built on `MCPServer` from the official `mcp` SDK (formerly FastMCP). The game logic lives in `acequias/`, independent of the server in `server/`, so it can be tested without MCP. All randomness (dice, board generation, bots) goes through a seeded RNG, so games are reproducible.
 
 | Tool | Input | Output |
 | --- | --- | --- |
@@ -211,7 +211,7 @@ A Python server with FastMCP (official SDK). The game logic lives in `acequias/`
 
 | Layer | Tool |
 | --- | --- |
-| MCP server | [FastMCP](https://github.com/modelcontextprotocol/python-sdk) (official Python SDK) |
+| MCP server | [`mcp`](https://github.com/modelcontextprotocol/python-sdk) 2.x (official Python SDK), class `MCPServer` (formerly FastMCP) |
 | Environment and dependencies | [uv](https://docs.astral.sh/uv/) (fallback: conda-forge if OpenCASCADE fails on Windows) |
 | Logic and simulation | Pure Python, axial hex coordinates |
 | Functional geometry | [build123d](https://github.com/gumyr/build123d) (OpenCASCADE; STL/STEP/3MF export), chosen over CadQuery for its API; reversible |
@@ -286,6 +286,33 @@ Provisional defaults let work start; the simulation (or CAD, for physical values
 uv sync          # install dependencies
 uv run pytest    # run the test suite
 ```
+
+### Running the MCP server
+
+`uv run acequias-server` starts the server over stdio (`server/app.py`). For now it exposes one tool, `ping`, which returns `"pong"`.
+
+Claude Code, from the repo root:
+
+```sh
+claude mcp add acequias -- uv run --directory /path/to/ProyAcequiasMCP acequias-server
+```
+
+Claude Desktop, in `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "acequias": {
+      "command": "uv",
+      "args": ["run", "--directory", "/path/to/ProyAcequiasMCP", "acequias-server"]
+    }
+  }
+}
+```
+
+Then ask Claude to "call the acequias ping tool"; it should answer `pong`. In Claude Code, `/mcp` shows whether the server is connected.
+
+New tools go in `server/app.py` on the module-level `app`, as `@app.tool()` over `@tool_errors`: a `ValueError` or `TypeError` from `acequias` comes back as a tool error with its message, and any other exception as a tool error with a generic message. Tests connect `mcp.Client(app)` in-process (`tests/test_server.py`).
 
 ## Documents
 
