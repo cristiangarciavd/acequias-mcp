@@ -1,15 +1,21 @@
 import ast
 import math
 import dataclasses
-import itertools
 from pathlib import Path
 
 import pytest
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
 from acequias.hex import Direction, Hex
 
 ORIGIN = Hex(0, 0)
 SAMPLE = [Hex(0, 0), Hex(2, -1), Hex(-3, 4), Hex(5, 5), Hex(-2, -2)]
+
+# Bounded coordinates keep generated hexes in a sane range. deadline=None on
+# the tests avoids flaky timing failures on slow CI runners.
+COORD = st.integers(min_value=-1000, max_value=1000)
+hexes = st.builds(Hex, COORD, COORD)
 
 
 # --- Immutability and hashing ---------------------------------------------
@@ -88,12 +94,14 @@ def test_distance_to_every_neighbor_is_one(h):
     assert all(h.distance(n) == 1 for n in h.neighbors())
 
 
-@pytest.mark.parametrize("a, b", list(itertools.combinations(SAMPLE, 2)))
+@settings(deadline=None)
+@given(hexes, hexes)
 def test_distance_is_symmetric(a, b):
     assert a.distance(b) == b.distance(a)
 
 
-@pytest.mark.parametrize("a, b, c", list(itertools.combinations(SAMPLE, 3)))
+@settings(deadline=None)
+@given(hexes, hexes, hexes)
 def test_distance_obeys_triangle_inequality(a, b, c):
     assert a.distance(c) <= a.distance(b) + b.distance(c)
 

@@ -1,5 +1,7 @@
 # Acequias MCP
 
+[![Tests](https://github.com/cristiangarciavd/acequias-mcp/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/cristiangarciavd/acequias-mcp/actions/workflows/tests.yml?query=branch%3Amain)
+
 Acequias is a competitive board game for 2 to 5 players with 3D-printed hex pieces. Players build canals to carry water from the mountains to the vineyards of Mendoza. This repo holds an MCP server that generates balanced boards, scores games, simulates them with bots to tune the rules, and outputs printable STL pieces for a Bambu Lab A1.
 
 > **Status:** early development. The hex model, domain model, game config, water reach, board generator, assembly instructions, and scoring are in place; the turn engine comes next. Progress is tracked in the [GitHub issues](../../issues) and [milestones](../../milestones).

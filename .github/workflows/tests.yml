@@ -1,0 +1,45 @@
+name: Tests
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    name: ${{ matrix.os }} / Python ${{ matrix.python-version }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: ["3.11", "3.12"]
+    env:
+      # Overrides the 3.12 pinned in .python-version, so each job really
+      # runs on its matrix Python.
+      UV_PYTHON: ${{ matrix.python-version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: Show Python version
+        run: uv run python --version
+
+      - name: Check Python version matches the matrix
+        shell: bash
+        run: |
+          actual="$(uv run python -c 'import sys; print("%d.%d" % sys.version_info[:2])')"
+          echo "Expected ${{ matrix.python-version }}, got $actual"
+          test "$actual" = "${{ matrix.python-version }}"
+
+      - name: Run tests
+        run: uv run pytest

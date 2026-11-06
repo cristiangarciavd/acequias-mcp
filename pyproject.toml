@@ -7,7 +7,10 @@ requires-python = ">=3.11"
 dependencies = []
 
 [dependency-groups]
-dev = ["pytest"]
+dev = [
+    "hypothesis>=6.170.15",
+    "pytest",
+]
 
 [build-system]
 requires = ["hatchling"]
