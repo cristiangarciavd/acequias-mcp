@@ -86,6 +86,7 @@ async def test_real_server_lists_only_its_own_tools():
         assert sorted(tool.name for tool in tools) == [
             "calculate_score",
             "generate_board",
+            "generate_piece_stl",
             "ping",
             "simulate_game",
         ]
