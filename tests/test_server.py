@@ -83,7 +83,12 @@ async def test_real_server_lists_only_its_own_tools():
     failing_server()  # building a test server must not touch the real one
     async with Client(app) as client:
         tools = (await client.list_tools()).tools
-        assert sorted(tool.name for tool in tools) == ["calculate_score", "generate_board", "ping"]
+        assert sorted(tool.name for tool in tools) == [
+            "calculate_score",
+            "generate_board",
+            "ping",
+            "simulate_game",
+        ]
 
 
 @pytest.mark.parametrize(
