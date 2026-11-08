@@ -88,6 +88,10 @@ class PieceKind(Enum):
         ``rotation`` must be an int from 0 to 5. The floodgate is not a
         canal shape and has no edges.
         """
+        if type(rotation) is int:
+            edges = _EDGES.get((self, rotation))
+            if edges is not None:
+                return edges
         _check_rotation(rotation)
         if not self.is_canal:
             raise ValueError("the floodgate is not a canal shape and has no edges")
@@ -102,6 +106,13 @@ _BASE_EDGES: dict[PieceKind, tuple[Direction, ...]] = {
     PieceKind.SYMMETRIC_Y: (Direction.E, Direction.NW, Direction.SW),
     PieceKind.T_BRANCH: (Direction.E, Direction.W, Direction.NE),
     PieceKind.CLAW: (Direction.E, Direction.NE, Direction.NW),
+}
+
+# Every canal shape's edges at every rotation, worked out once.
+_EDGES: dict[tuple[PieceKind, int], frozenset[Direction]] = {
+    (kind, rotation): frozenset(d.rotated(rotation) for d in base)
+    for kind, base in _BASE_EDGES.items()
+    for rotation in range(ROTATIONS)
 }
 
 
@@ -215,6 +226,11 @@ class Board:
     _floodgate_index: Mapping[frozenset, Floodgate] = field(
         init=False, repr=False, compare=False
     )
+    # Lookups that depend on the tiles only, built on first use (``_static``)
+    # and shared by every board ``_derive`` makes from this one.
+    _statics: _BoardStatics | None = field(
+        default=None, init=False, repr=False, compare=False
+    )
 
     def __post_init__(self) -> None:
         tiles = _items("Board.tiles", self.tiles, Tile)
@@ -293,11 +309,97 @@ class Board:
         """Whether the edge of ``hex`` facing ``direction`` has a floodgate."""
         return self.floodgate_at(hex, direction) is not None
 
+    # --- Internal fast paths (for ``acequias.turn`` and ``acequias.flow``) ----
+
+    def _static(self) -> _BoardStatics:
+        """The lookups that depend only on the tiles, built once per tile set."""
+        statics = self._statics
+        if statics is None:
+            statics = _BoardStatics(self.tiles)
+            _set(self, "_statics", statics)
+        return statics
+
+    def _derive(
+        self,
+        *,
+        canals: tuple[PlacedCanal, ...] | None = None,
+        floodgates: tuple[Floodgate, ...] | None = None,
+        claims: tuple[tuple[Hex, str], ...] | None = None,
+    ) -> Board:
+        """This board with some collections replaced, for callers that checked every piece.
+
+        Equal to ``replace(self, ...)`` with the same arguments, but runs no
+        check: the caller (``acequias.turn``) guarantees the new pieces are
+        valid. The tiles, their index, and their statics are shared.
+        """
+        new = object.__new__(Board)
+        _set(new, "tiles", self.tiles)
+        _set(new, "_tile_index", self._tile_index)
+        _set(new, "_statics", self._static())
+        if canals is None:
+            _set(new, "canals", self.canals)
+            _set(new, "_canal_index", self._canal_index)
+        else:
+            canals = tuple(sorted(canals, key=_canal_order))
+            _set(new, "canals", canals)
+            _set(new, "_canal_index", MappingProxyType({c.hex: c for c in canals}))
+        if floodgates is None:
+            _set(new, "floodgates", self.floodgates)
+            _set(new, "_floodgate_index", self._floodgate_index)
+        else:
+            floodgates = tuple(sorted(floodgates, key=_floodgate_key))
+            _set(new, "floodgates", floodgates)
+            _set(new, "_floodgate_index", MappingProxyType({g.edge: g for g in floodgates}))
+        if claims is None:
+            _set(new, "claims", self.claims)
+            _set(new, "_claim_index", self._claim_index)
+        else:
+            claims = tuple(sorted(claims))
+            _set(new, "claims", claims)
+            _set(new, "_claim_index", MappingProxyType(dict(claims)))
+        return new
+
+
+class _BoardStatics:
+    """Lookups that depend only on a board's tiles.
+
+    For each tile hex: its neighbours by direction, the directions that face
+    a river tile, and the directions that face a vineyard tile (with the
+    vineyard hex). ``empty`` lists the ``EMPTY`` tile hexes in hex order.
+    """
+
+    __slots__ = ("neighbors", "river_dirs", "vineyard_dirs", "empty")
+
+    def __init__(self, tiles: tuple[Tile, ...]) -> None:
+        terrain = {t.hex: t.terrain for t in tiles}
+        self.neighbors: dict[Hex, dict[Direction, Hex]] = {}
+        self.river_dirs: dict[Hex, frozenset[Direction]] = {}
+        self.vineyard_dirs: dict[Hex, dict[Direction, Hex]] = {}
+        for hex in terrain:
+            around = {d: hex.neighbor(d) for d in Direction}
+            self.neighbors[hex] = around
+            self.river_dirs[hex] = frozenset(
+                d for d, n in around.items() if terrain.get(n) is Terrain.RIVER
+            )
+            self.vineyard_dirs[hex] = {
+                d: n for d, n in around.items() if terrain.get(n) is Terrain.VINEYARD
+            }
+        self.empty: tuple[Hex, ...] = tuple(
+            sorted(h for h, t in terrain.items() if t is Terrain.EMPTY)
+        )
+
+
+_DIRECTION_INDEX = {d: i for i, d in enumerate(Direction)}
+
+
+def _canal_order(canal: PlacedCanal) -> Hex:
+    return canal.hex
+
 
 def _floodgate_key(gate: Floodgate) -> tuple[Hex, Hex, int, int]:
     """A canonical order for floodgates, the same from either side of the edge."""
-    a, b = sorted(gate.edge, key=lambda side: (side[0], list(Direction).index(side[1])))
-    return (a[0], b[0], list(Direction).index(a[1]), list(Direction).index(b[1]))
+    a, b = sorted(gate.edge, key=lambda side: (side[0], _DIRECTION_INDEX[side[1]]))
+    return (a[0], b[0], _DIRECTION_INDEX[a[1]], _DIRECTION_INDEX[b[1]])
 
 
 # --- Players and game state ------------------------------------------------
