@@ -4,7 +4,7 @@
 
 Acequias is a competitive board game for 2 to 5 players with 3D-printed hex pieces. Players build canals to carry water from the mountains to the vineyards of Mendoza. This repo holds an MCP server that generates balanced boards, scores games, simulates them with bots to tune the rules, and outputs printable STL pieces for a Bambu Lab A1.
 
-> **Status:** early development. Milestones 1 (game logic) and 2 (MCP server) are done. Milestone 3 (simulation) is nearly done: the turn engine, the round loop, the random, greedy, and saboteur bots, and the simulation are in, and the server exposes `generate_board`, `calculate_score`, and `simulate_game`; speeding up the simulation (#84) and tuning the open parameters with it (#20) are left. Progress is tracked in the [GitHub issues](../../issues) and [milestones](../../milestones).
+> **Status:** early development. Milestones 1 (game logic) and 2 (MCP server) are done. Milestone 3 (simulation) is nearly done: the turn engine, the round loop, the random, greedy, and saboteur bots, and the faster simulation are in, and the server exposes `generate_board`, `calculate_score`, and `simulate_game`; only tuning the open parameters with it (#20) is left. Milestone 4 (pieces) has the terrain hex (#14) and the canal pieces, floodgate, and owner token (#15); milestone 5 has the plate layout (#18). Progress is tracked in the [GitHub issues](../../issues) and [milestones](../../milestones).
 
 This README is the project's specification: game rules, design decisions, architecture, and roadmap. Task details live in the GitHub issues.
 
@@ -151,10 +151,14 @@ All pieces are parametric build123d models printed on the Bambu Lab A1 (256 × 2
 | --- | --- |
 | Hex side | 16 mm (~32 mm corner to corner); fallback 18 mm if the groove or fit is too tight |
 | Tile height (functional) | 4 mm, plus decorative relief on top |
+| Canal groove | 6 mm wide, 1.5 mm deep |
+| Owner token | hole 4 mm across, 2 mm deep; cap 7 mm across, 1.2 mm high |
+| Floodgate | 5.70 × 2.00 × 1.50 mm (groove width minus a 0.15 mm fit tolerance per side, flush with the top) |
+| Thinnest wall | 0.8 mm (two widths of the 0.4 mm nozzle) |
 | Board footprint (4p) | ~18–20 cm across |
 | Print estimate (4p set, ~50–70 hexes) | ~150–200 g PLA, ~8–12 h; rough until the real STL is sliced |
 
-The bag of canal pieces is sized to the board's canalizable capacity, which caps how many canals need printing. Groove size and fit tolerance are still to be validated against the 0.4 mm nozzle.
+The bag of canal pieces is sized to the board's canalizable capacity, which caps how many canals need printing. The piece sizes are the code's defaults and stay provisional until the first test print (#34) validates the groove and the fit tolerance.
 
 ### Aesthetics
 
@@ -169,6 +173,8 @@ Relief comes from real elevation data (SRTM / Copernicus DEM) for mountain hexes
 
 Pieces are placed on a deterministic hex grid on the 256 × 256 mm plate, spilling onto more plates when needed.
 
+`acequias/plate.py` (pure layout math, standard library only): `layout_plates(pieces)` takes `Piece`s with a footprint (`HexFootprint`, `CircleFootprint`, or `RectFootprint`, in mm) and a color group, and returns numbered `Plate`s of `Placement`s: each footprint's center from the bed's front-left corner, rotation always 0. Hexes go on a honeycomb grid spaced so neighbours are exactly `gap` apart; circles and rectangles go on a square grid of bounding-box cells. Each plate holds one color group and one grid type, so it prints with one filament; within a group every cell is sized to the largest piece and plates fill in input order. With the defaults (256 × 256 bed, 5 mm margin, 3 mm gap) a plate holds 68 hexes of 16 mm, 52 of 18 mm, or 256 circles of 12 mm.
+
 ## MCP architecture
 
 A Python server built on `MCPServer` from the official `mcp` SDK (formerly FastMCP). The game logic lives in `acequias/`, independent of the server in `server/`, so it can be tested without MCP. All randomness (dice, board generation, bots) goes through a seeded RNG, so games are reproducible.
@@ -181,7 +187,7 @@ A Python server built on `MCPServer` from the official `mcp` SDK (formerly FastM
 | `generate_piece_stl` | Piece type, parameters | STL files |
 | `build_plate` | List of pieces | Print plates for the A1 |
 
-`simulate_game` caps `games` at `MAX_GAMES = 10`: a 5-player Normal game of greedy bots takes about 2 s, so 10 games keep one call within a 30-second client timeout. Raising the cap is #43.
+`simulate_game` caps `games` at `MAX_GAMES = 10`, set when a 5-player Normal game of greedy bots took about 2 s, so 10 games kept one call within a 30-second client timeout; since #84 such a game takes under 0.1 s. Raising the cap is #43.
 
 ### Hex convention
 
@@ -231,6 +237,14 @@ A Python server built on `MCPServer` from the official `mcp` SDK (formerly FastM
 
 `acequias/sim.py`: `simulate_game(rules, n, seed)` plays `n` bot games of one mode and returns a `SimResult`. `SimRules` holds `mode`, `players`, `policies` (`policies[k]` plays seat `k + 1`, whatever the start player), and `overrides` for `with_overrides`; the resulting preset is passed only to `new_game`, and every later step reads it from `state.preset`. Game `i` uses `game_seed(seed, i)`, and `play_one(rules, game_seed)` replays any single game of a run. A board the preset cannot satisfy raises `ValueError` naming the game index and seed, with no partial result. A shared win among `k` players gives each `1/k` win credit, so each game hands out exactly 1. Position `j` is the place in round 1's turn order, and `turn_order_advantage` is `max_j |win_rate_by_position[j] − 1/P| × P` (0.10 means a position wins 10% more or less than its fair share). Each statistic is defined in its field's docstring; `SimResult.to_json()` gives plain JSON with the names of `server/schemas.py`.
 
+### Performance
+
+The engine and the bots take fast paths (precomputed tables, boards derived without re-validation) whose results must equal the plain rules. `tests/test_golden_games.py` replays fixed simulation runs against `tests/data/golden_games.json`, recorded before the speed-up, so any change in a log, a final state, a path, or a score fails; re-record it only when the rules change on purpose. `uv run python scripts/bench_sim.py` prints the best wall time of fixed 5-player runs and a SHA-256 of each result (equal digests mean nothing moved); `--profile` lists the hottest functions.
+
+### CAD pieces
+
+`acequias/cad/` holds the build123d models; it is the only code that imports build123d or trimesh, and the game logic and the server never import it at module level, so a plain install stays CAD-free. CAD frame: `x` east, `y` north, `z` up, in mm, each piece centered at `x = y = 0` with its bottom on `z = 0`; outlines come from `Hex.corners`, each corner `(x, y)` used as `(x, -y)`, so each edge faces the same `Direction` as on the board. `hex_tile.py`: `hex_tile(side, height, clearance)` is the terrain prism and `export_stl(shape, path)` writes a binary STL. `channel.py`: `canal_piece(kind)` is the tile with a groove spoke to each edge the kind opens at rotation 0 (players rotate the printed piece) and a hole for the owner token; `floodgate()` is the gate as it sits in the groove; `owner_token()` is a cap with a peg, printed cap down. Defaults are those of the [Geometry profile](#geometry-profile); any size that would leave a wall under 0.8 mm raises `ValueError` naming it.
+
 ### Board JSON
 
 `server/schemas.py`: the JSON shapes every tool shares, so a board means the same JSON everywhere. A hex is `q`, `r`, `terrain`, and `varietal` (null except on vineyards). Enum strings are lowercase ASCII: terrain `"river"`, `"vineyard"`, `"stone"`, `"empty"`; varietal `"malbec"`, `"bonarda"`, `"torrontes"`; canal `kind` `"straight"`, `"gentle_curve"`, `"sharp_curve"`, `"symmetric_y"`, `"t_branch"`, `"claw"` (the floodgate is not a kind). Directions are the case-sensitive names `"E"`, `"NE"`, `"NW"`, `"W"`, `"SW"`, `"SE"`. A canal is `q`, `r`, `kind`, `rotation` (0 to 5), `owner`; a floodgate is the canal's `q`, `r` and the `direction` it closes; a claim is `q`, `r`, `player`; a player is `id` and `debt`, and the list order gives seats 1 to N. From a `generate_board` result only `mode` and `hexes` carry over to `calculate_score`: its `players` is a count, not a list, and `seed` and `assembly` are not inputs. Inputs are strict (`"3"`, `3.0`, or `true` is not an int), and the server only maps JSON to `acequias` types; every check comes from the model.
@@ -242,8 +256,8 @@ A Python server built on `MCPServer` from the official `mcp` SDK (formerly FastM
 | MCP server | [`mcp`](https://github.com/modelcontextprotocol/python-sdk) 2.x (official Python SDK), class `MCPServer` (formerly FastMCP) |
 | Environment and dependencies | [uv](https://docs.astral.sh/uv/) (fallback: conda-forge if OpenCASCADE fails on Windows) |
 | Logic and simulation | Pure Python, axial hex coordinates |
-| Functional geometry | [build123d](https://github.com/gumyr/build123d) (OpenCASCADE; STL/STEP/3MF export), chosen over CadQuery for its API; reversible |
-| Decorative relief | trimesh + numpy; Blender/bpy later |
+| Functional geometry | [build123d](https://github.com/gumyr/build123d) (OpenCASCADE; STL/STEP/3MF export), chosen over CadQuery for its API; reversible. In the optional `cad` extra |
+| Decorative relief | trimesh + numpy, in the optional `cad` extra; Blender/bpy later |
 | Elevation data | SRTM / Copernicus DEM |
 | Tests and QA | pytest + hypothesis; `trimesh.is_watertight` for STL |
 
@@ -311,9 +325,12 @@ Provisional defaults let work start; the simulation (or CAD, for physical values
 ## Development
 
 ```sh
-uv sync          # install dependencies
-uv run pytest    # run the test suite
+uv sync              # install dependencies (game logic and server)
+uv sync --extra cad  # also install build123d and trimesh, for the CAD pieces
+uv run pytest        # run the test suite
 ```
+
+Without the `cad` extra the CAD tests are skipped; CI installs it, so they run there.
 
 ### Running the MCP server
 
