@@ -392,8 +392,14 @@ def _list(xs) -> str:
 
 SWEEP_HEADER = (
     "| Candidate | P | Seating | Advantage ± 95% | Win rate by position | Shared wins "
-    "| Turns (min) | Pass share | Canal / gate / bribe / pass | Winning score | Score | Bodega rate | Bribe games | Mean debt |"
+    "| Turns (min) | Pass share | Canal / gate / bribe / pass | Winning score | Score | Bodega rate | Bodega points "
+    "| Winner has Malbec / Bonarda / Torrontés | Bribe games | Win rate bribers / non-bribers | Mean debt |"
 )
+SWEEP_COLUMNS = 17
+
+
+def _varietals(data: Mapping[str, object]) -> str:
+    return " / ".join(f"{data['winner_varietal_rate'][v]:.2f}" for v in ("malbec", "bonarda", "torrontes"))
 
 
 def _not_run(outcome: Outcome) -> str:
@@ -404,7 +410,7 @@ def sweep_row(job: Job, outcome: Outcome) -> str:
     head = f"| {job.label} | {job.players} | {job.seating} |"
     data = outcome.data
     if data is None:
-        return f"{head} {_not_run(outcome)} |" + " |" * 10
+        return f"{head} {_not_run(outcome)} |" + " |" * (SWEEP_COLUMNS - 4)
     a = data["actions_per_game"]
     turns = data["turns_per_game"]
     return (
@@ -413,7 +419,9 @@ def sweep_row(job: Job, outcome: Outcome) -> str:
         f"| {turns:.0f} ({turns * MINUTES_PER_TURN:.0f}) | {a['pass'] / turns:.2f} "
         f"| {a['canal']:.1f} / {a['floodgate']:.2f} / {a['bribe']:.2f} / {a['pass']:.1f} "
         f"| {_spread(data['winning_score'])} | {_spread(data['score_terms']['total'])} "
-        f"| {_f(data['bodega_rate'], 3)} | {_f(data['games_with_bribe'])} "
+        f"| {_f(data['bodega_rate'], 3)} | {data['score_terms']['bodega']['mean']:.3f} | {_varietals(data)} "
+        f"| {_f(data['games_with_bribe'])} "
+        f"| {_f(data['win_rate_bribers'], 3)} / {_f(data['win_rate_non_bribers'], 3)} "
         f"| {_f(data['score_terms']['debt']['mean'])} |"
     )
 
@@ -431,7 +439,7 @@ def detail_rows(job: Job, outcome: Outcome) -> list[str]:
     low, high = TARGET_TURNS[job.mode]
     minutes = turns * MINUTES_PER_TURN
     by_policy = ", ".join(f"{k} {v:.3f}" for k, v in data["win_rate_by_policy"].items())
-    varietals = " / ".join(f"{data['winner_varietal_rate'][v]:.2f}" for v in ("malbec", "bonarda", "torrontes"))
+    varietals = _varietals(data)
     terms = data["score_terms"]
     return [
         f"| {name} | {job.n} | {adv:.3f} ± {m:.3f} | {'yes' if adv <= ADVANTAGE_TARGET else 'no'} "
@@ -505,7 +513,7 @@ def do_sweeps(sweeps: list[Sweep], workers: int, modes, games: int) -> list[Outc
             print(f"### {mode.value.capitalize()}\n")
             print(f"Base: {describe(SWEEP_BASE[mode])}.\n")
             print(SWEEP_HEADER)
-            print("|" + " --- |" * 14)
+            print("|" + " --- |" * SWEEP_COLUMNS)
             for job, outcome in rows:
                 print(sweep_row(job, outcome))
             print()
