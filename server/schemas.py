@@ -43,7 +43,8 @@ one object per printable piece, told apart by `type` (`"terrain"`,
 `"canal"`, `"floodgate"`, `"owner_token"`, `"grape_cluster"`,
 `"debt_token"`), with the sizes of its `acequias.cad` generator in mm.
 `piece_variant` and `piece_params` split one into the arguments of
-`acequias.cad.pieces.build_piece`.
+`acequias.cad.pieces.build_piece`. `build_plate` reads a list of
+`PlateEntryJSON`: `{"piece": PieceJSON, "count": int, "color": str}`.
 
 Reading JSON back leaves the checks to the model: `Hex`, `Tile`, and `Board`
 raise `ValueError` or `TypeError` on a bad hex, and the `*_from_json`
@@ -520,6 +521,42 @@ PIECE_MODELS: dict[str, type[BaseModel]] = {
 
 PIECE_VARIANT_FIELDS: dict[str, str] = {"terrain": "terrain", "canal": "kind", "debt_token": "value"}
 """The field that holds the variant, for the piece types that have one."""
+
+
+MAX_PLATE_COUNT = 500
+"""The most copies of one entry, and of all entries together, `build_plate` takes."""
+
+COLOR_PATTERN = r"^[a-z0-9][a-z0-9_-]{0,31}$"
+"""A color group: 1 to 32 of `a-z`, `0-9`, `_`, `-`, starting with a letter or digit."""
+
+
+class PlateEntryJSON(BaseModel):
+    """One line of a `build_plate` request: a piece, how many, and its color."""
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    piece: PieceJSON = Field(
+        description=(
+            'The piece to print, chosen by its "type": "terrain", "canal", "floodgate", '
+            '"owner_token", "grape_cluster", or "debt_token". Sizes are in mm; any left '
+            "out take their default."
+        )
+    )
+    count: int = Field(
+        ge=1,
+        le=MAX_PLATE_COUNT,
+        description=f"How many of this piece to print, 1 to {MAX_PLATE_COUNT}.",
+    )
+    color: str = Field(
+        min_length=1,
+        max_length=32,
+        pattern=COLOR_PATTERN,
+        description=(
+            "The color group and the filament the piece prints in: 1 to 32 characters "
+            'from a-z, 0-9, "_", "-", starting with a letter or digit (for example '
+            '"red", "neutral", "dark_green"). Each plate holds one color.'
+        ),
+    )
 
 
 def piece_variant(piece: BaseModel) -> Terrain | PieceKind | int | None:

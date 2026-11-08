@@ -21,6 +21,7 @@ from mcp.server.mcpserver.exceptions import ToolError
 import acequias
 from server.tools import board as board_tools
 from server.tools import pieces as piece_tools
+from server.tools import plate as plate_tools
 from server.tools import score as score_tools
 from server.tools import simulate as simulate_tools
 
@@ -81,6 +82,7 @@ generate_board = app.tool()(tool_errors(board_tools.generate_board))
 calculate_score = app.tool()(tool_errors(score_tools.calculate_score))
 simulate_game = app.tool()(tool_errors(simulate_tools.simulate_game))
 generate_piece_stl = app.tool()(tool_errors(piece_tools.generate_piece_stl))
+build_plate = app.tool()(tool_errors(plate_tools.build_plate))
 
 
 def main() -> None:
