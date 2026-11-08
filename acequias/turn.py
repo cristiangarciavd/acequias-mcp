@@ -27,7 +27,7 @@ import random
 from dataclasses import dataclass, replace
 
 from acequias.config import preset as shipped_preset
-from acequias.flow import water
+from acequias.flow import _watered
 from acequias.hex import Direction, Hex
 from acequias.model import (
     ROTATIONS,
@@ -136,11 +136,19 @@ def apply(state: GameState, player: str, action: Action, rng: random.Random) -> 
     _check_player(state, player)
 
     if isinstance(action, PlaceCanal):
-        return _apply_canal(state, player, action)
+        board, _ = _board_after(state, player, action)
+        return _take_from_market(state, board, action.kind)
     if isinstance(action, PlaceFloodgate):
-        return _apply_floodgate(state, player, action)
+        board, _ = _board_after(state, player, action)
+        return _take_from_market(state, board, PieceKind.FLOODGATE)
     if isinstance(action, Bribe):
-        return _apply_bribe(state, player, action, rng)
+        board, _ = _board_after(state, player, action)
+        die_faces = (state.preset or shipped_preset(state.mode)).die_faces
+        roll = rng.randint(1, die_faces)
+        players = tuple(
+            replace(p, debt=p.debt + roll) if p.id == player else p for p in state.players
+        )
+        return replace(state, players=players, board=board)
     if _has_placement(state):
         raise IllegalAction("pass is only legal when the player has nothing they can place")
     return replace(state)
@@ -164,10 +172,30 @@ def legal_actions(state: GameState, player: str) -> tuple[Action, ...]:
     return (*canals, *gates, *bribes, *passes)
 
 
+def _board_after(
+    state: GameState, player: str, action: PlaceCanal | PlaceFloodgate | Bribe
+) -> tuple[Board, list[Hex]]:
+    """The board after ``player`` places a piece or bribes, and its watered vineyards.
+
+    The board is the one ``apply`` puts in its new state, claims included;
+    the market, debt, and die roll are left out, so nothing is drawn. Raises
+    ``IllegalAction`` exactly as ``apply`` does. ``state`` and ``player``
+    must already be checked. The bots use this to weigh a move without
+    building a whole state.
+    """
+    if isinstance(action, PlaceCanal):
+        board = _canal_board(state, player, action)
+    elif isinstance(action, PlaceFloodgate):
+        board = _floodgate_board(state, action)
+    else:
+        board = _bribe_board(state, action)
+    return _claim(board, player)
+
+
 # --- Place a canal -----------------------------------------------------------
 
 
-def _apply_canal(state: GameState, player: str, action: PlaceCanal) -> GameState:
+def _canal_board(state: GameState, player: str, action: PlaceCanal) -> Board:
     board = state.board
     kind, hex, rotation = action.kind, action.hex, action.rotation
     if not kind.is_canal:
@@ -186,8 +214,7 @@ def _apply_canal(state: GameState, player: str, action: PlaceCanal) -> GameState
             "or an opening of a canal on the board"
         )
     canal = PlacedCanal(hex, kind, _canonical_rotation(kind, rotation), player)
-    new_board = replace(board, canals=board.canals + (canal,))
-    return _after_action(state, player, new_board, market_take=kind)
+    return board._derive(canals=board.canals + (canal,))  # every piece checked above
 
 
 def _canal_hex_problem(board: Board, hex: Hex) -> str | None:
@@ -202,33 +229,59 @@ def _canal_hex_problem(board: Board, hex: Hex) -> str | None:
 
 
 def _connects(board: Board, hex: Hex, edges: frozenset[Direction]) -> bool:
-    """Whether an opening faces the river or an opening of any canal, gated or dry."""
-    for d in edges:
-        target = hex.neighbor(d)
-        tile = board.tile_at(target)
-        if tile is not None and tile.terrain is Terrain.RIVER:
-            return True
-        other = board.canal_at(target)
-        if other is not None and d.opposite() in other.edges:
-            return True
-    return False
+    """Whether an opening faces the river or an opening of any canal, gated or dry.
+
+    ``hex`` is an empty tile of ``board``.
+    """
+    return not edges.isdisjoint(_connecting_dirs(board, hex))
+
+
+def _connecting_dirs(board: Board, hex: Hex) -> frozenset[Direction]:
+    """The directions from tile ``hex`` that face the river or an opening of a canal."""
+    statics = board._static()
+    dirs = statics.river_dirs[hex]
+    canal_at = board._canal_index.get
+    extra = [
+        d
+        for d, target in statics.neighbors[hex].items()
+        if (other := canal_at(target)) is not None and _OPPOSITE[d] in other.edges
+    ]
+    return dirs.union(extra) if extra else dirs
 
 
 def _canonical_rotation(kind: PieceKind, rotation: int) -> int:
+    return _CANONICAL[kind, rotation]
+
+
+def _first_rotation(kind: PieceKind, rotation: int) -> int:
+    """The smallest rotation that gives ``kind`` the same edges as ``rotation``."""
     edges = kind.edges(rotation)
     return next(r for r in range(ROTATIONS) if kind.edges(r) == edges)
+
+
+_OPPOSITE = {d: d.opposite() for d in Direction}
+_CANONICAL: dict[tuple[PieceKind, int], int] = {
+    (kind, r): _first_rotation(kind, r)
+    for kind in PieceKind
+    if kind.is_canal
+    for r in range(ROTATIONS)
+}
+_CANONICAL_ROTATIONS: dict[PieceKind, tuple[int, ...]] = {
+    kind: tuple(r for r in range(ROTATIONS) if _CANONICAL[kind, r] == r)
+    for kind in PieceKind
+    if kind.is_canal
+}
 
 
 # --- Place a floodgate -------------------------------------------------------
 
 
-def _apply_floodgate(state: GameState, player: str, action: PlaceFloodgate) -> GameState:
+def _floodgate_board(state: GameState, action: PlaceFloodgate) -> Board:
     if PieceKind.FLOODGATE not in state.market:
         raise IllegalAction("the market has no floodgate")
     board = state.board
     side = _gate_side_or_raise(board, action.hex, action.direction)
-    new_board = replace(board, floodgates=board.floodgates + (Floodgate(*side),))
-    return _after_action(state, player, new_board, market_take=PieceKind.FLOODGATE)
+    return board._derive(floodgates=board.floodgates + (Floodgate(*side),))
 
 
 def _gate_side(board: Board, hex: Hex, direction: Direction) -> tuple[Hex, Direction] | None:
@@ -256,9 +309,8 @@ def _gate_side_or_raise(board: Board, hex: Hex, direction: Direction) -> tuple[H
 # --- Bribe -------------------------------------------------------------------
 
 
-def _apply_bribe(
-    state: GameState, player: str, action: Bribe, rng: random.Random
-) -> GameState:
+def _bribe_board(state: GameState, action: Bribe) -> Board:
+    """The board after the bribe; the die is rolled by ``apply``, after this passes."""
     board = state.board
     if not board.floodgates:
         raise IllegalAction("a bribe needs a floodgate on the board")
@@ -274,30 +326,24 @@ def _apply_bribe(
             raise IllegalAction("a moved floodgate must go to another edge, not the one it is on")
         side = _gate_side_or_raise(board, to_hex, to_direction)
         floodgates += (Floodgate(*side),)
-    new_board = replace(board, floodgates=floodgates)
-
-    die_faces = (state.preset or shipped_preset(state.mode)).die_faces
-    roll = rng.randint(1, die_faces)
-    players = tuple(
-        replace(p, debt=p.debt + roll) if p.id == player else p for p in state.players
-    )
-    return _after_action(replace(state, players=players), player, new_board, market_take=None)
+    return board._derive(floodgates=floodgates)
 
 
 # --- Shared ------------------------------------------------------------------
 
 
-def _after_action(
-    state: GameState, player: str, board: Board, market_take: PieceKind | None
-) -> GameState:
-    """Claim newly watered vineyards and, after a placement, update the market."""
+def _claim(board: Board, player: str) -> tuple[Board, list[Hex]]:
+    """``player`` claims every newly watered vineyard; also returns the watered vineyards."""
+    watered = _watered(board)
     claims = list(board.claims)
-    for vineyard in water(board):
+    for vineyard in watered:
         if board.claimant(vineyard) is None:
             claims.append((vineyard, player))
-    board = replace(board, claims=tuple(claims))
-    if market_take is None:
-        return replace(state, board=board)
+    return board._derive(claims=tuple(claims)), watered
+
+
+def _take_from_market(state: GameState, board: Board, market_take: PieceKind) -> GameState:
+    """The state with ``board``, after the placed piece left the market and it was refilled."""
     market = list(state.market)
     market.remove(market_take)  # the first copy of that kind
     bag = state.bag
@@ -316,15 +362,20 @@ def _canal_placements(state: GameState) -> list[PlaceCanal]:
     kinds = [k for k in PieceKind if k.is_canal and k in state.market]
     if not kinds:
         return []
-    hexes = sorted(
-        t.hex for t in board.tiles if _canal_hex_problem(board, t.hex) is None
-    )
+    # The empty tiles with no canal, in hex order, each with the directions
+    # an opening must face to connect.
+    has_canal = board._canal_index
+    hexes = [
+        (hex, _connecting_dirs(board, hex))
+        for hex in board._static().empty
+        if hex not in has_canal
+    ]
     actions = []
     for kind in kinds:
-        rotations = [r for r in range(ROTATIONS) if _canonical_rotation(kind, r) == r]
-        for hex in hexes:
-            for rotation in rotations:
-                if _connects(board, hex, kind.edges(rotation)):
+        rotations = [(r, kind.edges(r)) for r in _CANONICAL_ROTATIONS[kind]]
+        for hex, connecting in hexes:
+            for rotation, edges in rotations:
+                if not edges.isdisjoint(connecting):
                     actions.append(PlaceCanal(kind, hex, rotation))
     return actions
 
@@ -332,11 +383,20 @@ def _canal_placements(state: GameState) -> list[PlaceCanal]:
 def _open_gate_edges(board: Board) -> list[tuple[Hex, Direction]]:
     """Every edge a floodgate may go on, by its canonical side, in hex then direction order."""
     edges = []
+    canal_at = board._canal_index.get
+    gated = board._floodgate_index
+    neighbors = board._static().neighbors
     for canal in board.canals:
-        for d in Direction:
-            if d in canal.edges and not board.has_floodgate(canal.hex, d):
-                if _gate_side(board, canal.hex, d) == (canal.hex, d):
-                    edges.append((canal.hex, d))
+        hex = canal.hex
+        for d in canal.edges:
+            if gated and board.has_floodgate(hex, d):
+                continue
+            # The canonical side is the smaller hex among the canals opening the edge.
+            target = neighbors[hex][d]
+            other = canal_at(target)
+            if other is not None and _OPPOSITE[d] in other.edges and target < hex:
+                continue
+            edges.append((hex, d))
     return sorted(edges, key=_side_key)
 
 

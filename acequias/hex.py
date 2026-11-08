@@ -28,6 +28,8 @@ class Hex:
     r: int
 
     def __post_init__(self) -> None:
+        if type(self.q) is int and type(self.r) is int:
+            return  # the common case; anything else is checked in full below
         for name in ("q", "r"):
             value = getattr(self, name)
             if not isinstance(value, int) or isinstance(value, bool):
@@ -50,7 +52,10 @@ class Hex:
 
     def neighbor(self, direction: Direction) -> Hex:
         """The adjacent hex in ``direction``."""
-        return self + direction.offset
+        step = _STEP.get(direction) if isinstance(direction, Direction) else None
+        if step is None:
+            return self + direction.offset  # not a Direction: fails as it always has
+        return Hex(self.q + step[0], self.r + step[1])
 
     def neighbors(self) -> tuple[Hex, ...]:
         """The 6 adjacent hexes, in ``Direction`` order (E, NE, NW, W, SW, SE)."""
@@ -127,12 +132,11 @@ class Direction(Enum):
 
     @property
     def offset(self) -> Hex:
-        return Hex(*self.value)
+        return _OFFSET[self]
 
     def opposite(self) -> Direction:
         """The direction pointing the other way (E <-> W, NE <-> SW, NW <-> SE)."""
-        members = list(Direction)
-        return members[(members.index(self) + 3) % 6]
+        return _OPPOSITE[self]
 
     def rotated(self, steps: int) -> Direction:
         """This direction turned ``steps`` x 60 degrees counterclockwise.
@@ -143,8 +147,17 @@ class Direction(Enum):
         """
         if not isinstance(steps, int) or isinstance(steps, bool):
             raise TypeError(f"steps must be an int, got {steps!r}")
-        members = list(Direction)
-        return members[(members.index(self) + steps) % 6]
+        return _ROTATED[self][steps % 6]
+
+
+# Static tables, so hot paths look directions up instead of searching them.
+_MEMBERS = tuple(Direction)
+_STEP: dict[Direction, tuple[int, int]] = {d: d.value for d in _MEMBERS}
+_OFFSET: dict[Direction, Hex] = {d: Hex(*d.value) for d in _MEMBERS}
+_OPPOSITE: dict[Direction, Direction] = {d: _MEMBERS[(i + 3) % 6] for i, d in enumerate(_MEMBERS)}
+_ROTATED: dict[Direction, tuple[Direction, ...]] = {
+    d: tuple(_MEMBERS[(i + k) % 6] for k in range(6)) for i, d in enumerate(_MEMBERS)
+}
 
 
 def _check_size(size: float) -> None:

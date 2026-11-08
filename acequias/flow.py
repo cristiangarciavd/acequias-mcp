@@ -28,7 +28,9 @@ from itertools import combinations
 from types import MappingProxyType
 
 from acequias.hex import Direction, Hex
-from acequias.model import Board, PlacedCanal, Terrain
+from acequias.model import Board, PlacedCanal
+
+_OPPOSITE = {d: d.opposite() for d in Direction}
 
 
 @dataclass(frozen=True, slots=True)
@@ -52,69 +54,78 @@ def water(board: Board) -> Mapping[Hex, WaterPath]:
     if not isinstance(board, Board):
         raise TypeError(f"water needs a Board, got {board!r}")
 
-    links = _links(board)
-    sources = _sources(board)
-    feeders = _feeders(board)
-
+    links, sources, feeders = _graph(board)
     wet = _reach(sources, links, allowed=None)
+    owner_of = {h: board.canal_at(h).owner for h in wet}
     result: dict[Hex, WaterPath] = {}
     for vineyard in sorted(feeders):
         ends = {h for h in feeders[vineyard] if h in wet}
         if not ends:
             continue
-        path = _choose(board, vineyard, ends, sources, links, wet)
+        path = _choose(board, vineyard, ends, sources, links, owner_of)
         canals = tuple(board.canal_at(h) for h in path)
         result[vineyard] = WaterPath(canals, frozenset(c.owner for c in canals))
     return MappingProxyType(result)
 
 
+def _watered(board: Board) -> list[Hex]:
+    """The vineyards ``water(board)`` maps, in hex order, without choosing their paths.
+
+    Whether a vineyard is watered does not depend on who claimed it, so this
+    is all that claiming needs.
+    """
+    links, sources, feeders = _graph(board)
+    wet = _reach(sources, links, allowed=None)
+    return [v for v in sorted(feeders) if any(h in wet for h in feeders[v])]
+
+
 # --- Graph -------------------------------------------------------------------
 
 
-def _open_edges(board: Board, canal: PlacedCanal) -> Iterable[Direction]:
-    """The canal's open edges that have no floodgate, in ``Direction`` order."""
-    for d in Direction:
-        if d in canal.edges and not board.has_floodgate(canal.hex, d):
-            yield d
+def _graph(
+    board: Board,
+) -> tuple[dict[Hex, tuple[Hex, ...]], frozenset[Hex], dict[Hex, set[Hex]]]:
+    """``(links, sources, feeders)`` of ``board``, in one pass over its canals.
 
+    - ``links``: for each canal hex, the neighbouring canal hexes water can
+      cross to (both open the shared edge and it has no floodgate)
+    - ``sources``: canal hexes with an open, ungated edge facing a river hex
+    - ``feeders``: for each vineyard hex, the canal hexes with an open,
+      ungated edge facing it
+    """
+    statics = board._static()
+    canal_at = board._canal_index.get
+    gated: set[tuple[Hex, Direction]] = set()
+    for gate in board.floodgates:
+        gated.add((gate.hex, gate.direction))
+        gated.add((gate.hex.neighbor(gate.direction), _OPPOSITE[gate.direction]))
 
-def _links(board: Board) -> dict[Hex, tuple[Hex, ...]]:
-    """For each canal hex, the neighbouring canal hexes water can cross to."""
     links: dict[Hex, tuple[Hex, ...]] = {}
-    for canal in board.canals:
-        out = []
-        for d in _open_edges(board, canal):
-            other = board.canal_at(canal.hex.neighbor(d))
-            if other is not None and d.opposite() in other.edges:
-                out.append(other.hex)
-        links[canal.hex] = tuple(sorted(out))
-    return links
-
-
-def _sources(board: Board) -> frozenset[Hex]:
-    """Canal hexes with an open, ungated edge facing a river hex."""
-    return frozenset(
-        canal.hex
-        for canal in board.canals
-        if any(_terrain(board, canal.hex.neighbor(d)) is Terrain.RIVER
-               for d in _open_edges(board, canal))
-    )
-
-
-def _feeders(board: Board) -> dict[Hex, set[Hex]]:
-    """For each vineyard hex, the canal hexes with an open, ungated edge facing it."""
+    sources = []
     feeders: dict[Hex, set[Hex]] = {}
     for canal in board.canals:
-        for d in _open_edges(board, canal):
-            target = canal.hex.neighbor(d)
-            if _terrain(board, target) is Terrain.VINEYARD:
-                feeders.setdefault(target, set()).add(canal.hex)
-    return feeders
-
-
-def _terrain(board: Board, hex: Hex) -> Terrain | None:
-    tile = board.tile_at(hex)
-    return None if tile is None else tile.terrain
+        hex = canal.hex
+        around = statics.neighbors[hex]
+        river = statics.river_dirs[hex]
+        vineyards = statics.vineyard_dirs[hex]
+        out = []
+        source = False
+        for d in canal.edges:
+            if gated and (hex, d) in gated:
+                continue
+            if d in river:
+                source = True
+            elif d in vineyards:
+                feeders.setdefault(vineyards[d], set()).add(hex)
+            else:
+                target = around[d]
+                other = canal_at(target)
+                if other is not None and _OPPOSITE[d] in other.edges:
+                    out.append(target)
+        links[hex] = tuple(out)
+        if source:
+            sources.append(hex)
+    return links, frozenset(sources), feeders
 
 
 def _reach(
@@ -125,18 +136,20 @@ def _reach(
     """BFS from ``starts`` over ``links``, within ``allowed`` (None: every canal).
 
     Returns each reached hex with its distance in canals, the starts at 1.
+    The distances do not depend on the order of ``starts`` or of the links.
     """
     dist: dict[Hex, int] = {}
     queue: deque[Hex] = deque()
-    for h in sorted(starts):
+    for h in starts:
         if allowed is None or h in allowed:
             dist[h] = 1
             queue.append(h)
     while queue:
         h = queue.popleft()
+        step = dist[h] + 1
         for n in links[h]:
             if n not in dist and (allowed is None or n in allowed):
-                dist[n] = dist[h] + 1
+                dist[n] = step
                 queue.append(n)
     return dist
 
@@ -150,19 +163,28 @@ def _choose(
     ends: set[Hex],
     sources: frozenset[Hex],
     links: Mapping[Hex, tuple[Hex, ...]],
-    wet: Mapping[Hex, int],
+    owner_of: Mapping[Hex, str],
 ) -> tuple[Hex, ...]:
     """The hex sequence of the cheapest path to ``vineyard`` (see module doc).
 
-    Rival subsets are tried in increasing size; the first size that gives a
-    path is the fewest rivals possible, and among those subsets the
+    First the shortest, then hex-smallest, path over every wet canal; say it
+    has ``k`` rivals. No path has a smaller (length, hexes) key, so it is
+    also the best path among those with ``k`` rivals, and it is the answer
+    unless a path with fewer rivals exists. Those are looked for as before:
+    rival subsets in increasing size below ``k``; the first size that gives
+    a path is the fewest rivals possible, and among those subsets the
     shortest, then hex-smallest, path wins.
     """
     claimant = board.claimant(vineyard)
-    owner_of = {h: board.canal_at(h).owner for h in wet}
+    overall = _best_path(sources, ends, links, frozenset(owner_of))
+    if overall is None:
+        raise AssertionError(f"{vineyard} is watered but no path was found")
+    fewest = len({owner_of[h] for h in overall} - {claimant})
+    if fewest == 0:
+        return overall
     rivals = sorted({o for o in owner_of.values() if o != claimant})
 
-    for size in range(len(rivals) + 1):
+    for size in range(fewest):
         best: tuple[Hex, ...] | None = None
         for subset in combinations(rivals, size):
             permitted = {claimant, *subset}
@@ -172,7 +194,7 @@ def _choose(
                 best = path
         if best is not None:
             return best
-    raise AssertionError(f"{vineyard} is watered but no path was found")
+    return overall
 
 
 def _best_path(
