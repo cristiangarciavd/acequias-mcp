@@ -14,3 +14,6 @@ dist/
 *.stl
 *.3mf
 *.step
+
+# Files the server writes (ACEQUIAS_OUTPUT_DIR defaults to output/)
+output/
