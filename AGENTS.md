@@ -1,6 +1,8 @@
 # Commands
 
 - `uv sync` - install dependencies
+- `uv sync --extra cad` - also install build123d and trimesh (CAD tests
+  skip without them)
 - `uv run pytest` - the whole suite
 
 # Rules
