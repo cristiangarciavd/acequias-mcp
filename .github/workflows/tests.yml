@@ -27,9 +27,11 @@ jobs:
         uses: astral-sh/setup-uv@v6
         with:
           python-version: ${{ matrix.python-version }}
+          enable-cache: true
 
       - name: Install dependencies
-        run: uv sync --locked
+        # The cad extra (build123d, trimesh) so the CAD tests run too.
+        run: uv sync --locked --extra cad
 
       - name: Show Python version
         run: uv run python --version

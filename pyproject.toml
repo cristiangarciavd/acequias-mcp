@@ -11,6 +11,12 @@ dependencies = [
 [project.scripts]
 acequias-server = "server.app:main"
 
+[project.optional-dependencies]
+cad = [
+    "build123d>=0.13,<0.14",
+    "trimesh>=5.2,<6",
+]
+
 [dependency-groups]
 dev = [
     "hypothesis>=6.170.15",
