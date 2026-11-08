@@ -7,6 +7,7 @@ Usage (from the repo root):
     uv run python scripts/tune.py --sweep all        # every sweep, in SWEEP order
     uv run python scripts/tune.py --mode flash --players 3 --seating mixed
     uv run python scripts/tune.py --list             # the sweeps and their candidates
+    uv run python scripts/tune.py --sweep all --smoke   # quick check of the runner (10 games)
 
 Every number comes from ``acequias.sim.simulate_game``: this script builds
 ``SimRules`` with ``overrides`` (``Preset`` field names, #22), runs them,
@@ -22,9 +23,13 @@ greedy, seat 1 saboteur). Sweeps vary one or two parameters around
 validation runs ``PROPOSED`` at ``final_games(players)`` games from
 ``FINAL_SEED``, a seed no sweep uses. A candidate the preset or the board
 generator rejects is printed as infeasible with its error, and the run goes
-on.
+on. Any other error is reported with its configuration as failed, and the
+run goes on too. Each configuration runs in a process of its own, so a
+process that dies (killed, out of memory) fails only its configuration,
+which is run once more; every table is still printed, and the exit status
+is 1 if anything failed.
 
-``--jobs`` runs configurations in parallel processes (one
+``--jobs`` runs that many configurations at a time (one process and one
 ``simulate_game`` call each); it changes only the wall time, never a
 number. Wall times go to stderr, so stdout is identical between runs.
 
@@ -37,9 +42,11 @@ import argparse
 import math
 import os
 import sys
+import threading
 import time
 from collections.abc import Mapping
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+from concurrent.futures.process import BrokenProcessPool
 from dataclasses import dataclass
 
 from acequias.model import Mode, PieceKind
@@ -55,6 +62,8 @@ FINAL_SEED = 20_002
 """The run seed of the final validation; no sweep uses it."""
 SWEEP_GAMES = 500
 """Games per configuration in a sweep."""
+SMOKE_GAMES = 10
+"""Games per configuration with ``--smoke``, a quick check that the runner works."""
 PLAYER_COUNTS = (2, 3, 4, 5)
 SEATINGS = ("greedy", "mixed")
 ADVANTAGE_TARGET = 0.10
@@ -112,22 +121,30 @@ BAG_MORE_GATES = bag(35, 20, 15, 5, 5, 5, 15)
 LOW_ROUNDS = {mode: rounds_for_turns(mode, "low") for mode in Mode}
 HIGH_ROUNDS = {mode: rounds_for_turns(mode, "high") for mode in Mode}
 CURRENT_ROUNDS = {Mode.NORMAL: {p: 12 for p in PLAYER_COUNTS}, Mode.FLASH: {p: 5 for p in PLAYER_COUNTS}}
+ROTATION_ROUNDS = {
+    Mode.NORMAL: {2: 24, 3: 15, 4: 12, 5: 10},
+    Mode.FLASH: {2: 6, 3: 6, 4: 4, 5: 4},
+}
+"""Rounds inside the length target that are a whole number of start-player
+rotations (a multiple of the player count), so every seat starts a round
+equally often. Flash with 5 players has none (5 rounds is 25 turns), so it
+takes the target's high end, 4."""
 
 SWEEP_BASE: Mapping[Mode, Mapping[str, object]] = {
     Mode.NORMAL: {
-        "rounds": LOW_ROUNDS[Mode.NORMAL],
+        "rounds": ROTATION_ROUNDS[Mode.NORMAL],
         "hexes_per_player": 18,
-        "stone_share": 0,
+        "stone_share": 10,
         "vineyard_distance": (4, 4),
     },
     Mode.FLASH: {
-        "rounds": LOW_ROUNDS[Mode.FLASH],
+        "rounds": ROTATION_ROUNDS[Mode.FLASH],
         "hexes_per_player": 14,
-        "stone_share": 0,
+        "stone_share": 10,
         "vineyard_distance": (4, 4),
     },
 }
-"""The overrides every sweep starts from (chosen from exploratory runs); each
+"""The overrides every sweep starts from (chosen from an exploratory board sweep); each
 sweep changes only the parameters it names. Unnamed fields keep the shipped
 preset's values."""
 
@@ -209,7 +226,8 @@ SWEEPS: tuple[Sweep, ...] = (
     ),
     Sweep(
         "rounds",
-        "Rounds per player count (2/3/4/5 players): current, low and high end of the length target",
+        "Rounds per player count (2/3/4/5 players): current, low and high end of the length target, "
+        "and whole start-player rotations",
         {
             mode: tuple(
                 (f"{name}: {_rounds_label(r)}", {"rounds": r})
@@ -217,6 +235,7 @@ SWEEPS: tuple[Sweep, ...] = (
                     ("current", CURRENT_ROUNDS[mode]),
                     ("target low", LOW_ROUNDS[mode]),
                     ("target high", HIGH_ROUNDS[mode]),
+                    ("full rotations", ROTATION_ROUNDS[mode]),
                 )
             )
             for mode in Mode
@@ -260,15 +279,36 @@ class Job:
     seed: int
 
 
-def run_job(job: Job) -> tuple[dict | None, str | None, float]:
-    """``(result JSON, None, seconds)``, or ``(None, error, seconds)`` if infeasible."""
+INFEASIBLE = "infeasible"
+"""Outcome status: the preset or the board generator rejected the candidate (a ``ValueError``)."""
+FAILED = "failed"
+"""Outcome status: the run broke for another reason (a bug, or a worker process that died)."""
+RETRIES = 1
+"""How many more times a job whose worker process died is run, in a fresh process."""
+
+
+@dataclass(frozen=True)
+class Outcome:
+    """A job's result JSON, or why it has none: ``status`` is ``"ok"``, ``INFEASIBLE``, or ``FAILED``."""
+
+    status: str
+    data: dict | None = None
+    error: str | None = None
+    seconds: float = 0.0
+
+
+def run_job(job: Job) -> Outcome:
+    """Run one job in this process. Never raises: a rejected candidate is
+    ``INFEASIBLE`` and any other exception is ``FAILED``, each with its message."""
     start = time.perf_counter()
     try:
         rules = SimRules(job.mode, job.players, policies(job.seating, job.players), job.overrides)
         result: SimResult = simulate_game(rules, job.n, job.seed)
     except ValueError as error:
-        return None, str(error), time.perf_counter() - start
-    return result.to_json(), None, time.perf_counter() - start
+        return Outcome(INFEASIBLE, error=str(error), seconds=time.perf_counter() - start)
+    except Exception as error:  # noqa: BLE001 - reported with its job, the run goes on
+        return Outcome(FAILED, error=f"{type(error).__name__}: {error}", seconds=time.perf_counter() - start)
+    return Outcome("ok", data=result.to_json(), seconds=time.perf_counter() - start)
 
 
 def _cost(job: Job) -> float:
@@ -277,24 +317,61 @@ def _cost(job: Job) -> float:
     return job.n * job.players**2 * hexes * (4 if job.seating == "mixed" else 1)
 
 
-def run_all(jobs: list[Job], workers: int) -> list[tuple[dict | None, str | None]]:
-    """Run ``jobs`` and return their outcomes in ``jobs`` order."""
-    outcomes: list = [None] * len(jobs)
+def describe_job(job: Job) -> str:
+    """The configuration of ``job`` in one line, for progress and error reports."""
+    return f"{job.mode.value} {job.players}p {job.seating} {job.label} (n={job.n}, seed={job.seed})"
+
+
+def run_isolated(job: Job) -> Outcome:
+    """Run ``job`` in a process of its own and wait for it. A process that
+    dies (killed, out of memory) breaks only its own one-worker pool, so it
+    fails this job alone instead of every job sharing a pool with it."""
+    try:
+        with ProcessPoolExecutor(max_workers=1) as pool:
+            return pool.submit(run_job, job).result()
+    except BrokenProcessPool as error:
+        return Outcome(FAILED, error=f"worker process died: {error}")
+    except Exception as error:  # noqa: BLE001 - e.g. a result that cannot be pickled
+        return Outcome(FAILED, error=f"{type(error).__name__}: {error}")
+
+
+def run_all(jobs: list[Job], workers: int) -> list[Outcome]:
+    """Run ``jobs``, ``workers`` at a time, and return their outcomes in ``jobs`` order.
+
+    A job never stops the run: infeasible candidates and failures are
+    recorded with their error and configuration. Each job runs in its own
+    process (``run_isolated``), so a process that dies fails only its job;
+    such a job is run again up to ``RETRIES`` times before it is recorded as
+    ``FAILED``. Failures are listed on stderr at the end."""
+    outcomes: list[Outcome | None] = [None] * len(jobs)
     started = time.perf_counter()
-    order = sorted(range(len(jobs)), key=lambda i: -_cost(jobs[i]))
-    with ProcessPoolExecutor(max_workers=workers) as pool:
-        futures = {pool.submit(run_job, jobs[i]): i for i in order}
-        for done, future in enumerate(as_completed(futures), 1):
-            i = futures[future]
-            data, error, seconds = future.result()
-            outcomes[i] = (data, error)
-            job = jobs[i]
+    lock = threading.Lock()
+
+    def run(i: int) -> None:
+        for attempt in range(RETRIES + 1):
+            outcome = run_isolated(jobs[i])
+            if not (outcome.status == FAILED and outcome.error.startswith("worker process died")):
+                break
+            if attempt < RETRIES:
+                print(f"RETRY {describe_job(jobs[i])}: {outcome.error}", file=sys.stderr, flush=True)
+        with lock:
+            outcomes[i] = outcome
+            done = sum(o is not None for o in outcomes)
+            note = "" if outcome.status == "ok" else f" {outcome.status.upper()}: {outcome.error}"
             print(
-                f"[{done}/{len(jobs)}] {job.mode.value} {job.players}p {job.seating} "
-                f"{job.label}: {seconds:.0f} s (elapsed {time.perf_counter() - started:.0f} s)",
+                f"[{done}/{len(jobs)}] {describe_job(jobs[i])}: {outcome.seconds:.0f} s "
+                f"(elapsed {time.perf_counter() - started:.0f} s){note}",
                 file=sys.stderr,
                 flush=True,
             )
+
+    order = sorted(range(len(jobs)), key=lambda i: -_cost(jobs[i]))
+    with ThreadPoolExecutor(max_workers=max(1, workers)) as threads:
+        for future in [threads.submit(run, i) for i in order]:
+            future.result()
+    for job, outcome in zip(jobs, outcomes):
+        if outcome.status == FAILED:
+            print(f"FAILED {describe_job(job)}: {outcome.error}", file=sys.stderr, flush=True)
     return outcomes
 
 
@@ -319,10 +396,15 @@ SWEEP_HEADER = (
 )
 
 
-def sweep_row(job: Job, data: dict | None, error: str | None) -> str:
+def _not_run(outcome: Outcome) -> str:
+    return f"{outcome.status}: {outcome.error}"
+
+
+def sweep_row(job: Job, outcome: Outcome) -> str:
     head = f"| {job.label} | {job.players} | {job.seating} |"
+    data = outcome.data
     if data is None:
-        return f"{head} infeasible: {error} |" + " |" * 10
+        return f"{head} {_not_run(outcome)} |" + " |" * 10
     a = data["actions_per_game"]
     turns = data["turns_per_game"]
     return (
@@ -336,11 +418,12 @@ def sweep_row(job: Job, data: dict | None, error: str | None) -> str:
     )
 
 
-def detail_rows(job: Job, data: dict | None, error: str | None) -> list[str]:
+def detail_rows(job: Job, outcome: Outcome) -> list[str]:
     """The rows of the three final tables: balance and length, actions and bribes, scores."""
     name = f"{job.mode.value} | {job.players} | {job.seating}"
+    data = outcome.data
     if data is None:
-        return [f"| {name} | infeasible: {error} |"] * 3
+        return [f"| {name} | {_not_run(outcome)} |"] * 3
     a = data["actions_per_game"]
     turns = data["turns_per_game"]
     adv = data["turn_order_advantage"]
@@ -394,32 +477,42 @@ def describe(overrides: Mapping[str, object]) -> str:
 # --- Commands ----------------------------------------------------------------
 
 
-def do_sweep(sweep: Sweep, workers: int) -> None:
-    jobs = [
-        Job(label, mode, players, seating, {**SWEEP_BASE[mode], **changes}, SWEEP_GAMES, SWEEP_SEED)
-        for mode in Mode
+def sweep_jobs(sweep: Sweep, modes, games: int) -> list[Job]:
+    return [
+        Job(label, mode, players, seating, {**SWEEP_BASE[mode], **changes}, games, SWEEP_SEED)
+        for mode in modes
         for label, changes in sweep.candidates.get(mode, ())
         for players in PLAYER_COUNTS
         for seating in sweep.seatings
     ]
-    outcomes = run_all(jobs, workers)
-    print(f"## Sweep `{sweep.name}`: {sweep.title}\n")
-    print(f"Command: `uv run python scripts/tune.py --sweep {sweep.name}`. "
-          f"{SWEEP_GAMES} games per row, seed {SWEEP_SEED}.\n")
-    for mode in Mode:
-        rows = [(j, o) for j, o in zip(jobs, outcomes) if j.mode is mode]
-        if not rows:
-            continue
-        print(f"### {mode.value.capitalize()}\n")
-        print(f"Base: {describe(SWEEP_BASE[mode])}.\n")
-        print(SWEEP_HEADER)
-        print("|" + " --- |" * 14)
-        for job, (data, error) in rows:
-            print(sweep_row(job, data, error))
-        print()
 
 
-def do_final(workers: int, modes, players_list, seatings, n: int | None, seed: int) -> None:
+def do_sweeps(sweeps: list[Sweep], workers: int, modes, games: int) -> list[Outcome]:
+    """Run every job of ``sweeps`` in one pool (so no core idles between
+    sweeps), then print each sweep's table."""
+    per_sweep = [sweep_jobs(sweep, modes, games) for sweep in sweeps]
+    outcomes = run_all([job for jobs in per_sweep for job in jobs], workers)
+    at = 0
+    for sweep, jobs in zip(sweeps, per_sweep):
+        mine, at = outcomes[at:at + len(jobs)], at + len(jobs)
+        print(f"## Sweep `{sweep.name}`: {sweep.title}\n")
+        print(f"Command: `uv run python scripts/tune.py --sweep {sweep.name}`. "
+              f"{games} games per row, seed {SWEEP_SEED}.\n")
+        for mode in modes:
+            rows = [(j, o) for j, o in zip(jobs, mine) if j.mode is mode]
+            if not rows:
+                continue
+            print(f"### {mode.value.capitalize()}\n")
+            print(f"Base: {describe(SWEEP_BASE[mode])}.\n")
+            print(SWEEP_HEADER)
+            print("|" + " --- |" * 14)
+            for job, outcome in rows:
+                print(sweep_row(job, outcome))
+            print()
+    return outcomes
+
+
+def do_final(workers: int, modes, players_list, seatings, n: int | None, seed: int) -> list[Outcome]:
     jobs = [
         Job("proposed", mode, players, seating, PROPOSED[mode], n or final_games(players), seed)
         for mode in modes
@@ -437,25 +530,36 @@ def do_final(workers: int, modes, players_list, seatings, n: int | None, seed: i
     for k, (title, header) in enumerate(zip(DETAIL_TITLES, DETAIL_HEADERS)):
         print(f"### {title}\n")
         print(header)
-        for job, (data, error) in zip(jobs, outcomes):
-            print(detail_rows(job, data, error)[k])
+        for job, outcome in zip(jobs, outcomes):
+            print(detail_rows(job, outcome)[k])
         print()
+    return outcomes
 
 
-def main() -> None:
+def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--sweep", nargs="+", choices=(*SWEEP_NAMES, "all"),
                         help="run these candidate sweeps, or all of them")
-    parser.add_argument("--mode", choices=[m.value for m in Mode], help="only this mode (final validation)")
-    parser.add_argument("--players", type=int, choices=PLAYER_COUNTS, help="only this player count")
-    parser.add_argument("--seating", choices=SEATINGS, help="only this seating")
-    parser.add_argument("--games", type=int, help="games per configuration (default: the final count)")
-    parser.add_argument("--seed", type=int, default=FINAL_SEED, help=f"run seed (default {FINAL_SEED})")
+    parser.add_argument("--mode", choices=[m.value for m in Mode], help="only this mode")
+    parser.add_argument("--players", type=int, choices=PLAYER_COUNTS,
+                        help="only this player count (final validation)")
+    parser.add_argument("--seating", choices=SEATINGS, help="only this seating (final validation)")
+    parser.add_argument("--games", type=int,
+                        help=f"games per configuration (default: {SWEEP_GAMES} in a sweep, the final count otherwise)")
+    parser.add_argument("--smoke", action="store_true",
+                        help=f"a quick check of the runner: {SMOKE_GAMES} games per configuration; "
+                             "its numbers are not the report's")
+    parser.add_argument("--seed", type=int, default=FINAL_SEED,
+                        help=f"run seed of the final validation (default {FINAL_SEED})")
     parser.add_argument("--jobs", type=int, default=os.cpu_count() or 1,
                         help="parallel processes; changes the wall time only")
     parser.add_argument("--list", action="store_true", help="list the sweeps and their candidates")
     args = parser.parse_args()
     sys.stdout.reconfigure(encoding="utf-8", line_buffering=True)  # tables appear as each sweep ends
+    games = SMOKE_GAMES if args.smoke else args.games
+    if games is not None and games < 1:
+        parser.error("--games must be at least 1")
+    modes = [Mode(args.mode)] if args.mode else list(Mode)
 
     started = time.perf_counter()
     if args.list:
@@ -464,21 +568,25 @@ def main() -> None:
             for mode in Mode:
                 for label, _ in sweep.candidates.get(mode, ()):
                     print(f"  {mode.value}: {label}")
-        return
+        return 0
+    if args.smoke:
+        print(f"SMOKE RUN ({SMOKE_GAMES} games per configuration): not the report's numbers\n")
     if args.sweep:
-        for sweep in [s for s in SWEEPS if "all" in args.sweep or s.name in args.sweep]:
-            do_sweep(sweep, args.jobs)
+        chosen = [s for s in SWEEPS if "all" in args.sweep or s.name in args.sweep]
+        outcomes = do_sweeps(chosen, args.jobs, modes, games or SWEEP_GAMES)
     else:
-        do_final(
+        outcomes = do_final(
             args.jobs,
-            [Mode(args.mode)] if args.mode else list(Mode),
+            modes,
             [args.players] if args.players else list(PLAYER_COUNTS),
             [args.seating] if args.seating else list(SEATINGS),
-            args.games,
+            games,
             args.seed,
         )
-    print(f"total wall time {time.perf_counter() - started:.0f} s", file=sys.stderr)
+    failed = sum(o.status == FAILED for o in outcomes)
+    print(f"total wall time {time.perf_counter() - started:.0f} s; {failed} failed job(s)", file=sys.stderr)
+    return 1 if failed else 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
