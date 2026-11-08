@@ -122,9 +122,9 @@ SWEEP_BASE: Mapping[Mode, Mapping[str, object]] = {
     },
     Mode.FLASH: {
         "rounds": LOW_ROUNDS[Mode.FLASH],
-        "hexes_per_player": 10,
+        "hexes_per_player": 14,
         "stone_share": 0,
-        "vineyard_distance": (3, 4),
+        "vineyard_distance": (4, 4),
     },
 }
 """The overrides every sweep starts from (chosen from exploratory runs); each
@@ -365,7 +365,7 @@ def detail_rows(job: Job, data: dict | None, error: str | None) -> list[str]:
 
 
 DETAIL_HEADERS = (
-    "| Mode | P | Seating | Games | Advantage ± 95% | ≤ 0.10 | Win rate by position | Win rate by policy "
+    "| Mode | P | Seating | Games | Advantage ± 95% | At most 0.10 | Win rate by position | Win rate by policy "
     "| Shared wins | Turns | Minutes | In length target | Pass share |\n"
     "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     "| Mode | P | Seating | Canal | Floodgate | Bribe | Pass | Games with floodgate | Games with bribe "
@@ -444,7 +444,8 @@ def do_final(workers: int, modes, players_list, seatings, n: int | None, seed: i
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--sweep", choices=(*SWEEP_NAMES, "all"), help="run one candidate sweep, or all")
+    parser.add_argument("--sweep", nargs="+", choices=(*SWEEP_NAMES, "all"),
+                        help="run these candidate sweeps, or all of them")
     parser.add_argument("--mode", choices=[m.value for m in Mode], help="only this mode (final validation)")
     parser.add_argument("--players", type=int, choices=PLAYER_COUNTS, help="only this player count")
     parser.add_argument("--seating", choices=SEATINGS, help="only this seating")
@@ -454,6 +455,7 @@ def main() -> None:
                         help="parallel processes; changes the wall time only")
     parser.add_argument("--list", action="store_true", help="list the sweeps and their candidates")
     args = parser.parse_args()
+    sys.stdout.reconfigure(encoding="utf-8", line_buffering=True)  # tables appear as each sweep ends
 
     started = time.perf_counter()
     if args.list:
@@ -464,7 +466,7 @@ def main() -> None:
                     print(f"  {mode.value}: {label}")
         return
     if args.sweep:
-        for sweep in SWEEPS if args.sweep == "all" else [s for s in SWEEPS if s.name == args.sweep]:
+        for sweep in [s for s in SWEEPS if "all" in args.sweep or s.name in args.sweep]:
             do_sweep(sweep, args.jobs)
     else:
         do_final(
