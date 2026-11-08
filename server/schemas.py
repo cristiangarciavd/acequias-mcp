@@ -38,6 +38,13 @@ floodgate included), `vineyard_distance` as `[low, high]`, the rest as ints.
 `overrides_from_json` turns those keys back into `int` and `PieceKind` and
 the pair into a tuple; every value check is left to `Preset`.
 
+The piece shape, read by `generate_piece_stl` (and `build_plate`): `PieceJSON`,
+one object per printable piece, told apart by `type` (`"terrain"`,
+`"canal"`, `"floodgate"`, `"owner_token"`, `"grape_cluster"`,
+`"debt_token"`), with the sizes of its `acequias.cad` generator in mm.
+`piece_variant` and `piece_params` split one into the arguments of
+`acequias.cad.pieces.build_piece`.
+
 Reading JSON back leaves the checks to the model: `Hex`, `Tile`, and `Board`
 raise `ValueError` or `TypeError` on a bad hex, and the `*_from_json`
 functions raise `ValueError` on an unknown string, so a tool wrapped with
@@ -49,7 +56,7 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StrictInt, with_config
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, StrictInt, with_config
 from typing_extensions import TypedDict
 
 from acequias.assembly import AssemblyStep
@@ -358,6 +365,184 @@ def overrides_from_json(overrides: Mapping[str, Any]) -> dict[str, Any]:
     if isinstance(changes.get("vineyard_distance"), (list, tuple)):
         changes["vineyard_distance"] = tuple(changes["vineyard_distance"])
     return changes
+
+
+# --- Printable pieces -------------------------------------------------------
+#
+# One shape per piece type, told apart by `type`; `PieceJSON` is their union.
+# `generate_piece_stl` and `build_plate` read the same objects. Every
+# default is the default of the `acequias.cad` generator the type maps to
+# (`acequias.cad.pieces`); the CAD modules are not imported here, so the
+# numbers are repeated, and a test checks they match. Only the plain limits
+# are checked here; the CAD functions check the combinations.
+
+MAX_LENGTH_MM = 100.0
+"""The largest length a piece parameter takes, in mm."""
+
+MAX_FIT_MM = 2.0
+"""The largest clearance or tolerance a piece parameter takes, in mm."""
+
+DebtValue = Literal[1, 5]
+
+_LENGTH_LIMITS = f"above 0 and at most {MAX_LENGTH_MM:g}"
+_FIT_LIMITS = f"0 to {MAX_FIT_MM:g}"
+
+
+def _length(default: float, description: str) -> Any:
+    return Field(default, gt=0, le=MAX_LENGTH_MM, description=f"{description}, in mm, {_LENGTH_LIMITS}.")
+
+
+def _fit(default: float, description: str) -> Any:
+    return Field(default, ge=0, le=MAX_FIT_MM, description=f"{description}, in mm, {_FIT_LIMITS}.")
+
+
+def _side() -> Any:
+    return _length(16.0, "Nominal hex side (corner to corner is twice this)")
+
+
+def _tile_height() -> Any:
+    return _length(4.0, "Height of the tile")
+
+
+def _clearance() -> Any:
+    return _fit(0.0, "Gap each edge moves in, between neighboring printed tiles")
+
+
+def _groove_width(fits: str = "") -> Any:
+    return _length(6.0, "Width of the canal groove" + fits)
+
+
+def _groove_depth(fits: str = "") -> Any:
+    return _length(1.5, "Depth of the canal groove" + fits)
+
+
+_MATCH_CANALS = "; must match the canal pieces the floodgate goes in"
+
+
+def _reject_bool(value: Any) -> Any:
+    if type(value) is not int:
+        raise ValueError(f"must be the integer 1 or 5, got {value!r}")
+    return value
+
+
+class TerrainPieceJSON(BaseModel):
+    """A terrain hex: for the MVP the plain hexagonal tile, the same for every terrain."""
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    type: Literal["terrain"] = Field(description='Piece type: "terrain".')
+    terrain: TerrainName = Field(description="The hex terrain; it names the file only.")
+    side: float = _side()
+    height: float = _tile_height()
+    clearance: float = _clearance()
+
+
+class CanalPieceJSON(BaseModel):
+    """A canal piece: a hex tile with a groove, and a hole for the owner token."""
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    type: Literal["canal"] = Field(description='Piece type: "canal".')
+    kind: KindName = Field(description="The canal shape (lowercase ASCII); a floodgate is not a canal.")
+    side: float = _side()
+    height: float = _tile_height()
+    clearance: float = _clearance()
+    groove_width: float = _groove_width()
+    groove_depth: float = _groove_depth()
+
+
+class FloodgatePieceJSON(BaseModel):
+    """A floodgate: a gate that slots into a canal groove and closes one opening."""
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    type: Literal["floodgate"] = Field(description='Piece type: "floodgate".')
+    tolerance: float = _fit(0.15, "Fit gap against the groove on each side")
+    groove_width: float = _groove_width(_MATCH_CANALS)
+    groove_depth: float = _groove_depth(_MATCH_CANALS)
+    thickness: float = _length(2.0, "Thickness of the gate")
+
+
+class OwnerTokenPieceJSON(BaseModel):
+    """An owner token: a cap on a peg that fits the hole of a canal piece."""
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    type: Literal["owner_token"] = Field(description='Piece type: "owner_token".')
+    tolerance: float = _fit(0.15, "Fit gap between the peg and the canal hole")
+    cap_diameter: float = _length(7.0, "Diameter of the cap")
+    cap_height: float = _length(1.2, "Height of the cap")
+
+
+class GrapeClusterPieceJSON(BaseModel):
+    """A grape cluster: the marker a player puts on a claimed vineyard."""
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    type: Literal["grape_cluster"] = Field(description='Piece type: "grape_cluster".')
+    base_diameter: float = _length(14.0, "Diameter of the round base")
+    height: float = _length(15.0, "Total height, stem included (at most 1.5 x base_diameter)")
+
+
+class DebtTokenPieceJSON(BaseModel):
+    """A debt token: a round coin worth 1 or 5 points of bribe debt."""
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    type: Literal["debt_token"] = Field(description='Piece type: "debt_token".')
+    value: Annotated[DebtValue, BeforeValidator(_reject_bool)] = Field(
+        description="The debt the token is worth: 1 or 5."
+    )
+    diameter: float = _length(12.0, "Diameter of the coin")
+    thickness: float = _length(2.0, "Thickness of the coin")
+
+
+PieceJSON = Annotated[
+    TerrainPieceJSON
+    | CanalPieceJSON
+    | FloodgatePieceJSON
+    | OwnerTokenPieceJSON
+    | GrapeClusterPieceJSON
+    | DebtTokenPieceJSON,
+    Field(discriminator="type"),
+]
+"""One printable piece, by `type`."""
+
+PIECE_MODELS: dict[str, type[BaseModel]] = {
+    "terrain": TerrainPieceJSON,
+    "canal": CanalPieceJSON,
+    "floodgate": FloodgatePieceJSON,
+    "owner_token": OwnerTokenPieceJSON,
+    "grape_cluster": GrapeClusterPieceJSON,
+    "debt_token": DebtTokenPieceJSON,
+}
+"""Each piece type and its shape, in the order of `acequias.cad.pieces.PIECE_TYPES`."""
+
+PIECE_VARIANT_FIELDS: dict[str, str] = {"terrain": "terrain", "canal": "kind", "debt_token": "value"}
+"""The field that holds the variant, for the piece types that have one."""
+
+
+def piece_variant(piece: BaseModel) -> Terrain | PieceKind | int | None:
+    """The variant of a piece as `acequias.cad.pieces.build_piece` takes it.
+
+    A `Terrain` for a terrain, a canal `PieceKind` for a canal, the value for
+    a debt token, and None for the other types.
+    """
+    field = PIECE_VARIANT_FIELDS.get(piece.type)  # type: ignore[attr-defined]
+    if field is None:
+        return None
+    raw = getattr(piece, field)
+    if field == "terrain":
+        return terrain_from_json(raw)
+    if field == "kind":
+        return kind_from_json(raw)
+    return raw
+
+
+def piece_params(piece: BaseModel) -> dict[str, float]:
+    """The size parameters of a piece, in field order: every field but `type` and the variant."""
+    skip = {"type", PIECE_VARIANT_FIELDS.get(piece.type)}  # type: ignore[attr-defined]
+    return {name: value for name, value in piece.model_dump().items() if name not in skip}
 
 
 # --- Board <-> JSON ---------------------------------------------------------
