@@ -21,6 +21,7 @@ from mcp.server.mcpserver.exceptions import ToolError
 import acequias
 from server.tools import board as board_tools
 from server.tools import score as score_tools
+from server.tools import simulate as simulate_tools
 
 F = TypeVar("F", bound=Callable[..., Any])
 
@@ -77,6 +78,7 @@ def ping() -> str:
 # Each tool lives in `server.tools`; registering it here keeps every tool on `app`.
 generate_board = app.tool()(tool_errors(board_tools.generate_board))
 calculate_score = app.tool()(tool_errors(score_tools.calculate_score))
+simulate_game = app.tool()(tool_errors(simulate_tools.simulate_game))
 
 
 def main() -> None:

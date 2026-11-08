@@ -30,6 +30,14 @@ The other shapes, read and written by `calculate_score`:
 - score: one `Score`, its `watered_vineyards` each with the canal path in the
   canal shape
 
+The preset shape, written by `simulate_game` (the `preset` of
+`SimResult.to_json()`) and read back as its `overrides`: `mode` by value,
+`rounds` keyed by player count as a string (`"2"` to `"5"`), `bag_mix` keyed
+by the lowercase `PieceKind` name (`"straight"` ... `"floodgate"`, the
+floodgate included), `vineyard_distance` as `[low, high]`, the rest as ints.
+`overrides_from_json` turns those keys back into `int` and `PieceKind` and
+the pair into a tuple; every value check is left to `Preset`.
+
 Reading JSON back leaves the checks to the model: `Hex`, `Tile`, and `Board`
 raise `ValueError` or `TypeError` on a bad hex, and the `*_from_json`
 functions raise `ValueError` on an unknown string, so a tool wrapped with
@@ -39,11 +47,13 @@ functions raise `ValueError` on an unknown string, so a tool wrapped with
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, StrictInt, with_config
+from typing_extensions import TypedDict
 
 from acequias.assembly import AssemblyStep
+from acequias.config import PLAYER_COUNTS
 from acequias.hex import Direction, Hex
 from acequias.model import (
     ROTATIONS,
@@ -64,6 +74,9 @@ VarietalName = Literal["malbec", "bonarda", "torrontes"]
 ModeName = Literal["normal", "flash"]
 KindName = Literal["straight", "gentle_curve", "sharp_curve", "symmetric_y", "t_branch", "claw"]
 DirectionName = Literal["E", "NE", "NW", "W", "SW", "SE"]
+# Built from the library, so they follow `PLAYER_COUNTS` and `PieceKind`.
+PlayerCountName = Literal[tuple(str(players) for players in PLAYER_COUNTS)]  # type: ignore[valid-type]
+PieceName = Literal[tuple(kind.name.lower() for kind in PieceKind)]  # type: ignore[valid-type]
 
 HEX_KEYS = frozenset({"q", "r", "terrain", "varietal"})
 
@@ -72,6 +85,8 @@ _VARIETAL_BY_NAME = {varietal.name.lower(): varietal for varietal in Varietal}
 _MODE_BY_NAME = {mode.value: mode for mode in Mode}
 _KIND_BY_NAME = {kind.name.lower(): kind for kind in PieceKind if kind.is_canal}
 _DIRECTION_BY_NAME = {direction.name: direction for direction in Direction}
+_PIECE_BY_NAME = {kind.name.lower(): kind for kind in PieceKind}
+_PLAYER_COUNT_BY_NAME = {str(players): players for players in PLAYER_COUNTS}
 
 
 # --- String mappings --------------------------------------------------------
@@ -255,6 +270,94 @@ class ScoreJSON(BaseModel):
     watered_vineyards: list[WateredVineyardJSON] = Field(
         description="The player's watered claimed vineyards, by hex."
     )
+
+
+_ROUNDS_DESCRIPTION = 'Rounds per player count, keyed "2" to "5".'
+_BAG_MIX_DESCRIPTION = (
+    'Percentage of the bag for each piece kind, keyed "straight", "gentle_curve", '
+    '"sharp_curve", "symmetric_y", "t_branch", "claw", "floodgate".'
+)
+_DISTANCE_DESCRIPTION = "[low, high]: how far, in hexes, a vineyard lies from the river."
+
+
+class PresetJSON(BaseModel):
+    """Every value of a game preset (the numbers of one mode), after overrides."""
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    mode: ModeName = Field(description="The mode the preset belongs to.")
+    rounds: dict[PlayerCountName, int] = Field(description=_ROUNDS_DESCRIPTION)
+    hexes_per_player: int = Field(description="Board hexes per player.")
+    vineyards_per_player: int = Field(description="Vineyards per player.")
+    stone_share: int = Field(description="Percentage of non-river hexes that are stone.")
+    vineyard_distance: list[int] = Field(
+        min_length=2, max_length=2, description=_DISTANCE_DESCRIPTION
+    )
+    market_size: int = Field(description="Pieces face up in the market.")
+    bag_mix: dict[PieceName, int] = Field(description=_BAG_MIX_DESCRIPTION)
+    die_faces: int = Field(description="Faces of the bribe die.")
+    bodega_points: int = Field(description="Points of the bodega bonus.")
+    bodega_varietals: int = Field(description="Distinct watered varietals the bodega bonus needs.")
+
+
+@with_config(ConfigDict(extra="forbid"))
+class PresetOverridesJSON(TypedDict, total=False):
+    """Preset values to replace, in the `PresetJSON` shape without `mode`.
+
+    Every key is optional; omitted keys keep the mode's shipped value, and a
+    key given replaces that value as a whole. Only keys and types are checked
+    here (strict integers); the value rules come from `Preset`.
+    """
+
+    rounds: Annotated[
+        dict[PlayerCountName, StrictInt],
+        Field(description=_ROUNDS_DESCRIPTION + " Give every key, e.g. {\"2\": 10, ...}."),
+    ]
+    hexes_per_player: Annotated[StrictInt, Field(description="Board hexes per player.")]
+    vineyards_per_player: Annotated[StrictInt, Field(description="Vineyards per player.")]
+    stone_share: Annotated[
+        StrictInt, Field(description="Percentage, 0 to 100, of non-river hexes that are stone.")
+    ]
+    vineyard_distance: Annotated[
+        tuple[StrictInt, StrictInt],
+        Field(description=_DISTANCE_DESCRIPTION + " low is 2 or more, high at least low."),
+    ]
+    market_size: Annotated[StrictInt, Field(description="Pieces face up in the market.")]
+    bag_mix: Annotated[
+        dict[PieceName, StrictInt],
+        Field(description=_BAG_MIX_DESCRIPTION + " Give every key; the shares add up to 100."),
+    ]
+    die_faces: Annotated[StrictInt, Field(description="Faces of the bribe die, 2 or more.")]
+    bodega_points: Annotated[StrictInt, Field(description="Points of the bodega bonus.")]
+    bodega_varietals: Annotated[
+        StrictInt, Field(description="Distinct watered varietals the bodega bonus needs, 1 to 3.")
+    ]
+
+
+def overrides_from_json(overrides: Mapping[str, Any]) -> dict[str, Any]:
+    """The `with_overrides` keyword arguments for an overrides JSON object.
+
+    `rounds` keys become `int`, `bag_mix` keys `PieceKind`, and
+    `vineyard_distance` a tuple; every other value is passed on as is, for
+    `Preset` to check. Raises `ValueError` on a `rounds` or `bag_mix` key
+    that is not one.
+    """
+    if not isinstance(overrides, Mapping):
+        raise TypeError(f"overrides must be an object, got {overrides!r}")
+    changes = dict(overrides)
+    if isinstance(changes.get("rounds"), Mapping):
+        changes["rounds"] = {
+            _lookup("rounds key", key, _PLAYER_COUNT_BY_NAME): value
+            for key, value in changes["rounds"].items()
+        }
+    if isinstance(changes.get("bag_mix"), Mapping):
+        changes["bag_mix"] = {
+            _lookup("bag_mix key", key, _PIECE_BY_NAME): value
+            for key, value in changes["bag_mix"].items()
+        }
+    if isinstance(changes.get("vineyard_distance"), (list, tuple)):
+        changes["vineyard_distance"] = tuple(changes["vineyard_distance"])
+    return changes
 
 
 # --- Board <-> JSON ---------------------------------------------------------
