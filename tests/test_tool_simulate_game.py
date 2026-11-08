@@ -14,7 +14,7 @@ from acequias.sim import SimRules, simulate_game
 from server.app import app
 from server.schemas import overrides_from_json
 from server.tools.board import MAX_PICKED_SEED, MAX_SEED
-from server.tools.simulate import MAX_GAMES
+from server.tools.simulate import DEFAULT_GAMES, MAX_GAMES
 
 pytestmark = pytest.mark.anyio
 
@@ -80,8 +80,9 @@ async def test_input_schema_describes_every_field():
     assert (properties["players"]["minimum"], properties["players"]["maximum"]) == (2, 5)
     games = properties["games"]
     assert (games["type"], games["minimum"], games["maximum"]) == ("integer", 1, MAX_GAMES)
-    assert games["default"] == 100
-    assert MAX_GAMES == 1000
+    # Planned as 1,000 and 100; lowered so one call fits in 30 s (see MAX_GAMES).
+    assert games["default"] == DEFAULT_GAMES == min(100, MAX_GAMES)
+    assert MAX_GAMES == 10
 
     seed_int = next(arm for arm in properties["seed"]["anyOf"] if arm.get("type") == "integer")
     assert (seed_int["minimum"], seed_int["maximum"]) == (0, MAX_SEED)
@@ -158,13 +159,13 @@ async def test_without_seed_the_server_picks_one_and_returns_it():
     assert again.structured_content == picked.structured_content
 
 
-async def test_games_defaults_to_100():
+async def test_games_has_a_default():
     async with Client(app) as client:
-        # One round per game keeps the 100 games quick.
+        # One round per game keeps the default run quick.
         one_round = {"rounds": {"2": 1, "3": 1, "4": 1, "5": 1}}
         result = await call(client, mode="flash", players=2, seed=1, overrides=one_round)
     assert not result.is_error, text_of(result)
-    assert result.structured_content["n"] == 100
+    assert result.structured_content["n"] == DEFAULT_GAMES
 
 
 async def test_overrides_change_only_the_given_fields():

@@ -27,9 +27,12 @@ from server.schemas import (
 from server.tools.board import MAX_SEED, pick_seed
 
 # The most games one call plays. It keeps one call well inside the client's
-# timeout; #43 raises it (progress updates, parallel games).
-MAX_GAMES = 1_000
-DEFAULT_GAMES = 100
+# timeout; #43 raises it (progress updates, parallel games). Planned as 1,000,
+# but a 5-player Normal game of greedy bots takes about 2 s on the dev
+# machine, so 1,000 games would take over 30 minutes; 10 games fit in 30 s.
+MAX_GAMES = 10
+# Planned as 100; it cannot be above MAX_GAMES.
+DEFAULT_GAMES = min(100, MAX_GAMES)
 DEFAULT_POLICY = "greedy"
 
 # Built from `POLICIES` at import time, so a policy added there is listed here.
