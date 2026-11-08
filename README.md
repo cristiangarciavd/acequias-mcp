@@ -4,7 +4,7 @@
 
 Acequias is a competitive board game for 2 to 5 players with 3D-printed hex pieces. Players build canals to carry water from the mountains to the vineyards of Mendoza. This repo holds an MCP server that generates balanced boards, scores games, simulates them with bots to tune the rules, and outputs printable STL pieces for a Bambu Lab A1.
 
-> **Status:** early development. Milestones 1 (game logic) and 2 (MCP server) are done: the server exposes `generate_board` and `calculate_score`. Milestone 3 (simulation) is under way: game setup, the turn engine, the round loop, and the random and greedy bots are done; the floodgate-and-bribe bot and `simulate_game` come next. Progress is tracked in the [GitHub issues](../../issues) and [milestones](../../milestones).
+> **Status:** early development. Milestones 1 (game logic) and 2 (MCP server) are done. Milestone 3 (simulation) is nearly done: the turn engine, the round loop, the random, greedy, and saboteur bots, and the simulation are in, and the server exposes `generate_board`, `calculate_score`, and `simulate_game`; speeding up the simulation (#84) and tuning the open parameters with it (#20) are left. Progress is tracked in the [GitHub issues](../../issues) and [milestones](../../milestones).
 
 This README is the project's specification: game rules, design decisions, architecture, and roadmap. Task details live in the GitHub issues.
 
@@ -177,9 +177,11 @@ A Python server built on `MCPServer` from the official `mcp` SDK (formerly FastM
 | --- | --- | --- |
 | `generate_board` | `players` (2 to 5), `mode`, optional `seed` | `players`, `mode`, the `seed` used, `hexes`, and `assembly` instructions |
 | `calculate_score` | `mode`, `hexes`, `players` (id and debt), optional `canals`, `floodgates`, `claims` | `mode`, `scores` per player by term (vineyards + bodega − rights paid + rights collected − debt) with the watered vineyards and their paths, and `winners` |
-| `simulate_game` | Rules (incl. mode), number of games | Balance statistics (turn-order advantage, varietals) |
+| `simulate_game` | `mode`, `players`, optional `games` (1 to `MAX_GAMES`, default 10), `policies` (one per seat, default all `"greedy"`), `overrides` (preset values, in the shape of the result's `preset` without `mode`), `seed` | `SimResult.to_json()` unchanged: the statistics, plus the inputs, the `seed` used, and every preset value after overrides |
 | `generate_piece_stl` | Piece type, parameters | STL files |
 | `build_plate` | List of pieces | Print plates for the A1 |
+
+`simulate_game` caps `games` at `MAX_GAMES = 10`: a 5-player Normal game of greedy bots takes about 2 s, so 10 games keep one call within a 30-second client timeout. Raising the cap is #43.
 
 ### Hex convention
 
@@ -223,7 +225,11 @@ A Python server built on `MCPServer` from the official `mcp` SDK (formerly FastM
 
 ### Bots
 
-`acequias/bots.py`: a bot is a plain function `decide(state, player, rng)` (the `Bot` type in `game.py`) that returns one element of `legal_actions(state, player)`, keeps no state, and draws only from `rng`. `POLICIES` maps names to bots (read-only) and `policy(name)` looks one up, listing the valid names when it is unknown. `random` picks with one `rng.choice` over every legal action. `greedy` weighs only this move and only vineyard points, with no lookahead: the canal that claims the most points now, else the one nearest the most valuable unclaimed vineyard, else a floodgate on a rival's canal; it never bribes, passing instead, and breaks ties with `rng.choice`.
+`acequias/bots.py`: a bot is a plain function `decide(state, player, rng)` (the `Bot` type in `game.py`) that returns one element of `legal_actions(state, player)`, keeps no state, and draws only from `rng`. `POLICIES` maps names to bots (read-only) and `policy(name)` looks one up, listing the valid names when it is unknown. `random` picks with one `rng.choice` over every legal action. `greedy` weighs only this move and only vineyard points, with no lookahead: the canal that claims the most points now, else the one nearest the most valuable unclaimed vineyard, else a floodgate on a rival's canal; it never bribes, passing instead, and breaks ties with `rng.choice`. `saboteur` values each non-pass action by its swing in watered vineyard points (own minus rivals'), minus the expected bribe cost `(die_faces + 1) / 2` for a bribe; it plays the best action worth more than 0 and otherwise falls back to `greedy`.
+
+### Simulation
+
+`acequias/sim.py`: `simulate_game(rules, n, seed)` plays `n` bot games of one mode and returns a `SimResult`. `SimRules` holds `mode`, `players`, `policies` (`policies[k]` plays seat `k + 1`, whatever the start player), and `overrides` for `with_overrides`; the resulting preset is passed only to `new_game`, and every later step reads it from `state.preset`. Game `i` uses `game_seed(seed, i)`, and `play_one(rules, game_seed)` replays any single game of a run. A board the preset cannot satisfy raises `ValueError` naming the game index and seed, with no partial result. A shared win among `k` players gives each `1/k` win credit, so each game hands out exactly 1. Position `j` is the place in round 1's turn order, and `turn_order_advantage` is `max_j |win_rate_by_position[j] − 1/P| × P` (0.10 means a position wins 10% more or less than its fair share). Each statistic is defined in its field's docstring; `SimResult.to_json()` gives plain JSON with the names of `server/schemas.py`.
 
 ### Board JSON
 
@@ -311,7 +317,7 @@ uv run pytest    # run the test suite
 
 ### Running the MCP server
 
-`uv run acequias-server` starts the server over stdio (`server/app.py`). It exposes `generate_board`, `calculate_score`, and `ping`, which returns `"pong"` as a connection check.
+`uv run acequias-server` starts the server over stdio (`server/app.py`). It exposes `generate_board`, `calculate_score`, `simulate_game`, and `ping`, which returns `"pong"` as a connection check.
 
 Claude Code (replace the path with your checkout):
 
