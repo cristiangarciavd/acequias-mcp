@@ -4,7 +4,7 @@
 
 Acequias is a competitive board game for 2 to 5 players with 3D-printed hex pieces. Players build canals to carry water from the mountains to the vineyards of Mendoza. This repo holds an MCP server that generates balanced boards, scores games, simulates them with bots to tune the rules, and outputs printable STL pieces for a Bambu Lab A1.
 
-> **Status:** early development. Milestones 1 (game logic) and 2 (MCP server) are done. Milestone 3 (simulation) is nearly done: the turn engine, the round loop, the random, greedy, and saboteur bots, and the faster simulation are in, and the server exposes `generate_board`, `calculate_score`, and `simulate_game`; only tuning the open parameters with it (#20) is left. Milestone 4 (pieces) has the terrain hex (#14) and the canal pieces, floodgate, and owner token (#15); milestone 5 has the plate layout (#18). Progress is tracked in the [GitHub issues](../../issues) and [milestones](../../milestones).
+> **Status:** early development. Milestones 1 (game logic) and 2 (MCP server) are done. Milestone 3 (simulation) is nearly done: the turn engine, the round loop, the random, greedy, and saboteur bots, and the faster simulation are in, and the server exposes `generate_board`, `calculate_score`, and `simulate_game`; only tuning the open parameters with it (#20) is left. Milestone 4 (pieces) is done: every MVP piece is modeled and `generate_piece_stl` writes its STL. Milestone 5 has the plate layout (#18); the 3MF export (#33), `build_plate` (#19), and the first test print (#34) are left. Progress is tracked in the [GitHub issues](../../issues) and [milestones](../../milestones).
 
 This README is the project's specification: game rules, design decisions, architecture, and roadmap. Task details live in the GitHub issues.
 
@@ -154,6 +154,8 @@ All pieces are parametric build123d models printed on the Bambu Lab A1 (256 × 2
 | Canal groove | 6 mm wide, 1.5 mm deep |
 | Owner token | hole 4 mm across, 2 mm deep; cap 7 mm across, 1.2 mm high |
 | Floodgate | 5.70 × 2.00 × 1.50 mm (groove width minus a 0.15 mm fit tolerance per side, flush with the top) |
+| Grape cluster | 14 mm base, 15 mm high, grapes at least 2 mm across |
+| Debt token | 12 mm across, 2 mm thick; pips 2 mm across, 0.6 mm deep |
 | Thinnest wall | 0.8 mm (two widths of the 0.4 mm nozzle) |
 | Board footprint (4p) | ~18–20 cm across |
 | Print estimate (4p set, ~50–70 hexes) | ~150–200 g PLA, ~8–12 h; rough until the real STL is sliced |
@@ -184,10 +186,12 @@ A Python server built on `MCPServer` from the official `mcp` SDK (formerly FastM
 | `generate_board` | `players` (2 to 5), `mode`, optional `seed` | `players`, `mode`, the `seed` used, `hexes`, and `assembly` instructions |
 | `calculate_score` | `mode`, `hexes`, `players` (id and debt), optional `canals`, `floodgates`, `claims` | `mode`, `scores` per player by term (vineyards + bodega − rights paid + rights collected − debt) with the watered vineyards and their paths, and `winners` |
 | `simulate_game` | `mode`, `players`, optional `games` (1 to `MAX_GAMES`, default 10), `policies` (one per seat, default all `"greedy"`), `overrides` (preset values, in the shape of the result's `preset` without `mode`), `seed` | `SimResult.to_json()` unchanged: the statistics, plus the inputs, the `seed` used, and every preset value after overrides |
-| `generate_piece_stl` | Piece type, parameters | STL files |
+| `generate_piece_stl` | `piece`: one `PieceJSON` object, chosen by `type` (`terrain`, `canal`, `floodgate`, `owner_token`, `grape_cluster`, `debt_token`), with optional sizes in mm | `path` of the STL written, `piece` with every default filled in, and the mesh's `size`, `volume`, `triangles`, and `watertight` |
 | `build_plate` | List of pieces | Print plates for the A1 |
 
 `simulate_game` caps `games` at `MAX_GAMES = 10`, set when a 5-player Normal game of greedy bots took about 2 s, so 10 games kept one call within a 30-second client timeout; since #84 such a game takes under 0.1 s. Raising the cap is #43.
+
+`generate_piece_stl` writes into one output folder, set by `ACEQUIAS_OUTPUT_DIR` (default `output/` in the server's working folder, git-ignored), and takes no path. The file name is built from the type, the variant, and every parameter, so the same request overwrites the same file. Without the `cad` extra the server still starts, and the tool returns an error naming the extra and `uv sync --extra cad`.
 
 ### Hex convention
 
@@ -243,7 +247,7 @@ The engine and the bots take fast paths (precomputed tables, boards derived with
 
 ### CAD pieces
 
-`acequias/cad/` holds the build123d models; it is the only code that imports build123d or trimesh, and the game logic and the server never import it at module level, so a plain install stays CAD-free. CAD frame: `x` east, `y` north, `z` up, in mm, each piece centered at `x = y = 0` with its bottom on `z = 0`; outlines come from `Hex.corners`, each corner `(x, y)` used as `(x, -y)`, so each edge faces the same `Direction` as on the board. `hex_tile.py`: `hex_tile(side, height, clearance)` is the terrain prism and `export_stl(shape, path)` writes a binary STL. `channel.py`: `canal_piece(kind)` is the tile with a groove spoke to each edge the kind opens at rotation 0 (players rotate the printed piece) and a hole for the owner token; `floodgate()` is the gate as it sits in the groove; `owner_token()` is a cap with a peg, printed cap down. Defaults are those of the [Geometry profile](#geometry-profile); any size that would leave a wall under 0.8 mm raises `ValueError` naming it.
+`acequias/cad/` holds the build123d models; it is the only code that imports build123d or trimesh, and the game logic and the server never import it at module level, so a plain install stays CAD-free. CAD frame: `x` east, `y` north, `z` up, in mm, each piece centered at `x = y = 0` with its bottom on `z = 0`; outlines come from `Hex.corners`, each corner `(x, y)` used as `(x, -y)`, so each edge faces the same `Direction` as on the board. `hex_tile.py`: `hex_tile(side, height, clearance)` is the terrain prism and `export_stl(shape, path)` writes a binary STL. `channel.py`: `canal_piece(kind)` is the tile with a groove spoke to each edge the kind opens at rotation 0 (players rotate the printed piece) and a hole for the owner token; `floodgate()` is the gate as it sits in the groove; `owner_token()` is a cap with a peg, printed cap down. `tokens.py`: `grape_cluster()` is tiers of grapes on a flat round base, topped by a stem, that rests loose on a vineyard tile (no peg); `debt_token(value)` is a disc worth 1 or 5, marked with die-face pips (no text). Both have circle footprints for the plate layout. `pieces.py`: `build_piece(type, variant, **params)` maps each piece type to its generator. Defaults are those of the [Geometry profile](#geometry-profile); any size that would leave a wall under 0.8 mm raises `ValueError` naming it.
 
 ### Board JSON
 
@@ -334,7 +338,7 @@ Without the `cad` extra the CAD tests are skipped; CI installs it, so they run t
 
 ### Running the MCP server
 
-`uv run acequias-server` starts the server over stdio (`server/app.py`). It exposes `generate_board`, `calculate_score`, `simulate_game`, and `ping`, which returns `"pong"` as a connection check.
+`uv run acequias-server` starts the server over stdio (`server/app.py`). It exposes `generate_board`, `calculate_score`, `simulate_game`, `generate_piece_stl` (needs the `cad` extra), and `ping`, which returns `"pong"` as a connection check.
 
 Claude Code (replace the path with your checkout):
 
