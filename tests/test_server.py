@@ -84,6 +84,7 @@ async def test_real_server_lists_only_its_own_tools():
     async with Client(app) as client:
         tools = (await client.list_tools()).tools
         assert sorted(tool.name for tool in tools) == [
+            "build_plate",
             "calculate_score",
             "generate_board",
             "generate_piece_stl",

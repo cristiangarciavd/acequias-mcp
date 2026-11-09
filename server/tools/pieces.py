@@ -23,10 +23,15 @@ from pydantic import BaseModel, ConfigDict, Field
 from server.output import output_dir
 from server.schemas import PIECE_VARIANT_FIELDS, PieceJSON, piece_params, piece_variant
 
-CAD_EXTRA_MESSAGE = (
-    "generate_piece_stl needs the optional 'cad' extra (build123d and trimesh), "
-    "which is not installed; install it with: uv sync --extra cad"
-)
+def cad_extra_message(tool: str) -> str:
+    """The error a CAD tool returns when the optional `cad` extra is not installed."""
+    return (
+        f"{tool} needs the optional 'cad' extra (build123d and trimesh), "
+        "which is not installed; install it with: uv sync --extra cad"
+    )
+
+
+CAD_EXTRA_MESSAGE = cad_extra_message("generate_piece_stl")
 
 FILE_NAME_PATTERN = re.compile(r"[a-z0-9_.-]+\.stl")
 """What every file name matches: only `a-z`, `0-9`, `_`, `-`, and `.`."""
