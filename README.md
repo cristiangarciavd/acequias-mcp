@@ -4,7 +4,7 @@
 
 Acequias is a competitive board game for 2 to 5 players with 3D-printed hex pieces. Players build canals to carry water from the mountains to the vineyards of Mendoza. This repo holds an MCP server that generates balanced boards, scores games, simulates them with bots to tune the rules, and outputs printable STL pieces for a Bambu Lab A1.
 
-> **Status:** early development. Milestones 1 (game logic) and 2 (MCP server) are done. Milestone 3 (simulation) is nearly done: the turn engine, the round loop, the random, greedy, and saboteur bots, and the faster simulation are in, and the server exposes `generate_board`, `calculate_score`, and `simulate_game`; tuning the open parameters with it (#20) is in progress. Milestone 4 (pieces) is done: every MVP piece is modeled and `generate_piece_stl` writes its STL. Milestone 5 has the plate layout (#18), the 3MF export (#33), and `build_plate` (#19); only the first test print (#34) is left. Progress is tracked in the [GitHub issues](../../issues) and [milestones](../../milestones).
+> **Status:** early development. Milestones 1 (game logic) and 2 (MCP server) are done. Milestone 3 (simulation) is nearly done: the turn engine, the round loop, the random, greedy, and saboteur bots, and the faster simulation are in, and the server exposes `generate_board`, `calculate_score`, and `simulate_game`; the open parameters are tuned with it (#20, [results](#tuning-results)). Milestone 4 (pieces) is done: every MVP piece is modeled and `generate_piece_stl` writes its STL. Milestone 5 has the plate layout (#18), the 3MF export (#33), and `build_plate` (#19); only the first test print (#34) is left. Progress is tracked in the [GitHub issues](../../issues) and [milestones](../../milestones).
 
 This README is the project's specification: game rules, design decisions, architecture, and roadmap. Task details live in the GitHub issues.
 
@@ -112,10 +112,10 @@ A player whose watered vineyards include **each** varietal (Malbec, Bonarda, Tor
 
 | Mode | Rounds | Board | Target time |
 | --- | --- | --- | --- |
-| **Normal** | ~12 | ~12 hexes/player (2p 24 · 3p 36 · 4p 48 · 5p 60) | ~45–60 min |
-| **Flash** | ~5 | ~7 hexes/player, river one row closer to the vineyards | ~10–20 min |
+| **Normal** | 2p 10 · 3p 15 · 4p 12 · 5p 10 | 15 hexes/player (2p 30 · 3p 45 · 4p 60 · 5p 75) | ~45–60 min (2p ~20 min) |
+| **Flash** | 2p 6 · 3p 6 · 4p 4 · 5p 4 | 14 hexes/player (2p 28 · 3p 42 · 4p 56 · 5p 70) | ~10–20 min |
 
-Flash is shorter in two ways: fewer rounds, and a denser board where vineyards connect in 1–2 pieces instead of 3–4. Its bodega bonus is reduced to +1. Both modes start with 2 vineyards per player and 10% stone hexes. All values are provisional and tuned by the simulation; they live in `acequias/config.py` (see [Game config](#game-config)).
+Flash is shorter because it has fewer rounds. In both modes every vineyard sits 4 hexes from the river, so it connects in 3 pieces: closer vineyards hand the first player most of the wins. Flash's bodega bonus is reduced to +1. Both modes start with 2 vineyards per player and 10% stone hexes. A 2-player Normal game is shorter (about 20 turns) because its board is full by then and more rounds would only add passes. The values were tuned by the simulation (#20, [results](#tuning-results)); they live in `acequias/config.py` (see [Game config](#game-config)).
 
 ### End and scoring
 
@@ -209,7 +209,7 @@ A Python server built on `MCPServer` from the official `mcp` SDK (formerly FastM
 
 ### Game config
 
-`acequias/config.py`: every number the game needs, as one immutable `Preset` per mode, fetched with `preset(mode)`. Board generation, setup, scoring, the round loop, and the simulation read their values from it and hard-code none. Tuning changes the shipped values there; experiments build variants with `with_overrides`, which validates them like the shipped presets. Shares (stone hexes, bag mix) are whole-number percentages, and rounds are set per player count so they can differ later.
+`acequias/config.py`: every number the game needs, as one immutable `Preset` per mode, fetched with `preset(mode)`. Board generation, setup, scoring, the round loop, and the simulation read their values from it and hard-code none. Tuning changes the shipped values there; experiments build variants with `with_overrides`, which validates them like the shipped presets. Shares (stone hexes, bag mix) are whole-number percentages, and rounds are set per player count (they differ since #20).
 
 ### Water reach
 
@@ -312,23 +312,40 @@ MVP pieces are plain and functional; the decorative layer below comes after the 
 
 - [ ] Each tool has unit tests with pytest
 - [ ] Every generated board has at least one reachable vineyard per player
-- [ ] Turn-order advantage is at most 10%, in Normal and in Flash separately
-- [ ] A Normal game takes about 45–60 min and a Flash game 10–20 min, estimated at 1 minute per turn
+- [ ] Turn-order advantage is at most 10%, in Normal and in Flash separately: met in 10 of 16 simulated configurations; missed by all-greedy tables at Normal 4–5p and Flash 3–5p, and by Flash 5p with saboteurs (follow-ups #103, #104)
+- [ ] A Normal game takes about 45–60 min and a Flash game 10–20 min, estimated at 1 minute per turn: met at every player count except 2-player Normal, which takes about 20 min by the owner's choice (more rounds would only add passes)
 - [ ] Each STL is a closed solid and fits with the other pieces
+
+### Tuning results
+
+The values above were tuned in #20 with `scripts/tune.py`; the full report, with the method, every sweep, and the owner's decisions, is [`_docs/tuning-results.md`](_docs/tuning-results.md). Final validation, seed 20002, 2,000 / 3,200 / 4,800 / 6,400 games for 2 / 3 / 4 / 5 players (95% margin on the advantage at most ±0.05). Seatings: all `greedy` bots, or `saboteur` and `greedy` alternating (mixed). Minutes assume 1 minute per turn.
+
+| Mode | Players | Advantage (greedy / mixed) | Turns (minutes) | Average winning score (greedy / mixed) |
+| --- | --- | --- | --- | --- |
+| Normal | 2 | 0.02 / 0.01 | 20 | 0.75 / 0.53 |
+| Normal | 3 | 0.07 / 0.01 | 45 | 1.14 / 0.41 |
+| Normal | 4 | **0.12** / 0.03 | 48 | 1.25 / 0.30 |
+| Normal | 5 | **0.15** / 0.05 | 50 | 1.59 / 0.35 |
+| Flash | 2 | 0.00 / 0.01 | 12 | 0.70 / 0.47 |
+| Flash | 3 | **0.12** / 0.01 | 18 | 0.98 / 0.34 |
+| Flash | 4 | **0.18** / 0.07 | 16 | 1.58 / 0.51 |
+| Flash | 5 | **0.29** / **0.15** | 20 | 2.06 / 0.60 |
+
+Bold marks a miss of the 0.10 target. With these one-move-ahead bots scores are very low and about half of the games (more with saboteurs) end in a shared win; #103 re-measures balance with the stronger bots (#42, #67) before any rule change (#104).
 
 ### Open questions
 
-Provisional defaults let work start; the simulation (or CAD, for physical values) settles them.
+Provisional defaults let work start; the simulation (or CAD, for physical values) settles them. The game values were settled in #20 ([results](#tuning-results)).
 
-- [ ] Normal rounds: default 12
-- [ ] Flash rounds per player count: default ~5, aiming at 10–20 min
-- [ ] Hexes per player: Normal ~12, Flash ~7
-- [ ] Bag mix: straight 40% · gentle curve 20% · sharp curve 15% · symmetric Y 5% · T branch 5% · claw 5% · floodgate 10%, sized to board capacity
-- [ ] Vineyards per player: default 2, both modes
-- [ ] Stone hexes: default 10% of the non-river hexes
-- [ ] Vineyard distance from the river: Normal 4–5 hexes (3–4 canals), Flash 2–3 (1–2 canals)
-- [ ] Die: is the d6 (average bribe cost 3.5) balanced against vineyard values, or should it be a d8 or a success threshold?
-- [ ] Flash bodega bonus: default +1 for all three varietals
+- [x] Normal rounds: 10 / 15 / 12 / 10 for 2 / 3 / 4 / 5 players
+- [x] Flash rounds per player count: 6 / 6 / 4 / 4 for 2 / 3 / 4 / 5 players
+- [x] Hexes per player: Normal 15, Flash 14
+- [x] Bag mix: straight 40% · gentle curve 20% · sharp curve 15% · symmetric Y 5% · T branch 5% · claw 5% · floodgate 10%, sized to board capacity (kept)
+- [x] Vineyards per player: 2, both modes (kept)
+- [x] Stone hexes: 10% of the non-river hexes (kept)
+- [x] Vineyard distance from the river: 4 hexes (3 canals) in both modes
+- [x] Die: the d6 is kept (a d4 makes bribes common, a d8 nearly removes them); a success threshold waits for smarter bots (#42, #67)
+- [x] Flash bodega bonus: +1 for all three varietals (kept)
 - [ ] Hex side: 16 mm, or the 18 mm fallback (validated in CAD and by printing)
 - [ ] Flash race-end variant: evaluate in the simulation before committing (see [Variants](#variants-under-evaluation))
 

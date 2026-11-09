@@ -190,7 +190,7 @@ def test_play_one_returns_a_full_frozen_record():
     assert record.game_seed == 12345
     assert record.start == new_game(2, 12345, Mode.FLASH, preset=shipped_preset(Mode.FLASH))
     assert record.final.round == record.start.preset.rounds_for(2) + 1
-    assert len(record.log) == 5 * 2
+    assert len(record.log) == 6 * 2
     assert set(record.scores) == {"p1", "p2"}
     assert record.winners and set(record.winners) <= {"p1", "p2"}
     with pytest.raises(dataclasses.FrozenInstanceError):
@@ -241,7 +241,7 @@ def test_same_inputs_give_an_equal_result_and_seeds_matter():
 def test_impossible_preset_fails_on_game_zero(players, monkeypatch):
     played = []
     monkeypatch.setattr("acequias.sim.play_game", lambda *a: played.append(a))
-    r = rules(players=players, vineyard_distance=(3, 3))
+    r = rules(players=players, vineyard_distance=(3, 3), hexes_per_player=7)
     with pytest.raises(ValueError) as info:
         simulate_game(r, 5, 11)
     message = str(info.value)
@@ -434,8 +434,8 @@ def test_to_json_names():
     assert data["mode"] == "normal"
     assert data["preset"]["mode"] == "normal"
     assert data["policies"] == ["random", "random"]
-    assert data["preset"]["rounds"] == {"2": 12, "3": 12, "4": 12, "5": 12}
-    assert data["preset"]["vineyard_distance"] == [4, 5]
+    assert data["preset"]["rounds"] == {"2": 10, "3": 15, "4": 12, "5": 10}
+    assert data["preset"]["vineyard_distance"] == [4, 4]
     assert set(data["preset"]["bag_mix"]) == {k.name.lower() for k in PieceKind}
     assert data["preset"]["bag_mix"]["gentle_curve"] == 20
     assert set(data["winner_varietal_rate"]) == {"malbec", "bonarda", "torrontes"}

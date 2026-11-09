@@ -587,7 +587,7 @@ def test_saboteur_bribes_with_a_cheap_die():
     bribes = 0
     for seed in range(4):
         mode = (Mode.NORMAL, Mode.FLASH)[seed % 2]
-        state = new_game(2, seed, mode, preset=with_overrides(shipped_preset(mode), die_faces=2))
+        state = new_game(3, seed, mode, preset=with_overrides(shipped_preset(mode), die_faces=2))
         bots = saboteur_seating(state, "alternating")
         _, log = play_game(state, bots, *game_rngs(seed))
         bribes += sum(isinstance(r.action, Bribe) and bots[r.player] is saboteur_bot

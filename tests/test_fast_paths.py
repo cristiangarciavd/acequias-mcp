@@ -69,7 +69,7 @@ def test_canonical_rotation_is_the_smallest_with_the_same_edges():
 
 def _states(seed, turns):
     """States of a random game, one per turn."""
-    state = new_game(3, seed, Mode.FLASH)
+    state = new_game(3, seed, Mode.NORMAL)
     rng = random.Random(seed)
     out = [state]
     while not game_over(state) and len(out) < turns:

@@ -26,14 +26,28 @@ from acequias.turn import Bribe, Pass, PlaceCanal, PlaceFloodgate
 
 DATA = Path(__file__).parent / "data" / "golden_games.json"
 
+# The shipped preset values when the file was recorded (before #20 tuned
+# them). The runs pin them as overrides, so retuning the presets changes no
+# golden game: these runs check the engine, not the shipped numbers.
+RECORDED_NORMAL = {
+    "rounds": {2: 12, 3: 12, 4: 12, 5: 12},
+    "hexes_per_player": 12,
+    "vineyard_distance": (4, 5),
+}
+RECORDED_FLASH = {
+    "rounds": {2: 5, 3: 5, 4: 5, 5: 5},
+    "hexes_per_player": 7,
+    "vineyard_distance": (2, 3),
+}
+
 # (id, mode, players, policies seat 1 first, overrides, run seed, n)
 RUNS = (
-    ("G1", Mode.NORMAL, 5, ("saboteur", "greedy", "saboteur", "greedy", "saboteur"), {}, 8401, 2),
-    ("G2", Mode.NORMAL, 2, ("greedy", "greedy"), {}, 8402, 3),
-    ("G3", Mode.NORMAL, 3, ("random", "random", "random"), {}, 8403, 3),
-    ("G4", Mode.FLASH, 4, ("saboteur", "greedy", "saboteur", "greedy"), {}, 8404, 3),
-    ("G5", Mode.FLASH, 5, ("random", "greedy", "saboteur", "random", "greedy"), {}, 8405, 3),
-    ("G6", Mode.FLASH, 2, ("saboteur", "greedy"), {"die_faces": 4}, 8406, 4),
+    ("G1", Mode.NORMAL, 5, ("saboteur", "greedy", "saboteur", "greedy", "saboteur"), RECORDED_NORMAL, 8401, 2),
+    ("G2", Mode.NORMAL, 2, ("greedy", "greedy"), RECORDED_NORMAL, 8402, 3),
+    ("G3", Mode.NORMAL, 3, ("random", "random", "random"), RECORDED_NORMAL, 8403, 3),
+    ("G4", Mode.FLASH, 4, ("saboteur", "greedy", "saboteur", "greedy"), RECORDED_FLASH, 8404, 3),
+    ("G5", Mode.FLASH, 5, ("random", "greedy", "saboteur", "random", "greedy"), RECORDED_FLASH, 8405, 3),
+    ("G6", Mode.FLASH, 2, ("saboteur", "greedy"), {**RECORDED_FLASH, "die_faces": 4}, 8406, 4),
 )
 RUN_IDS = [run[0] for run in RUNS]
 
