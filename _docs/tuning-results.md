@@ -4,38 +4,43 @@ The simulation (`acequias/sim.py`) run against the open parameters of
 `README.md` (Open questions), for Normal and Flash and every player count from 2 to 5.
 `scripts/tune.py` produces every number below.
 
-**Status: proposed values, waiting for the owner's approval on #20.**
-`acequias/config.py` and `README.md` have not changed yet. The "Approved
-values" section at the end will be filled in once the owner decides.
+**Status: final.** The owner decided on #20 (see [Approved values](#approved-values)):
+Normal uses 15 hexes per player (at most 75 terrain hexes) and 10 rounds at
+2 players, and the rest of the proposal was accepted. The final validation
+below was re-run with those values, and they are in `acequias/config.py`
+and `README.md`. Follow-ups for the missed targets: #103 and #104.
 
 ## Summary
 
-| Parameter | Mode | Current (shipped) | Proposed | Main evidence |
+| Parameter | Mode | Before #20 | Final | Main evidence |
 | --- | --- | --- | --- | --- |
-| Rounds (2/3/4/5 players) | Normal | 12/12/12/12 | 24/15/12/10 | Length target 45-60 turns met for every player count (48/45/48/50 turns). Each count is a whole number of start-player rotations |
+| Rounds (2/3/4/5 players) | Normal | 12/12/12/12 | 10/15/12/10 | 3-5p: 45/48/50 turns, inside 45-60, a whole number of start-player rotations. 2p: the owner chose a shorter game (20 turns); the 2p board is full by about 8 rounds, so more rounds only add passes (sweep `rounds2p`) |
 | Rounds (2/3/4/5 players) | Flash | 5/5/5/5 | 6/6/4/4 | Length target 10-20 turns met (12/18/16/20). The target's low end (rounds 5/4/3/2) pushes 4p and 5p advantage to 0.38 and 0.54 |
-| Hexes per player | Normal | 12 | 24 | Fewer passes and lower advantage than 12 or 18 (board sweep, combined sweep) |
+| Hexes per player | Normal | 12 | 15 (owner) | The sweeps favoured 24 (fewer passes, lower advantage), but that needs 120 terrain hexes at 5p. The owner capped it at about 75 |
 | Hexes per player | Flash | 7 | 14 | 7 cannot hold vineyards at distance 4. 14 gives fewer passes than 10 |
 | Vineyard distance | Normal | 4-5 | 4-4 | 3-4 gives seat 2 a large edge (advantage 0.16-0.61). 4-4 and 4-5 are close; 4-4 scores higher with fewer ties |
-| Vineyard distance | Flash | 2-3 | 4-4 | 2-3 hands seat 1 most wins (advantage 0.37-1.73). 3-4 gives seat 2 a large edge (0.09-0.75). Only 4-4 is near balance |
+| Vineyard distance | Flash | 2-3 | 4-4 (owner) | 2-3 hands seat 1 most wins (advantage 0.37-1.73). 3-4 gives seat 2 a large edge (0.09-0.75). Only 4-4 is near balance |
 | Vineyards per player | both | 2 | 2 (kept) | 3 gives no consistent gain in Normal and is infeasible in Flash at distance 4 |
 | Stone share | both | 10% | 10% (kept) | 0% and 15% move advantage up or down within the noise and in no consistent direction |
 | Bag mix | both | 40/20/15/5/5/5/10 | kept | Branchier bags raise scores and cut ties, but worsen advantage at 3p and 5p in the combined sweep |
 | Market size | both | 4 | 4 (kept) | 3 and 5 differ from 4 only within the noise |
-| Bribe die | both | d6 | d6 (kept) | d4 makes bribes frequent and ruinous for the briber. d8 nearly removes them. See [Bribe die](#bribe-die-d4-d6-d8) |
-| Bodega bonus | Normal | +2 for 3 varietals | kept | Earned by 0.0-0.3% of players. See [Bodega](#flash-bodega-bonus) |
-| Bodega bonus | Flash | +1 for 3 varietals | kept (owner's choice) | Earned by 0.0-0.5% of players. +2 for 2 varietals raises that to 1-5% |
+| Bribe die | both | d6 | d6 (kept, owner) | d4 makes bribes frequent and ruinous for the briber. d8 nearly removes them. See [Bribe die](#bribe-die-d4-d6-d8) |
+| Bodega bonus | Normal | +2 for 3 varietals | kept | Earned by 0.0-0.2% of players. See [Bodega](#flash-bodega-bonus) |
+| Bodega bonus | Flash | +1 for 3 varietals | kept (owner) | Earned by 0.0-0.4% of players. +2 for 2 varietals raises that to 1-5% |
 
 Targets at the final validation (all 16 configurations, 2,000-6,400 games each):
 
-- **Length (45-60 turns in Normal, 10-20 in Flash): met in 16 of 16
-  configurations.** In 2-player Normal, 63% of those turns are passes (see
+- **Length (45-60 turns in Normal, 10-20 in Flash): met in 14 of 16
+  configurations.** Missed by 2-player Normal (both seatings): 20 turns,
+  about 20 minutes, a gap the owner accepted (see
   [Length vs board size](#length-vs-board-size)).
-- **Turn-order advantage at most 0.10: met in 9 of 16, missed in 7.** It is
-  met at every 2-player count, and in the mixed seating everywhere except
-  Flash 5p. It is missed by all-greedy tables at 3 to 5 players (Normal
-  0.122 / 0.147 / 0.138, Flash 0.119 / 0.182 / 0.286) and by Flash 5p mixed
-  (0.147). No sweep candidate fixed this. See [Gaps](#gaps-and-proposed-follow-ups).
+- **Turn-order advantage at most 0.10: met in 10 of 16, missed in 6.** It is
+  met at every 2-player count, at Normal 3p, and in the mixed seating
+  everywhere except Flash 5p. It is missed by all-greedy tables at Normal
+  4-5p (0.122 / 0.154) and Flash 3-5p (0.119 / 0.182 / 0.286), and by
+  Flash 5p mixed (0.147). No sweep candidate fixed this. Follow-ups: #103
+  (re-check with smarter bots) and #104 (a seat-compensation rule). See
+  [Gaps](#gaps-and-follow-ups).
 
 ## Method
 
@@ -54,7 +59,7 @@ Targets at the final validation (all 16 configurations, 2,000-6,400 games each):
   advantage is ±0.088 / ±0.124 / ±0.152 / ±0.175 for 2 / 3 / 4 / 5
   players. So sweeps rank candidates roughly, and only the final validation
   decides.
-- **Final validation:** the proposed values (`PROPOSED` in the script),
+- **Final validation:** the final values (`PROPOSED` in the script),
   all 16 configurations, `max(2000, 1600 × (P − 1))` games (2,000 / 3,200 /
   4,800 / 6,400), and run seed **20002**, which no sweep uses. The 95%
   margin `1.96 × sqrt((P − 1) / n)` is printed next to each advantage (at
@@ -64,12 +69,13 @@ Targets at the final validation (all 16 configurations, 2,000-6,400 games each):
   table). A pass counts as a full turn.
 - **Commands** (from the repo root):
   - `uv run python scripts/tune.py`: the final validation (every number in
-    [Final validation](#final-validation)). Wall time here: 16,510 s
-    (4 h 35 min) on 12 cores. 5p Normal mixed alone took 4.6 h of one core.
+    [Final validation](#final-validation)). Wall time here: 6,776 s
+    (1 h 53 min) on 12 cores; 5p Normal mixed alone took 1.9 h of one core.
+    The first run, at 24 Normal hexes/player, took 4 h 35 min.
   - `uv run python scripts/tune.py --sweep <name>`: one sweep (`board`,
     `stone`, `vineyards`, `bag`, `market`, `rounds`, `die`, `bodega`,
-    `combined`). `--sweep all` runs all of them. The sweeps below took about
-    1 h (256 jobs) plus the combined sweep.
+    `combined`, `rounds2p`). `--sweep all` runs all of them. The sweeps below took about
+    1 h (256 jobs) plus the combined and `rounds2p` sweeps.
   - `uv run python scripts/tune.py --mode flash --players 3 --seating mixed`:
     one configuration of the final validation.
 - Numbers are identical between runs. `--jobs` changes only the wall time,
@@ -77,24 +83,27 @@ Targets at the final validation (all 16 configurations, 2,000-6,400 games each):
 
 ## Final validation
 
-Seed 20002. Normal: rounds=24/15/12/10, hexes_per_player=24,
-stone_share=10, vineyard_distance=4-4. Flash: rounds=6/6/4/4,
-hexes_per_player=14, stone_share=10, vineyard_distance=4-4. Every other
-field is the shipped preset's value (vineyards 2, market 4, bag
-40/20/15/5/5/5/10, d6, bodega +2/3 Normal and +1/3 Flash).
+Seed 20002; games per configuration: 2p 2000, 3p 3200, 4p 4800, 5p 6400. Minutes assume 1 minute per turn.
+
+- Normal: rounds=10/15/12/10, hexes_per_player=15, stone_share=10, vineyard_distance=4-4
+- Flash: rounds=6/6/4/4, hexes_per_player=14, stone_share=10, vineyard_distance=4-4
+
+These are the shipped presets; every other field is the preset's value
+(vineyards 2, market 4, bag 40/20/15/5/5/5/10, d6, bodega +2/3 Normal and
++1/3 Flash).
 
 ### Balance and length
 
 | Mode | P | Seating | Games | Advantage ± 95% | At most 0.10 | Win rate by position | Win rate by policy | Shared wins | Turns | Minutes | In length target | Pass share |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| normal | 2 | greedy | 2000 | 0.004 ± 0.044 | yes | 0.50 / 0.50 | greedy 1.000 | 0.436 | 48 | 48 | yes | 0.63 |
-| normal | 2 | mixed | 2000 | 0.015 ± 0.044 | yes | 0.51 / 0.49 | saboteur 0.555, greedy 0.445 | 0.601 | 48 | 48 | yes | 0.63 |
-| normal | 3 | greedy | 3200 | 0.122 ± 0.049 | no | 0.31 / 0.32 / 0.37 | greedy 1.000 | 0.457 | 45 | 45 | yes | 0.38 |
-| normal | 3 | mixed | 3200 | 0.011 ± 0.049 | yes | 0.33 / 0.34 / 0.33 | saboteur 0.591, greedy 0.409 | 0.827 | 45 | 45 | yes | 0.36 |
-| normal | 4 | greedy | 4800 | 0.147 ± 0.049 | no | 0.22 / 0.23 / 0.29 / 0.26 | greedy 1.000 | 0.524 | 48 | 48 | yes | 0.20 |
-| normal | 4 | mixed | 4800 | 0.031 ± 0.049 | yes | 0.25 / 0.25 / 0.25 / 0.24 | saboteur 0.436, greedy 0.564 | 0.929 | 48 | 48 | yes | 0.19 |
-| normal | 5 | greedy | 6400 | 0.138 ± 0.049 | no | 0.17 / 0.19 / 0.22 / 0.21 / 0.20 | greedy 1.000 | 0.453 | 50 | 50 | yes | 0.06 |
-| normal | 5 | mixed | 6400 | 0.048 ± 0.049 | yes | 0.21 / 0.21 / 0.20 / 0.19 / 0.19 | saboteur 0.521, greedy 0.479 | 0.923 | 50 | 50 | yes | 0.05 |
+| normal | 2 | greedy | 2000 | 0.023 ± 0.044 | yes | 0.51 / 0.49 | greedy 1.000 | 0.543 | 20 | 20 | no | 0.47 |
+| normal | 2 | mixed | 2000 | 0.014 ± 0.044 | yes | 0.51 / 0.49 | saboteur 0.544, greedy 0.456 | 0.659 | 20 | 20 | no | 0.47 |
+| normal | 3 | greedy | 3200 | 0.069 ± 0.049 | yes | 0.31 / 0.33 / 0.36 | greedy 1.000 | 0.501 | 45 | 45 | yes | 0.64 |
+| normal | 3 | mixed | 3200 | 0.006 ± 0.049 | yes | 0.33 / 0.33 / 0.34 | saboteur 0.613, greedy 0.387 | 0.777 | 45 | 45 | yes | 0.62 |
+| normal | 4 | greedy | 4800 | 0.122 ± 0.049 | no | 0.22 / 0.23 / 0.28 / 0.27 | greedy 1.000 | 0.606 | 48 | 48 | yes | 0.52 |
+| normal | 4 | mixed | 4800 | 0.025 ± 0.049 | yes | 0.25 / 0.25 / 0.25 / 0.24 | saboteur 0.457, greedy 0.543 | 0.914 | 48 | 48 | yes | 0.51 |
+| normal | 5 | greedy | 6400 | 0.154 ± 0.049 | no | 0.18 / 0.18 / 0.23 / 0.21 / 0.20 | greedy 1.000 | 0.568 | 50 | 50 | yes | 0.42 |
+| normal | 5 | mixed | 6400 | 0.054 ± 0.049 | yes | 0.21 / 0.21 / 0.20 / 0.19 / 0.19 | saboteur 0.530, greedy 0.470 | 0.912 | 50 | 50 | yes | 0.40 |
 | flash | 2 | greedy | 2000 | 0.000 ± 0.044 | yes | 0.50 / 0.50 | greedy 1.000 | 0.601 | 12 | 12 | yes | 0.27 |
 | flash | 2 | mixed | 2000 | 0.008 ± 0.044 | yes | 0.50 / 0.50 | saboteur 0.536, greedy 0.464 | 0.711 | 12 | 12 | yes | 0.27 |
 | flash | 3 | greedy | 3200 | 0.119 ± 0.049 | no | 0.31 / 0.32 / 0.37 | greedy 1.000 | 0.567 | 18 | 18 | yes | 0.22 |
@@ -108,14 +117,14 @@ field is the shipped preset's value (vineyards 2, market 4, bag
 
 | Mode | P | Seating | Canal | Floodgate | Bribe | Pass | Games with floodgate | Games with bribe | Win rate bribers | Win rate non-bribers | Mean debt |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| normal | 2 | greedy | 15.64 | 2.16 | 0.00 | 30.20 | 0.934 | 0.000 | n/a | 0.500 | 0.00 |
-| normal | 2 | mixed | 15.65 | 2.16 | 0.01 | 30.18 | 0.934 | 0.007 | 0.000 | 0.502 | 0.02 |
-| normal | 3 | greedy | 24.60 | 3.19 | 0.00 | 17.21 | 0.981 | 0.000 | n/a | 0.333 | 0.00 |
-| normal | 3 | mixed | 24.45 | 3.17 | 1.02 | 16.35 | 0.981 | 0.146 | 0.003 | 0.363 | 1.20 |
-| normal | 4 | greedy | 34.38 | 4.19 | 0.00 | 9.43 | 0.993 | 0.000 | n/a | 0.250 | 0.00 |
-| normal | 4 | mixed | 33.80 | 4.18 | 0.77 | 9.25 | 0.993 | 0.177 | 0.000 | 0.268 | 0.68 |
-| normal | 5 | greedy | 43.15 | 4.04 | 0.00 | 2.81 | 0.985 | 0.000 | n/a | 0.200 | 0.00 |
-| normal | 5 | mixed | 41.54 | 4.40 | 1.42 | 2.64 | 0.999 | 0.290 | 0.001 | 0.223 | 0.99 |
+| normal | 2 | greedy | 9.47 | 1.22 | 0.00 | 9.31 | 0.828 | 0.000 | n/a | 0.500 | 0.00 |
+| normal | 2 | mixed | 9.45 | 1.21 | 0.00 | 9.33 | 0.828 | 0.004 | 0.000 | 0.501 | 0.01 |
+| normal | 3 | greedy | 14.62 | 1.74 | 0.00 | 28.64 | 0.907 | 0.000 | n/a | 0.333 | 0.00 |
+| normal | 3 | mixed | 14.58 | 1.74 | 0.99 | 27.69 | 0.907 | 0.114 | 0.007 | 0.355 | 1.16 |
+| normal | 4 | greedy | 20.22 | 2.85 | 0.00 | 24.93 | 0.976 | 0.000 | n/a | 0.250 | 0.00 |
+| normal | 4 | mixed | 19.97 | 2.82 | 0.69 | 24.52 | 0.976 | 0.119 | 0.002 | 0.262 | 0.61 |
+| normal | 5 | greedy | 25.44 | 3.35 | 0.00 | 21.20 | 0.986 | 0.000 | n/a | 0.200 | 0.00 |
+| normal | 5 | mixed | 25.26 | 3.33 | 1.42 | 19.98 | 0.986 | 0.215 | 0.001 | 0.218 | 0.99 |
 | flash | 2 | greedy | 7.71 | 1.08 | 0.00 | 3.21 | 0.770 | 0.000 | n/a | 0.500 | 0.00 |
 | flash | 2 | mixed | 7.67 | 1.11 | 0.00 | 3.22 | 0.787 | 0.003 | 0.167 | 0.501 | 0.00 |
 | flash | 3 | greedy | 12.43 | 1.56 | 0.00 | 4.01 | 0.865 | 0.000 | n/a | 0.333 | 0.00 |
@@ -129,14 +138,14 @@ field is the shipped preset's value (vineyards 2, market 4, bag
 
 | Mode | P | Seating | Total (mean ± sd) | Winning score (mean ± sd) | Vineyard points | Bodega points | Bodega rate | Rights paid | Winner has Malbec / Bonarda / Torrontés |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| normal | 2 | greedy | 0.78 ± 0.93 | 1.00 ± 1.06 | 0.78 | 0.003 | 0.001 | 0.38 | 0.25 / 0.20 / 0.04 |
-| normal | 2 | mixed | 0.47 ± 0.79 | 0.62 ± 0.89 | 0.49 | 0.003 | 0.001 | 0.24 | 0.15 / 0.14 / 0.02 |
-| normal | 3 | greedy | 0.82 ± 0.96 | 1.29 ± 1.04 | 0.82 | 0.003 | 0.001 | 0.64 | 0.33 / 0.15 / 0.03 |
-| normal | 3 | mixed | -1.03 ± 4.68 | 0.25 ± 0.60 | 0.18 | 0.001 | 0.001 | 0.14 | 0.03 / 0.02 / 0.01 |
-| normal | 4 | greedy | 0.87 ± 1.11 | 1.60 ± 1.08 | 0.86 | 0.005 | 0.002 | 0.93 | 0.26 / 0.05 / 0.01 |
-| normal | 4 | mixed | -0.55 ± 3.14 | 0.25 ± 0.62 | 0.13 | 0.001 | 0.001 | 0.14 | 0.01 / 0.00 / 0.00 |
-| normal | 5 | greedy | 0.96 ± 1.34 | 2.10 ± 1.16 | 0.96 | 0.007 | 0.003 | 1.18 | 0.25 / 0.06 / 0.01 |
-| normal | 5 | mixed | -0.86 ± 3.73 | 0.31 ± 0.68 | 0.13 | 0.000 | 0.000 | 0.16 | 0.00 / 0.00 / 0.00 |
+| normal | 2 | greedy | 0.58 ± 0.83 | 0.75 ± 0.96 | 0.58 | 0.002 | 0.001 | 0.28 | 0.20 / 0.16 / 0.02 |
+| normal | 2 | mixed | 0.41 ± 0.71 | 0.53 ± 0.84 | 0.41 | 0.002 | 0.001 | 0.20 | 0.14 / 0.12 / 0.01 |
+| normal | 3 | greedy | 0.73 ± 0.92 | 1.14 ± 1.02 | 0.72 | 0.004 | 0.002 | 0.54 | 0.30 / 0.14 / 0.02 |
+| normal | 3 | mixed | -0.89 ± 5.09 | 0.41 ± 0.75 | 0.27 | 0.002 | 0.001 | 0.21 | 0.06 / 0.04 / 0.01 |
+| normal | 4 | greedy | 0.68 ± 0.96 | 1.25 ± 0.97 | 0.68 | 0.003 | 0.001 | 0.70 | 0.24 / 0.03 / 0.00 |
+| normal | 4 | mixed | -0.45 ± 3.35 | 0.30 ± 0.63 | 0.16 | 0.001 | 0.000 | 0.17 | 0.02 / 0.01 / 0.00 |
+| normal | 5 | greedy | 0.72 ± 1.12 | 1.59 ± 1.06 | 0.71 | 0.003 | 0.002 | 0.83 | 0.22 / 0.04 / 0.00 |
+| normal | 5 | mixed | -0.84 ± 4.06 | 0.35 ± 0.71 | 0.15 | 0.001 | 0.000 | 0.18 | 0.01 / 0.00 / 0.00 |
 | flash | 2 | greedy | 0.54 ± 0.85 | 0.70 ± 1.00 | 0.54 | 0.002 | 0.002 | 0.25 | 0.20 / 0.13 / 0.02 |
 | flash | 2 | mixed | 0.36 ± 0.70 | 0.47 ± 0.83 | 0.36 | 0.002 | 0.002 | 0.17 | 0.13 / 0.09 / 0.01 |
 | flash | 3 | greedy | 0.63 ± 0.88 | 0.98 ± 1.01 | 0.63 | 0.001 | 0.001 | 0.48 | 0.27 / 0.11 / 0.02 |
@@ -146,7 +155,25 @@ field is the shipped preset's value (vineyards 2, market 4, bag
 | flash | 5 | greedy | 0.97 ± 1.29 | 2.06 ± 1.09 | 0.96 | 0.004 | 0.004 | 1.11 | 0.26 / 0.06 / 0.01 |
 | flash | 5 | mixed | 0.07 ± 1.27 | 0.60 ± 0.87 | 0.26 | 0.000 | 0.000 | 0.30 | 0.05 / 0.01 / 0.00 |
 
-## Findings and choices for the owner
+### First run (the proposal, before the owner's decisions)
+
+The first final validation (same seed and game counts) used the proposal:
+Normal rounds 24/15/12/10 at 24 hexes/player. Flash had the same values as
+now, and its numbers were identical. Normal then gave:
+
+| P | Seating | Advantage ± 95% | Turns | Pass share | Winning score |
+| --- | --- | --- | --- | --- | --- |
+| 2 | greedy / mixed | 0.004 / 0.015 ± 0.044 | 48 | 0.63 | 1.00 / 0.62 |
+| 3 | greedy / mixed | 0.122 / 0.011 ± 0.049 | 45 | 0.38 / 0.36 | 1.29 / 0.25 |
+| 4 | greedy / mixed | 0.147 / 0.031 ± 0.049 | 48 | 0.20 / 0.19 | 1.60 / 0.25 |
+| 5 | greedy / mixed | 0.138 / 0.048 ± 0.049 | 50 | 0.06 / 0.05 | 2.10 / 0.31 |
+
+At 15 hexes/player the advantage moves within about one margin (3p greedy
+0.122 → 0.069 now meets the target; 5p greedy 0.138 → 0.154), but the
+3-5p pass share rises from 0.06-0.38 to 0.40-0.64, and winning scores
+drop a little.
+
+## Findings and the owner's choices
 
 ### Length vs board size
 
@@ -159,13 +186,13 @@ empty hex, so a small board runs out of useful moves early.
   hexes/player), 2p games with 12, 23, 24 and 30 rounds place the same
   11.4 canals and 1.8 floodgates, with identical win rates and scores. Only the pass
   count changes (10.8 → 46.8). 3p and 4p behave the same way.
-- **Pass share at the proposed Normal values (24 hexes/player):** 0.63 / 0.38 /
+- **Pass share at the first proposal (24 hexes/player):** 0.63 / 0.38 /
   0.20 / 0.06 for 2 / 3 / 4 / 5 players. In 2p Normal, about 18 of the 48
   turns are real moves. Pass share falls with board size: 2p is 0.85 / 0.72 /
   0.64 at 12 / 18 / 24 hexes/player (board sweep, distance 4-4).
 - **Flash:** pass share 0.27 / 0.22 / 0.01 / 0.00. 4p and 5p use almost
   all their turns.
-- **The owner chooses for 2-player Normal (and to a lesser degree 3-player Normal):**
+- **The choices put to the owner for 2-player Normal:**
   1. **Keep the length (proposed): 24 rounds, about 48 minutes, but about two
      thirds of the turns are passes.**
   2. **Shorter game:** about 10-12 rounds (20-24 turns, about 20-24 min).
@@ -179,8 +206,21 @@ empty hex, so a small board runs out of useful moves early.
      turns as passes. That figure is an extrapolation and was not run. It would also mean far more
      printed hexes.
 - **Physical cost of the proposal:** at 24 hexes/player, Normal needs up to
-  **120 terrain hexes** (5p), against 60 today. Flash at 14 hexes/player needs
+  **120 terrain hexes** (5p), against 60 before #20. Flash at 14 hexes/player needs
   up to 70. The printed set must cover the largest Normal board.
+- **The owner's decision:** option 2 for 2-player Normal (10-12 rounds),
+  and at most about 75 terrain hexes for 5-player Normal, so **15
+  hexes/player**. Sweep `rounds2p` (15 hexes/player, 500 games) shows that
+  2p places the same 9.5 canals and 1.2 floodgates with identical win rates
+  at 8, 10, 12 and 24 rounds: the board is full by about 8 rounds. **10
+  rounds** is the shortest game in the owner's range with every real move,
+  so it was chosen: 20 turns, pass share 0.47 (against 0.56 at 12 rounds).
+  3-5p keep 15 / 12 / 10 rounds (45 / 48 / 50 turns, inside the target).
+- **Recorded gap:** 2-player Normal takes about **20 minutes**, below the
+  45-60 minute target. Reaching it would only add passes on this board.
+- **Cost of the smaller board:** Normal at 15 hexes/player passes more at
+  3-5 players: 0.64 / 0.52 / 0.42 (greedy), against 0.38 / 0.20 / 0.06 at 24.
+  Normal needs up to 75 terrain hexes (5p) and Flash up to 70.
 
 ### Vineyard distance (and what it does to Flash)
 
@@ -197,6 +237,7 @@ Distance is the strongest lever on turn order:
   vineyards connect in 1-2 pieces". The proposed distance 4-4 means 3 canals,
   the same as Normal's minimum. Flash would then be shorter only through fewer rounds, not through a denser board.
   Keeping 2-3 means a large first-player advantage with these bots.
+- **The owner's decision:** distance 4 in Flash (accepted).
 
 ### Bribe die (d4, d6, d8)
 
@@ -214,8 +255,8 @@ The die sweep uses the mixed seating, 500 games per configuration, seed 20001.
 | Flash | 5 | d4 / d6 / d8 | 1.08 / 0.26 / 0.16 | 0.44 / 0.15 / 0.10 | 0.52 / 0.18 / 0.14 | 0.000 / 0.233 · 0.000 / 0.209 · 0.000 / 0.205 | 0.143 / 0.138 / 0.164 ± 0.175 |
 
 "Mean debt" is per player (all players, bribers or not). At the final
-validation count with the d6, games with a bribe are 0.007 / 0.146 /
-0.177 / 0.290 (Normal) and 0.003 / 0.084 / 0.067 / 0.149 (Flash), and
+validation count with the d6, games with a bribe are 0.004 / 0.114 /
+0.119 / 0.215 (Normal) and 0.003 / 0.084 / 0.067 / 0.149 (Flash), and
 bribers win 0-2.4% against 21-50% for non-bribers (16.7% in Flash 2p, from a
 handful of bribes).
 
@@ -227,13 +268,13 @@ handful of bribes).
   the end (see [Score spread](#score-spread-and-shared-wins)), a debt of
   1-6 sinks the briber. A d4 makes bribes common (up to 6 per game, in
   up to 59% of games) but still ruinous. A d8 makes them rare.
-- **Proposal: keep the d6.** Advantage does not separate the dice within
+- **Decision: keep the d6** (the owner accepted the proposal). Advantage does not separate the dice within
   the noise. The d6 keeps bribes present but uncommon. It also needs no
   special die.
 - **Success-threshold bribe: not recommended now.** These results come from a
   one-move-ahead bot in games that score almost nothing. A stronger bot
-  (#42, #67) should re-check the bribe before any rule change. So no
-  milestone-6 issue is filed for it.
+  (#42, #67) should re-check the bribe before any rule change, which #103
+  includes. So no separate issue is filed for it.
 
 ### Flash bodega bonus
 
@@ -252,72 +293,74 @@ Bodega sweep: Flash, 500 games per configuration, seed 20001.
 
 (Advantage margins: ±0.088 / 0.124 / 0.152 / 0.175 for 2-5 players.)
 
-- **Normal's bodega rate** (final validation): 0.000-0.003. The +2 for all
-  three varietals is earned by fewer than 1 player in 300.
+- **Normal's bodega rate** (final validation): 0.000-0.002. The +2 for all
+  three varietals is earned by fewer than 1 player in 500.
 - **Flash's current bonus is almost never earned** (0.0-0.5% of players).
   Changing it to +2 for 2 varietals raises that to 0.8-5.2% of players. It is still rare,
   but it pulls winners toward Bonarda and Torrontés. Its greedy advantage at 3-5p is higher
   (0.221 / 0.275 / 0.328 against 0.182 / 0.187 / 0.287). That is within the
   sweep's noise, but it never helps.
-- **Proposal: keep +1 for 3 in Flash.** No balance gain was shown for the change. The owner may
-  prefer +2 for 2 so the bonus is a real goal. Either way, the bodega bonus
-  hardly matters with these bots.
+- **Decision: keep +1 for 3 in Flash** (the owner accepted the proposal). No balance gain was
+  shown for the change. Either way, the bodega bonus hardly matters with these bots.
 
 ### Score spread and shared wins
 
 `README.md` sets no target for these, so this section reports numbers and invents no threshold.
 
-- Winning scores are tiny: mean 0.6-2.1 points (greedy) and 0.25-0.6 (mixed),
+- Winning scores are tiny: mean 0.7-2.1 points (greedy) and 0.3-0.6 (mixed),
   with standard deviation about 1. Most players end with 0 or 1 watered vineyard
   points.
-- **Shared wins: 44-60% of games (greedy) and 60-93% (mixed).** Most of these are ties at
+- **Shared wins: 46-61% of games (greedy) and 66-91% (mixed).** Most of these are ties at
   very low scores, often 0-0. In mixed games, saboteurs with debt drag the mean total below 0
-  (Normal 3p: −1.03 ± 4.68).
+  (Normal 3p: −0.89 ± 5.09).
 - The branchy bag (10/10/5/25/20/20/10) halves the ties and doubles scores
   (combined sweep, Normal 24 hexes: shared wins 0.44 → 0.26 at 2p, winning
   score 1.01 → 1.94). It raised 3p and 5p advantage, though (0.036 → 0.169,
   0.143 → 0.245, 500 games), so it is not proposed. Removing stone as well
   pushes 4p and 5p advantage higher still.
-- **Proposal: no change here.** The low scores look mostly like a bot
-  limit: greedy and saboteur look one move ahead. They should be re-measured with
-  #42 / #67 before the bag or the scoring is changed for them.
+- **Decision: not targeted for now** (the owner, for ties, scores, bribes and passes).
+  The low scores look mostly like a bot limit: greedy and saboteur look one move
+  ahead. #103 re-measures them with #42 / #67 before the bag or the scoring is
+  changed for them.
 
 ### Pass share
 
-The pass share is shown for every configuration above. At the proposed values it is
-0.63 / 0.38 / 0.20 / 0.06 (Normal) and 0.27 / 0.22 / 0.01 / 0.00 (Flash).
-There is no README target. The proposed value is "as low as the length target allows". Only 2p
-Normal (and 3p Normal) is high. See [Length vs board size](#length-vs-board-size).
+The pass share is shown for every configuration above. At the final values it is
+0.47 / 0.64 / 0.52 / 0.42 (Normal, greedy) and 0.27 / 0.22 / 0.01 / 0.00 (Flash).
+There is no README target, and the owner set none. Normal passes a lot at every
+player count because the owner capped the board at 15 hexes/player. See
+[Length vs board size](#length-vs-board-size).
 
-### Gaps and proposed follow-ups
+### Gaps and follow-ups
 
-The turn-order target (0.10) is missed in 7 of 16 configurations at the final count:
+The turn-order target (0.10) is missed in 6 of 16 configurations at the final count:
 
 | Mode | P | Seating | Advantage ± 95% | Gap | Pattern | Best sweep candidate (500 games, not validated) |
 | --- | --- | --- | --- | --- | --- | --- |
-| Normal | 3 | greedy | 0.122 ± 0.049 | 0.022 | Seat 3 wins 37% | bag 35/20/15/5/5/5/15: 0.052 ± 0.124 (the proposal itself measured 0.036 in the sweep) |
-| Normal | 4 | greedy | 0.147 ± 0.049 | 0.047 | Seat 3 wins 29% | stone 15%: 0.089 ± 0.152 (the proposal itself measured 0.059 in the sweep) |
-| Normal | 5 | greedy | 0.138 ± 0.049 | 0.038 | Seats 3-4 win 21-22% | bag 35/20/15/5/5/5/15: 0.077 ± 0.175 |
+| Normal | 4 | greedy | 0.122 ± 0.049 | 0.022 | Seats 3-4 win 27-28% | stone 15%: 0.089 ± 0.152 (at 18 hexes/player) |
+| Normal | 5 | greedy | 0.154 ± 0.049 | 0.054 | Seat 3 wins 23% | bag 35/20/15/5/5/5/15: 0.077 ± 0.175 (at 18 hexes/player) |
 | Flash | 3 | greedy | 0.119 ± 0.049 | 0.019 | Seat 3 wins 37% | bag 20/15/10/15/15/15/10: 0.039 ± 0.124 |
 | Flash | 4 | greedy | 0.182 ± 0.049 | 0.082 | Seat 4 wins 30% | rounds 5 (20 turns): 0.071 ± 0.152 |
 | Flash | 5 | greedy | 0.286 ± 0.049 | 0.186 | Seat 4 wins 26%, seats 1-2 16% | branchy bag, no stone: 0.107 ± 0.175 |
 | Flash | 5 | mixed | 0.147 ± 0.049 | 0.047 | Seat 3 wins 17% | only the die and bodega sweeps ran mixed: 0.115-0.164 |
 
+Also missed: the **length target for 2-player Normal** (20 turns, about 20
+minutes, against 45-60), by the owner's choice; see
+[Length vs board size](#length-vs-board-size).
+
 - With all-greedy tables, the **later seats in round 1 win more**: they react
   to more of the board before it fills. Mixed tables (where the saboteur
   disrupts the leader) stay within 0.10 except Flash 5p.
 - The "best candidates" above are single 500-game results with margins of
-  ±0.12-0.18, so they are not reliable. The proposal's own 3p and 4p sweep
-  values (0.036, 0.059) became 0.122 and 0.147 at the full count, and the
-  combined sweep did not reproduce the bag gains (the branchy bag was worse
-  at 3p and 5p).
-- **Proposed follow-ups (to be filed once the owner settles the values,
-  since the gaps depend on them):**
-  1. A rule against the late-seat advantage. Options: give
-     early seats a compensation, or end Flash 4-5p on a shared last round (milestone 6, a rule change).
-  2. Re-check balance with the look-ahead bot (#42) and the
-     rights/bodega/debt-aware bot (#67) before any rule change, because the
-     current gaps may come from the bots.
+  ±0.12-0.18, so they are not reliable. In the first run, the proposal's own
+  3p and 4p sweep values (0.036, 0.059) became 0.122 and 0.147 at the full
+  count, and the combined sweep did not reproduce the bag gains.
+- **Follow-ups filed (milestone 6):**
+  1. #103: re-check balance with the look-ahead bot (#42) and the
+     rights/bodega/debt-aware bot (#67), since the current gaps may come
+     from the bots. It also re-checks the bribe die.
+  2. #104: a rule that compensates the disadvantaged seats, compared in the
+     simulation, after #103 says whether the gaps remain.
 
 ### Kept parameters (details)
 
@@ -337,10 +380,32 @@ The turn-order target (0.10) is missed in 7 of 16 configurations at the final co
 
 ## Approved values
 
-Pending: the owner's decision on #20. Once the values are approved,
-`acequias/config.py`, `README.md` and this section will be updated. The
-final validation will be re-run if the approved values differ from the
-proposed ones.
+The owner's decisions on #20 (2026-11-09):
+
+1. 2-player Normal: 10-12 rounds, a shorter game with the same real moves;
+   the 2-player time target is recorded as a known gap. **10 rounds** was
+   picked from that range (sweep `rounds2p`).
+2. Flash vineyards at distance 4 (proposal accepted).
+3. Keep the d6 and the Flash bodega bonus of +1 for all three varietals
+   (proposal accepted).
+4. Board size: at most about 75 terrain hexes for 5-player Normal, so
+   **15 hexes/player** instead of the proposed 24. Flash stays at 14.
+5. Ties, scores, bribes and passes are not targeted for now.
+6. Both follow-ups for the missed turn-order targets are filed: #103 and #104.
+
+Shipped in `acequias/config.py`:
+
+| Field | Normal | Flash |
+| --- | --- | --- |
+| `rounds` (2/3/4/5 players) | 10 / 15 / 12 / 10 | 6 / 6 / 4 / 4 |
+| `hexes_per_player` | 15 | 14 |
+| `vineyards_per_player` | 2 | 2 |
+| `stone_share` | 10 | 10 |
+| `vineyard_distance` | (4, 4) | (4, 4) |
+| `market_size` | 4 | 4 |
+| `bag_mix` (straight/gentle/sharp/Y/T/claw/floodgate) | 40/20/15/5/5/5/10 | 40/20/15/5/5/5/10 |
+| `die_faces` | 6 | 6 |
+| `bodega_points` / `bodega_varietals` | 2 / 3 | 1 / 3 |
 
 ## Sweeps
 
@@ -801,3 +866,30 @@ Base: rounds=6/6/4/4, hexes_per_player=14, stone_share=10, vineyard_distance=4-4
 | branchy bag, +2 for 2 varietals | 3 | greedy | 0.186 ± 0.124 | 0.28 / 0.32 / 0.40 | 0.33 | 18 (18) | 0.12 | 14.7 / 1.20 / 0.00 / 2.1 | 2.37 ± 1.83 | 1.65 ± 1.62 | 0.136 | 0.272 | 0.50 / 0.24 / 0.15 | 0.00 | n/a / 0.333 | 0.00 |
 | branchy bag, +2 for 2 varietals | 4 | greedy | 0.231 ± 0.152 | 0.19 / 0.27 / 0.26 / 0.29 | 0.28 | 16 (16) | 0.00 | 15.9 / 0.08 / 0.00 / 0.0 | 3.15 ± 1.44 | 1.99 ± 1.60 | 0.153 | 0.307 | 0.46 / 0.22 / 0.08 | 0.00 | n/a / 0.250 | 0.00 |
 | branchy bag, +2 for 2 varietals | 5 | greedy | 0.376 ± 0.175 | 0.19 / 0.16 / 0.22 / 0.28 / 0.15 | 0.27 | 20 (20) | 0.00 | 19.8 / 0.14 / 0.00 / 0.0 | 3.73 ± 1.48 | 2.01 ± 1.82 | 0.163 | 0.326 | 0.31 / 0.14 / 0.07 | 0.00 | n/a / 0.200 | 0.00 |
+
+### Sweep `rounds2p`: Normal 2-player rounds on the owner's board (15 hexes/player); 3-5 players keep the full rotations
+
+Command: `uv run python scripts/tune.py --sweep rounds2p`. 500 games per row, seed 20001.
+
+#### Normal
+
+Base: rounds=24/15/12/10, hexes_per_player=18, stone_share=10, vineyard_distance=4-4.
+
+| Candidate | P | Seating | Advantage ± 95% | Win rate by position | Shared wins | Turns (min) | Pass share | Canal / gate / bribe / pass | Winning score | Score | Bodega rate | Bodega points | Winner has Malbec / Bonarda / Torrontés | Bribe games | Win rate bribers / non-bribers | Mean debt |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| rounds 8/15/12/10 | 2 | greedy | 0.044 ± 0.088 | 0.48 / 0.52 | 0.55 | 16 (16) | 0.33 | 9.5 / 1.19 / 0.00 / 5.4 | 0.75 ± 0.98 | 0.61 ± 0.86 | 0.000 | 0.000 | 0.19 / 0.19 / 0.02 | 0.00 | n/a / 0.500 | 0.00 |
+| rounds 8/15/12/10 | 3 | greedy | 0.088 ± 0.124 | 0.30 / 0.34 / 0.36 | 0.46 | 45 (45) | 0.64 | 14.5 / 1.72 / 0.00 / 28.8 | 1.17 ± 1.03 | 0.75 ± 0.91 | 0.001 | 0.001 | 0.32 / 0.16 / 0.02 | 0.00 | n/a / 0.333 | 0.00 |
+| rounds 8/15/12/10 | 4 | greedy | 0.115 ± 0.152 | 0.23 / 0.22 / 0.27 / 0.28 | 0.62 | 48 (48) | 0.52 | 20.0 / 2.83 / 0.00 / 25.1 | 1.21 ± 0.93 | 0.65 ± 0.93 | 0.000 | 0.000 | 0.25 / 0.01 / 0.00 | 0.00 | n/a / 0.250 | 0.00 |
+| rounds 8/15/12/10 | 5 | greedy | 0.172 ± 0.175 | 0.18 / 0.20 / 0.23 / 0.21 / 0.18 | 0.57 | 50 (50) | 0.42 | 25.4 / 3.34 / 0.00 / 21.2 | 1.62 ± 1.06 | 0.71 ± 1.15 | 0.002 | 0.004 | 0.23 / 0.04 / 0.00 | 0.00 | n/a / 0.200 | 0.00 |
+| rounds 10/15/12/10 | 2 | greedy | 0.044 ± 0.088 | 0.48 / 0.52 | 0.55 | 20 (20) | 0.47 | 9.5 / 1.19 / 0.00 / 9.3 | 0.75 ± 0.98 | 0.61 ± 0.86 | 0.000 | 0.000 | 0.19 / 0.19 / 0.02 | 0.00 | n/a / 0.500 | 0.00 |
+| rounds 10/15/12/10 | 3 | greedy | 0.088 ± 0.124 | 0.30 / 0.34 / 0.36 | 0.46 | 45 (45) | 0.64 | 14.5 / 1.72 / 0.00 / 28.8 | 1.17 ± 1.03 | 0.75 ± 0.91 | 0.001 | 0.001 | 0.32 / 0.16 / 0.02 | 0.00 | n/a / 0.333 | 0.00 |
+| rounds 10/15/12/10 | 4 | greedy | 0.115 ± 0.152 | 0.23 / 0.22 / 0.27 / 0.28 | 0.62 | 48 (48) | 0.52 | 20.0 / 2.83 / 0.00 / 25.1 | 1.21 ± 0.93 | 0.65 ± 0.93 | 0.000 | 0.000 | 0.25 / 0.01 / 0.00 | 0.00 | n/a / 0.250 | 0.00 |
+| rounds 10/15/12/10 | 5 | greedy | 0.172 ± 0.175 | 0.18 / 0.20 / 0.23 / 0.21 / 0.18 | 0.57 | 50 (50) | 0.42 | 25.4 / 3.34 / 0.00 / 21.2 | 1.62 ± 1.06 | 0.71 ± 1.15 | 0.002 | 0.004 | 0.23 / 0.04 / 0.00 | 0.00 | n/a / 0.200 | 0.00 |
+| rounds 12/15/12/10 | 2 | greedy | 0.044 ± 0.088 | 0.48 / 0.52 | 0.55 | 24 (24) | 0.56 | 9.5 / 1.19 / 0.00 / 13.3 | 0.75 ± 0.98 | 0.61 ± 0.86 | 0.000 | 0.000 | 0.19 / 0.19 / 0.02 | 0.00 | n/a / 0.500 | 0.00 |
+| rounds 12/15/12/10 | 3 | greedy | 0.088 ± 0.124 | 0.30 / 0.34 / 0.36 | 0.46 | 45 (45) | 0.64 | 14.5 / 1.72 / 0.00 / 28.8 | 1.17 ± 1.03 | 0.75 ± 0.91 | 0.001 | 0.001 | 0.32 / 0.16 / 0.02 | 0.00 | n/a / 0.333 | 0.00 |
+| rounds 12/15/12/10 | 4 | greedy | 0.115 ± 0.152 | 0.23 / 0.22 / 0.27 / 0.28 | 0.62 | 48 (48) | 0.52 | 20.0 / 2.83 / 0.00 / 25.1 | 1.21 ± 0.93 | 0.65 ± 0.93 | 0.000 | 0.000 | 0.25 / 0.01 / 0.00 | 0.00 | n/a / 0.250 | 0.00 |
+| rounds 12/15/12/10 | 5 | greedy | 0.172 ± 0.175 | 0.18 / 0.20 / 0.23 / 0.21 / 0.18 | 0.57 | 50 (50) | 0.42 | 25.4 / 3.34 / 0.00 / 21.2 | 1.62 ± 1.06 | 0.71 ± 1.15 | 0.002 | 0.004 | 0.23 / 0.04 / 0.00 | 0.00 | n/a / 0.200 | 0.00 |
+| rounds 24/15/12/10 | 2 | greedy | 0.044 ± 0.088 | 0.48 / 0.52 | 0.55 | 48 (48) | 0.78 | 9.5 / 1.19 / 0.00 / 37.3 | 0.75 ± 0.98 | 0.61 ± 0.86 | 0.000 | 0.000 | 0.19 / 0.19 / 0.02 | 0.00 | n/a / 0.500 | 0.00 |
+| rounds 24/15/12/10 | 3 | greedy | 0.088 ± 0.124 | 0.30 / 0.34 / 0.36 | 0.46 | 45 (45) | 0.64 | 14.5 / 1.72 / 0.00 / 28.8 | 1.17 ± 1.03 | 0.75 ± 0.91 | 0.001 | 0.001 | 0.32 / 0.16 / 0.02 | 0.00 | n/a / 0.333 | 0.00 |
+| rounds 24/15/12/10 | 4 | greedy | 0.115 ± 0.152 | 0.23 / 0.22 / 0.27 / 0.28 | 0.62 | 48 (48) | 0.52 | 20.0 / 2.83 / 0.00 / 25.1 | 1.21 ± 0.93 | 0.65 ± 0.93 | 0.000 | 0.000 | 0.25 / 0.01 / 0.00 | 0.00 | n/a / 0.250 | 0.00 |
+| rounds 24/15/12/10 | 5 | greedy | 0.172 ± 0.175 | 0.18 / 0.20 / 0.23 / 0.21 / 0.18 | 0.57 | 50 (50) | 0.42 | 25.4 / 3.34 / 0.00 / 21.2 | 1.62 ± 1.06 | 0.71 ± 1.15 | 0.002 | 0.004 | 0.23 / 0.04 / 0.00 | 0.00 | n/a / 0.200 | 0.00 |
