@@ -149,11 +149,11 @@ sweep changes only the parameters it names. Unnamed fields keep the shipped
 preset's values."""
 
 PROPOSED: Mapping[Mode, Mapping[str, object]] = {
-    Mode.NORMAL: dict(SWEEP_BASE[Mode.NORMAL]),
+    Mode.NORMAL: {**SWEEP_BASE[Mode.NORMAL], "hexes_per_player": 24},
     Mode.FLASH: dict(SWEEP_BASE[Mode.FLASH]),
 }
 """The proposed values, as overrides of the shipped presets: what the
-default command validates."""
+default command validates (see ``_docs/tuning-results.md`` for the reasons)."""
 
 
 # --- Sweeps ------------------------------------------------------------------
@@ -258,6 +258,27 @@ SWEEPS: tuple[Sweep, ...] = (
             ),
         },
         seatings=SEATINGS,
+    ),
+    Sweep(
+        "combined",
+        "The best single changes of the sweeps above, combined",
+        {
+            Mode.NORMAL: (
+                ("base", {}),
+                ("24 hexes/player", {"hexes_per_player": 24}),
+                ("24 hexes/player, branchy bag", {"hexes_per_player": 24, "bag_mix": BAG_VERY_BRANCHY}),
+                ("24 hexes/player, branchy bag, no stone",
+                 {"hexes_per_player": 24, "bag_mix": BAG_VERY_BRANCHY, "stone_share": 0}),
+                ("24 hexes/player, 3 vineyards/player", {"hexes_per_player": 24, "vineyards_per_player": 3}),
+            ),
+            Mode.FLASH: (
+                ("base", {}),
+                ("branchy bag", {"bag_mix": BAG_VERY_BRANCHY}),
+                ("branchy bag, no stone", {"bag_mix": BAG_VERY_BRANCHY, "stone_share": 0}),
+                ("branchy bag, +2 for 2 varietals",
+                 {"bag_mix": BAG_VERY_BRANCHY, "bodega_points": 2, "bodega_varietals": 2}),
+            ),
+        },
     ),
 )
 SWEEP_NAMES = tuple(s.name for s in SWEEPS)
