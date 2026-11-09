@@ -190,10 +190,10 @@ def test_rounds_started_differ_by_at_most_one(mode, n):
 @pytest.mark.parametrize(
     "mode, n, expected",
     [
-        (Mode.NORMAL, 2, {"p1": 6, "p2": 6}),
-        (Mode.NORMAL, 5, {"p1": 3, "p2": 3, "p3": 2, "p4": 2, "p5": 2}),
-        (Mode.FLASH, 2, {"p1": 3, "p2": 2}),
-        (Mode.FLASH, 5, {"p1": 1, "p2": 1, "p3": 1, "p4": 1, "p5": 1}),
+        (Mode.NORMAL, 2, {"p1": 5, "p2": 5}),
+        (Mode.NORMAL, 4, {"p1": 3, "p2": 3, "p3": 3, "p4": 3}),
+        (Mode.FLASH, 2, {"p1": 3, "p2": 3}),
+        (Mode.FLASH, 5, {"p1": 1, "p2": 1, "p3": 1, "p4": 1}),
     ],
 )
 def test_rounds_started_concrete_cases(mode, n, expected):
@@ -296,8 +296,8 @@ def test_game_over_exactly_past_the_last_round():
 def test_final_state_rotates_like_any_round_change():
     states = play_to_end(with_start(game(3, mode=Mode.FLASH), 1))
     final = states[-1]
-    # Flash has 5 rounds; round 6 would start with seat 6 -> seat 3.
-    assert final.start_player == final.current_player == "p3"
+    # Flash 3p has 6 rounds; round 7 would start with seat 7 -> seat 1.
+    assert final.start_player == final.current_player == "p1"
     GameState(**{f.name: getattr(final, f.name) for f in dataclasses.fields(GameState)})
 
 
@@ -312,7 +312,7 @@ def test_act_on_a_finished_game_raises():
 
 @pytest.mark.parametrize(
     "mode, n, turns",
-    [(Mode.NORMAL, 2, 24), (Mode.NORMAL, 5, 60), (Mode.FLASH, 2, 10), (Mode.FLASH, 5, 25)],
+    [(Mode.NORMAL, 2, 20), (Mode.NORMAL, 5, 50), (Mode.FLASH, 2, 12), (Mode.FLASH, 5, 20)],
 )
 def test_a_full_game_has_rounds_times_players_turns(mode, n, turns):
     state = game(n, seed=7, mode=mode)
@@ -345,7 +345,7 @@ def test_play_game_calls_bots_with_the_decide_signature():
         return first_bot(s, player, rng)
 
     final, log = play_game(state, bots_for(state, spy), random.Random(0), bot_rng)
-    assert len(calls) == len(log) == 15
+    assert len(calls) == len(log) == 18
     for (s, player, rng), rec in zip(calls, log):
         assert s.current_player == player == rec.player
         assert s.round == rec.round
@@ -357,7 +357,7 @@ def test_play_game_log_records_round_player_and_action():
     final, log = play_game(state, bots_for(state, first_bot), random.Random(0), random.Random(0))
     assert isinstance(log, tuple)
     assert all(isinstance(rec, TurnRecord) for rec in log)
-    assert [rec.round for rec in log] == [1, 1, 2, 2, 3, 3, 4, 4, 5, 5]
+    assert [rec.round for rec in log] == [1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6]
     with pytest.raises(dataclasses.FrozenInstanceError):
         log[0].round = 2
 
@@ -401,7 +401,7 @@ def test_play_game_from_mid_game_plays_only_the_remaining_turns():
     states = play_to_end(game(3, mode=Mode.FLASH))
     mid = states[7]
     final, log = play_game(mid, bots_for(mid, first_bot), random.Random(0), random.Random(0))
-    assert len(log) == 15 - 7
+    assert len(log) == 18 - 7
     assert final == states[-1]
 
 

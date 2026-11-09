@@ -291,12 +291,12 @@ def test_unreachable_distance_raises():
     with pytest.raises(ValueError, match="vineyard_distance") as info:
         generate_board(2, 0, Mode.NORMAL, preset=p)
     assert "(40, 50)" in str(info.value)
-    assert "hexes_per_player=12" in str(info.value)
+    assert f"hexes_per_player={NORMAL.hexes_per_player}" in str(info.value)
 
 
 def test_too_many_vineyards_for_the_distance_raises():
     # Distance 2 only: one candidate per row, far fewer than the vineyards.
-    p = with_overrides(NORMAL, vineyard_distance=(2, 2), vineyards_per_player=5)
+    p = with_overrides(NORMAL, vineyard_distance=(2, 2), vineyards_per_player=5, hexes_per_player=12)
     with pytest.raises(ValueError, match="vineyards_per_player=5"):
         generate_board(2, 0, Mode.NORMAL, preset=p)
 
@@ -358,7 +358,8 @@ def test_flash_boards_are_smaller(players):
 
 
 @pytest.mark.parametrize("players", PLAYER_COUNTS)
-def test_flash_vineyards_are_closer_to_the_river(players):
+def test_flash_vineyards_are_no_farther_from_the_river(players):
+    # #20 put both modes at distance 4: closer Flash vineyards hand seat 1 most wins.
     def average(mode):
         distances = []
         for seed in range(100):
@@ -371,4 +372,4 @@ def test_flash_vineyards_are_closer_to_the_river(players):
             ]
         return sum(distances) / len(distances)
 
-    assert average(Mode.FLASH) < average(Mode.NORMAL)
+    assert average(Mode.FLASH) <= average(Mode.NORMAL)

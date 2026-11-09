@@ -57,11 +57,11 @@ README_BAG_MIX = {
 
 README_VALUES = {
     Mode.NORMAL: dict(
-        rounds={2: 12, 3: 12, 4: 12, 5: 12},
-        hexes_per_player=12,
+        rounds={2: 10, 3: 15, 4: 12, 5: 10},
+        hexes_per_player=15,
         vineyards_per_player=2,
         stone_share=10,
-        vineyard_distance=(4, 5),
+        vineyard_distance=(4, 4),
         market_size=4,
         bag_mix=README_BAG_MIX,
         die_faces=6,
@@ -69,11 +69,11 @@ README_VALUES = {
         bodega_varietals=3,
     ),
     Mode.FLASH: dict(
-        rounds={2: 5, 3: 5, 4: 5, 5: 5},
-        hexes_per_player=7,
+        rounds={2: 6, 3: 6, 4: 4, 5: 4},
+        hexes_per_player=14,
         vineyards_per_player=2,
         stone_share=10,
-        vineyard_distance=(2, 3),
+        vineyard_distance=(4, 4),
         market_size=4,
         bag_mix=README_BAG_MIX,
         die_faces=6,
@@ -93,9 +93,9 @@ def test_shipped_values_match_readme(mode):
 
 
 def test_readme_distances_need_the_readme_canal_counts():
-    # A vineyard at distance d needs d - 1 canals: 3-4 in Normal, 1-2 in Flash.
-    assert tuple(d - 1 for d in NORMAL.vineyard_distance) == (3, 4)
-    assert tuple(d - 1 for d in FLASH.vineyard_distance) == (1, 2)
+    # A vineyard at distance d needs d - 1 canals: 3 in both modes (tuned in #20).
+    assert tuple(d - 1 for d in NORMAL.vineyard_distance) == (3, 3)
+    assert tuple(d - 1 for d in FLASH.vineyard_distance) == (3, 3)
 
 
 def test_flash_has_fewer_rounds_for_every_player_count():
@@ -107,8 +107,9 @@ def test_flash_has_fewer_hexes_per_player():
     assert FLASH.hexes_per_player < NORMAL.hexes_per_player
 
 
-def test_flash_vineyards_sit_closer_to_the_river():
-    assert FLASH.vineyard_distance[1] < NORMAL.vineyard_distance[0]
+def test_flash_vineyards_sit_no_farther_from_the_river():
+    # #20 moved Flash to Normal's distance: closer vineyards hand seat 1 most wins.
+    assert FLASH.vineyard_distance[1] <= NORMAL.vineyard_distance[0]
 
 
 @ids
@@ -234,13 +235,13 @@ def test_with_no_changes_returns_an_equal_preset(p):
 
 def test_with_overrides_returns_a_new_preset_and_leaves_the_original():
     before = fields_of(NORMAL)
-    p = with_overrides(NORMAL, hexes_per_player=15, market_size=5)
-    assert p.hexes_per_player == 15
+    p = with_overrides(NORMAL, hexes_per_player=20, market_size=5)
+    assert p.hexes_per_player == 20
     assert p.market_size == 5
     assert p.mode is Mode.NORMAL
     assert p != NORMAL
     assert fields_of(NORMAL) == before
-    assert NORMAL.hexes_per_player == 12
+    assert NORMAL.hexes_per_player == 15
 
 
 def test_with_overrides_unknown_field():

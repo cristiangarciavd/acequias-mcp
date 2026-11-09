@@ -148,12 +148,25 @@ SWEEP_BASE: Mapping[Mode, Mapping[str, object]] = {
 sweep changes only the parameters it names. Unnamed fields keep the shipped
 preset's values."""
 
+OWNER_HEXES = 15
+"""Normal hexes per player decided by the owner on #20: at most about 75
+terrain hexes for 5 players (the sweeps favoured 24, 120 hexes)."""
+OWNER_ROUNDS_2P = 10
+"""Normal 2-player rounds decided by the owner on #20 (10-12): the 2-player
+board is full by about 8 rounds, so 10 keeps every real move and is the
+shortest game; it misses the 45-60 minute target, a recorded gap."""
+
 PROPOSED: Mapping[Mode, Mapping[str, object]] = {
-    Mode.NORMAL: {**SWEEP_BASE[Mode.NORMAL], "hexes_per_player": 24},
+    Mode.NORMAL: {
+        **SWEEP_BASE[Mode.NORMAL],
+        "hexes_per_player": OWNER_HEXES,
+        "rounds": {**ROTATION_ROUNDS[Mode.NORMAL], 2: OWNER_ROUNDS_2P},
+    },
     Mode.FLASH: dict(SWEEP_BASE[Mode.FLASH]),
 }
-"""The proposed values, as overrides of the shipped presets: what the
-default command validates (see ``_docs/tuning-results.md`` for the reasons)."""
+"""The final values, as overrides of the shipped presets: what the default
+command validates (see ``_docs/tuning-results.md`` for the reasons and the
+owner's decisions)."""
 
 
 # --- Sweeps ------------------------------------------------------------------
@@ -277,6 +290,17 @@ SWEEPS: tuple[Sweep, ...] = (
                 ("branchy bag, no stone", {"bag_mix": BAG_VERY_BRANCHY, "stone_share": 0}),
                 ("branchy bag, +2 for 2 varietals",
                  {"bag_mix": BAG_VERY_BRANCHY, "bodega_points": 2, "bodega_varietals": 2}),
+            ),
+        },
+    ),
+    Sweep(
+        "rounds2p",
+        f"Normal 2-player rounds on the owner's board ({OWNER_HEXES} hexes/player); "
+        "3-5 players keep the full rotations",
+        {
+            Mode.NORMAL: tuple(
+                (f"{_rounds_label(r)}", {"hexes_per_player": OWNER_HEXES, "rounds": r})
+                for r in ({**ROTATION_ROUNDS[Mode.NORMAL], 2: n} for n in (8, 10, 12, 24))
             ),
         },
     ),

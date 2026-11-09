@@ -1,7 +1,8 @@
 """The Normal and Flash presets: every number the game needs, in one place.
 
-Values are the provisional ones in ``README.md`` (Game modes, Setup, Bodega
-bonus, Open questions) and are tuned later by the simulation. Board
+Values are the ones in ``README.md`` (Game modes, Setup, Bodega bonus),
+tuned by the simulation in #20 (``scripts/tune.py``,
+``_docs/tuning-results.md``). Board
 generation, setup, scoring, the round loop, and the simulation read them
 from here instead of hard-coding them.
 
@@ -185,11 +186,11 @@ def _bag_mix(value: object) -> Mapping[PieceKind, int]:
 
 NORMAL = Preset(
     mode=Mode.NORMAL,
-    rounds={players: 12 for players in PLAYER_COUNTS},
-    hexes_per_player=12,
+    rounds={2: 10, 3: 15, 4: 12, 5: 10},
+    hexes_per_player=15,
     vineyards_per_player=2,
     stone_share=10,
-    vineyard_distance=(4, 5),
+    vineyard_distance=(4, 4),
     market_size=4,
     bag_mix={
         PieceKind.STRAIGHT: 40,
@@ -207,11 +208,11 @@ NORMAL = Preset(
 
 FLASH = Preset(
     mode=Mode.FLASH,
-    rounds={players: 5 for players in PLAYER_COUNTS},
-    hexes_per_player=7,
+    rounds={2: 6, 3: 6, 4: 4, 5: 4},
+    hexes_per_player=14,
     vineyards_per_player=2,
     stone_share=10,
-    vineyard_distance=(2, 3),
+    vineyard_distance=(4, 4),
     market_size=4,
     bag_mix=NORMAL.bag_mix,
     die_faces=6,

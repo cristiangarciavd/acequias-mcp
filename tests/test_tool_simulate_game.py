@@ -280,7 +280,7 @@ async def test_values_preset_rejects_come_back_with_its_message(overrides, messa
 
 
 async def test_a_preset_the_board_cannot_meet_is_an_error_not_a_partial_result():
-    overrides = {"vineyard_distance": [3, 3]}
+    overrides = {"vineyard_distance": [3, 3], "hexes_per_player": 7}
     with pytest.raises(ValueError) as raised:
         library_json("flash", 2, 3, 1, overrides=overrides)
     async with Client(app) as client:
