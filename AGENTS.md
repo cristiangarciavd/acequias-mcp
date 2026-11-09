@@ -21,6 +21,8 @@
 - `_docs/process.md` - how work is organized
 - `_docs/task-template.md` - the shape every issue follows
 - `_docs/team/` - role instructions (e.g. `pm.md` for grooming)
+- `_docs/token-budget.md` - how to keep token use low (terse updates,
+  lean prompts, batched reviews)
 - Task backlog: GitHub issues, grouped by milestone (one per roadmap phase)
 
 # Outdated documents
