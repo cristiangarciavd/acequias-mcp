@@ -14,12 +14,24 @@ every running agent mid-task and wastes the work in flight.
 | Re-groom an issue only if its code context changed since it was groomed | Grooming is the most repeated step; a groomed issue usually stays valid |
 | Batch docs reviews: one per milestone or per 3-4 merged tasks | Each review re-reads the whole README; fewer, larger reviews cost less |
 | QA trusts green CI for the full suite and runs locally only the tests and scripts it needs | The full local suite with the `cad` extra takes minutes and a lot of output |
-| Use a lighter model for PM grooming, docs reviews and simple QA; keep the strongest model for engineering and tricky QA | Most of the cost is model size; those roles rarely need the top model (the owner decides when to switch) |
+| Pick the model per role (table below) | Most of the cost is model size; several roles rarely need the top model |
 | Don't poll background work; wait for the completion notice | Each poll is a full turn |
 | Resume a stopped agent with a message instead of starting a new one | A new agent re-reads all the context from scratch |
 | Run at most 2-3 agents at once, fewer near the limit | Parallel agents drain the limit faster and all die together when it is hit |
 | Before stopping, push any unpushed agent commits | Stopping kills an agent's background jobs; pushed work survives |
 | Keep long outputs (sweeps, logs, 3MF files) in files and report a path | Pasting them into chat costs tokens every time they are read |
+
+## Model per role
+
+Decided by the owner on 2026-11-09.
+
+| Role | Model | Why |
+|---|---|---|
+| Docs review | Sonnet | Reading diffs and summarizing them in the README is routine |
+| PM grooming | Sonnet; Opus when the issue involves a new dependency, an external API or a cross-task contract | Most grooming is routine; the exceptions need checking package versions, wheels or APIs |
+| QA, simple tasks (docs or templates, thin wrappers over tested code, test-only changes) | Sonnet | The checks are mechanical and CI covers the rest |
+| QA, algorithms and geometry (game rules, water flow, scoring, bots, performance, CAD) | Opus | These checks need independent reference implementations and careful reasoning; this is where real bugs were caught |
+| Engineering | Opus | A weaker implementation costs more in QA round trips than it saves |
 
 ## When the limit is hit
 
