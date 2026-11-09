@@ -4,7 +4,7 @@
 
 Acequias is a competitive board game for 2 to 5 players with 3D-printed hex pieces. Players build canals to carry water from the mountains to the vineyards of Mendoza. This repo holds an MCP server that generates balanced boards, scores games, simulates them with bots to tune the rules, and outputs printable STL pieces for a Bambu Lab A1.
 
-> **Status:** early development. Milestones 1 (game logic) and 2 (MCP server) are done. Milestone 3 (simulation) is nearly done: the turn engine, the round loop, the random, greedy, and saboteur bots, and the faster simulation are in, and the server exposes `generate_board`, `calculate_score`, and `simulate_game`; only tuning the open parameters with it (#20) is left. Milestone 4 (pieces) is done: every MVP piece is modeled and `generate_piece_stl` writes its STL. Milestone 5 has the plate layout (#18); the 3MF export (#33), `build_plate` (#19), and the first test print (#34) are left. Progress is tracked in the [GitHub issues](../../issues) and [milestones](../../milestones).
+> **Status:** early development. Milestones 1 (game logic) and 2 (MCP server) are done. Milestone 3 (simulation) is nearly done: the turn engine, the round loop, the random, greedy, and saboteur bots, and the faster simulation are in, and the server exposes `generate_board`, `calculate_score`, and `simulate_game`; tuning the open parameters with it (#20) is in progress. Milestone 4 (pieces) is done: every MVP piece is modeled and `generate_piece_stl` writes its STL. Milestone 5 has the plate layout (#18), the 3MF export (#33), and `build_plate` (#19); only the first test print (#34) is left. Progress is tracked in the [GitHub issues](../../issues) and [milestones](../../milestones).
 
 This README is the project's specification: game rules, design decisions, architecture, and roadmap. Task details live in the GitHub issues.
 
@@ -177,6 +177,12 @@ Pieces are placed on a deterministic hex grid on the 256 × 256 mm plate, spilli
 
 `acequias/plate.py` (pure layout math, standard library only): `layout_plates(pieces)` takes `Piece`s with a footprint (`HexFootprint`, `CircleFootprint`, or `RectFootprint`, in mm) and a color group, and returns numbered `Plate`s of `Placement`s: each footprint's center from the bed's front-left corner, rotation always 0. Hexes go on a honeycomb grid spaced so neighbours are exactly `gap` apart; circles and rectangles go on a square grid of bounding-box cells. Each plate holds one color group and one grid type, so it prints with one filament; within a group every cell is sized to the largest piece and plates fill in input order. With the defaults (256 × 256 bed, 5 mm margin, 3 mm gap) a plate holds 68 hexes of 16 mm, 52 of 18 mm, or 256 circles of 12 mm.
 
+`acequias/cad/footprints.py`: `piece_footprint(type, variant, **params)` gives each piece's footprint from its sizes without importing build123d (terrain and canal: the hex shrunk by `clearance`; floodgate: a rectangle; tokens and grape cluster: a circle), and a test checks it against the built solid.
+
+### Plate export
+
+`acequias/cad/plate_export.py`: `export_plate(plate, solids, path, bed=...)` writes one laid-out plate as a 3MF file in mm through build123d's `Mesher`: one separate object per placement, in placement order, named after its piece id, rotated by its `rotation` and moved to its `x`, `y` with its lowest point at z = 0. The plate number and color group go in as metadata (`acequias:plate`, `acequias:color_group`); no 3MF colors or filament assignments are written yet (#76), so the filament is picked in the slicer. UUIDs come from the piece ids, so the same plate exports to the same objects. A piece outside the bed, a missing solid, or a path not ending in `.3mf` raises `ValueError`, and a failed export leaves no file behind and any existing file unchanged.
+
 ## MCP architecture
 
 A Python server built on `MCPServer` from the official `mcp` SDK (formerly FastMCP). The game logic lives in `acequias/`, independent of the server in `server/`, so it can be tested without MCP. All randomness (dice, board generation, bots) goes through a seeded RNG, so games are reproducible.
@@ -187,11 +193,11 @@ A Python server built on `MCPServer` from the official `mcp` SDK (formerly FastM
 | `calculate_score` | `mode`, `hexes`, `players` (id and debt), optional `canals`, `floodgates`, `claims` | `mode`, `scores` per player by term (vineyards + bodega − rights paid + rights collected − debt) with the watered vineyards and their paths, and `winners` |
 | `simulate_game` | `mode`, `players`, optional `games` (1 to `MAX_GAMES`, default 10), `policies` (one per seat, default all `"greedy"`), `overrides` (preset values, in the shape of the result's `preset` without `mode`), `seed` | `SimResult.to_json()` unchanged: the statistics, plus the inputs, the `seed` used, and every preset value after overrides |
 | `generate_piece_stl` | `piece`: one `PieceJSON` object, chosen by `type` (`terrain`, `canal`, `floodgate`, `owner_token`, `grape_cluster`, `debt_token`), with optional sizes in mm | `path` of the STL written, `piece` with every default filled in, and the mesh's `size`, `volume`, `triangles`, and `watertight` |
-| `build_plate` | List of pieces | Print plates for the A1 |
+| `build_plate` | `entries`: 1 to 50 `{piece, count, color}` (`piece` as in `generate_piece_stl`, `color` the plate's color group and filament, at most 500 pieces in total), optional `bed_width`, `bed_depth`, `margin`, `gap` in mm | `folder` and `job`, `plates` (each with `number`, `color`, the 3MF `path`, and `placements` giving every piece id, its entry, its full `piece`, and `x`, `y`, `rotation`), and a `summary` of pieces and plates per color |
 
 `simulate_game` caps `games` at `MAX_GAMES = 10`, set when a 5-player Normal game of greedy bots took about 2 s, so 10 games kept one call within a 30-second client timeout; since #84 such a game takes under 0.1 s. Raising the cap is #43.
 
-`generate_piece_stl` writes into one output folder, set by `ACEQUIAS_OUTPUT_DIR` (default `output/` in the server's working folder, git-ignored), and takes no path. The file name is built from the type, the variant, and every parameter, so the same request overwrites the same file. Without the `cad` extra the server still starts, and the tool returns an error naming the extra and `uv sync --extra cad`.
+`generate_piece_stl` writes into one output folder, set by `ACEQUIAS_OUTPUT_DIR` (default `output/` in the server's working folder, git-ignored), and takes no path. The file name is built from the type, the variant, and every parameter, so the same request overwrites the same file. `build_plate` writes into the same folder, one subfolder per request: `plates-<job>/plate-<n>-<color>.3mf`, where `<job>` is the first 12 hex digits of the SHA-256 of the input with every default filled in, so the same request overwrites its own plates and different requests never share a folder. Every piece gets an id like `canal-straight-03` (numbered per type and variant in input order), and equal pieces are built once. All errors are found before any file is written. Without the `cad` extra the server still starts, and both CAD tools return an error naming the extra and `uv sync --extra cad`.
 
 ### Hex convention
 
@@ -338,7 +344,7 @@ Without the `cad` extra the CAD tests are skipped; CI installs it, so they run t
 
 ### Running the MCP server
 
-`uv run acequias-server` starts the server over stdio (`server/app.py`). It exposes `generate_board`, `calculate_score`, `simulate_game`, `generate_piece_stl` (needs the `cad` extra), and `ping`, which returns `"pong"` as a connection check.
+`uv run acequias-server` starts the server over stdio (`server/app.py`). It exposes `generate_board`, `calculate_score`, `simulate_game`, `generate_piece_stl` and `build_plate` (both need the `cad` extra), and `ping`, which returns `"pong"` as a connection check.
 
 Claude Code (replace the path with your checkout):
 
