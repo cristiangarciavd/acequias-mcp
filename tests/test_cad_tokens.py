@@ -239,8 +239,8 @@ def test_pip_constants():
     from acequias.cad import tokens
 
     assert PIP_DIAMETER == 2
-    assert PIP_DEPTH == 0.6
-    assert tokens.MIN_DEBT_THICKNESS == pytest.approx(1.4)
+    assert PIP_DEPTH == 1.0
+    assert tokens.MIN_DEBT_THICKNESS == pytest.approx(1.8)
 
 
 def test_pip_positions_are_a_die_face():
@@ -272,7 +272,7 @@ def test_probes_find_pips_and_solid_floor(built, value):
     assert solid.is_inside((0.2 * diameter, 0.0, z_pip))
 
 
-@pytest.mark.parametrize(("value", "expected"), [(1, 224.31), (5, 216.77)])
+@pytest.mark.parametrize(("value", "expected"), [(1, 223.05), (5, 210.49)])
 def test_volume_is_disc_minus_pips(built, value, expected):
     pips = 1 if value == 1 else 5
     formula = math.pi * 6.0**2 * 2.0 - pips * math.pi * 1.0**2 * PIP_DEPTH
@@ -294,8 +294,8 @@ def test_value_must_be_int_1_or_5(value):
     [
         ({"diameter": 9.89}, "diameter", False),
         ({"diameter": 9.91}, "diameter", True),
-        ({"thickness": 1.39}, "thickness", False),
-        ({"thickness": 1.41}, "thickness", True),
+        ({"thickness": 1.79}, "thickness", False),
+        ({"thickness": 1.81}, "thickness", True),
     ],
 )
 def test_debt_token_size_limits(value, kwargs, name, ok):

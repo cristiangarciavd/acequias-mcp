@@ -470,7 +470,7 @@ class OwnerTokenPieceJSON(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
     type: Literal["owner_token"] = Field(description='Piece type: "owner_token".')
-    tolerance: float = _fit(0.15, "Fit gap between the peg and the canal hole")
+    tolerance: float = _fit(0.20, "Fit gap between the peg and the canal hole")
     cap_diameter: float = _length(7.0, "Diameter of the cap")
     cap_height: float = _length(1.2, "Height of the cap")
 

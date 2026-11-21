@@ -238,7 +238,7 @@ async def test_file_name_follows_type_variant_and_every_parameter(out):
         "canal-symmetric_y-side16-height4-clearance0-groove_width6-groove_depth1.5.stl",
         "debt_token-5-diameter12-thickness2.stl",
         "floodgate-tolerance0.15-groove_width6-groove_depth1.5-thickness2.stl",
-        "owner_token-tolerance0.15-cap_diameter7-cap_height1.stl",
+        "owner_token-tolerance0.2-cap_diameter7-cap_height1.stl",
     ]
 
 
