@@ -4,7 +4,7 @@
 
 Acequias is a competitive board game for 2 to 5 players with 3D-printed hex pieces. Players build canals to carry water from the mountains to the vineyards of Mendoza. This repo holds an MCP server that generates balanced boards, scores games, simulates them with bots to tune the rules, and outputs printable STL pieces for a Bambu Lab A1.
 
-> **Status:** the MVP (milestones 1 to 5) is done: the game logic, the MCP server with all 5 tools, the simulation that tuned the rules (#20, [results](#tuning-results)), every MVP piece as STL, and A1 plates as 3MF, confirmed by the first test print (#34, [report](_docs/test-print-1.md)). The remaining work is milestone 6, After the MVP. Progress is tracked in the [GitHub issues](../../issues) and [milestones](../../milestones).
+> **Status:** the MVP (milestones 1 to 5) is done: the game logic, the MCP server with all 5 tools, the simulation that tuned the rules (#20, [results](#tuning-results)), every MVP piece as STL, and A1 plates as 3MF, confirmed by the first test print (#34, [report](_docs/test-print-1.md)). The remaining work is milestone 6, After the MVP: Rules v2 (#114) adds opt-in rule options (varietal roulette, more plots, grape-cluster cap, action die, larger score scale) to the engine, off in the shipped presets until the re-tuning in #103; its pieces are #113. Progress is tracked in the [GitHub issues](../../issues) and [milestones](../../milestones).
 
 This README is the project's specification: game rules, design decisions, architecture, and roadmap. Task details live in the GitHub issues.
 
@@ -133,7 +133,7 @@ The highest score wins. On a tie, the tied player with more watered vineyards wi
 
 ### Variants (under evaluation)
 
-Optional rules, off by default, kept only if the simulation shows they help:
+Optional rules, off by default, kept only if the simulation shows they help. The rules above are the shipped game. Flash race end and drought are not implemented yet (#35, #23). The other options are Rules v2 (#114): implemented as preset options (see [Game config](#game-config)), while the shipped Normal and Flash presets keep the rules above until #103.
 
 - **Flash race end:** the first player to claim a 2nd vineyard ends the round; then score.
 - **Drought (_sequía_):** in some mid-game rounds part of the river runs dry. It never falls on the last round, so final scoring always uses the full river.
@@ -356,6 +356,8 @@ It is done when:
 | --- | --- |
 | Looks | Height-map relief #16, real elevation relief #32, Blender shapes #36 |
 | Rule variants | Drought #23 and its marker #40, Flash race end #35 |
+| Rules v2 (#114) | Varietal roulette #85, floodgate plate with grip #109, more plots and grape-cluster cap #110, larger score scale #111, action die #112, their pieces #113 |
+| Balance | Re-check with smarter bots #103, seat compensation #104 |
 | Tooling | STEP/3MF per piece #37, board picture #39, faster simulation #43, lookahead bot #42 |
 | Product | Full game-set piece list #38, rulebook, packaging, and cost #41 |
 
