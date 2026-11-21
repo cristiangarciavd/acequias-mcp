@@ -461,7 +461,9 @@ class FloodgatePieceJSON(BaseModel):
     tolerance: float = _fit(0.15, "Fit gap against the groove on each side")
     groove_width: float = _groove_width(_MATCH_CANALS)
     groove_depth: float = _groove_depth(_MATCH_CANALS)
-    thickness: float = _length(2.0, "Thickness of the gate")
+    thickness: float = _length(3.0, "Thickness of the gate's base along the groove")
+    fin_thickness: float = _length(1.6, "Thickness of the grip fin along the groove")
+    height: float = _length(7.0, "Total height of the gate, base and grip fin")
 
 
 class OwnerTokenPieceJSON(BaseModel):

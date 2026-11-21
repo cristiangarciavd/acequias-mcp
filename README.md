@@ -140,7 +140,7 @@ All pieces are parametric build123d models printed on the Bambu Lab A1 (256 × 2
 
 - **Terrain hexes:** hexagonal prism, with relief depending on type
 - **Canal pieces:** hexagon with a groove; neutral, single-color
-- **Floodgates:** small gates that slot into the groove at one opening
+- **Floodgates:** small L-shaped gates: a base that slots into the groove at one opening, flush with the top, and a grip fin on the outer edge to place and lift it
 - **Owner tokens:** small marker that fits a hole in the canal; in each player's color
 - **Grape clusters:** figure that rests on the claimed vineyard
 - **Debt tokens:** small markers, printed in small batches
@@ -154,7 +154,7 @@ All pieces are parametric build123d models printed on the Bambu Lab A1 (256 × 2
 | Tile height (functional) | 4 mm, plus decorative relief on top |
 | Canal groove | 6 mm wide, 1.5 mm deep |
 | Owner token | hole 4 mm across, 2 mm deep; peg 3.60 mm across (0.20 mm fit tolerance per side); cap 7 mm across, 1.2 mm high |
-| Floodgate | 5.70 × 2.00 × 1.50 mm (groove width minus a 0.15 mm fit tolerance per side, flush with the top) |
+| Floodgate | 5.70 × 3.00 mm base (groove width minus a 0.15 mm fit tolerance per side, flush with the top), grip fin 1.6 mm thick, 7 mm total height; printed on its side, no supports |
 | Grape cluster | 14 mm base, 15 mm high, grapes at least 2 mm across |
 | Debt token | 12 mm across, 2 mm thick; pips 2 mm across, 1.0 mm deep |
 | Thinnest wall | 0.8 mm (two widths of the 0.4 mm nozzle) |
@@ -178,7 +178,7 @@ Pieces are placed on a deterministic hex grid on the 256 × 256 mm plate, spilli
 
 `acequias/plate.py` (pure layout math, standard library only): `layout_plates(pieces)` takes `Piece`s with a footprint (`HexFootprint`, `CircleFootprint`, or `RectFootprint`, in mm) and a color group, and returns numbered `Plate`s of `Placement`s: each footprint's center from the bed's front-left corner, rotation always 0. Hexes go on a honeycomb grid spaced so neighbours are exactly `gap` apart; circles and rectangles go on a square grid of bounding-box cells. Each plate holds one color group and one grid type, so it prints with one filament; within a group every cell is sized to the largest piece and plates fill in input order. With the defaults (256 × 256 bed, 5 mm margin, 3 mm gap) a plate holds 68 hexes of 16 mm, 52 of 18 mm, or 256 circles of 12 mm.
 
-`acequias/cad/footprints.py`: `piece_footprint(type, variant, **params)` gives each piece's footprint from its sizes without importing build123d (terrain and canal: the hex shrunk by `clearance`; floodgate: a rectangle; tokens and grape cluster: a circle), and a test checks it against the built solid.
+`acequias/cad/footprints.py`: `piece_footprint(type, variant, **params)` gives each piece's footprint from its sizes without importing build123d (terrain and canal: the hex shrunk by `clearance`; floodgate: a rectangle, its width by its `height`, as it lies on its side; tokens and grape cluster: a circle), and a test checks it against the built solid.
 
 ### Plate export
 
@@ -258,7 +258,7 @@ The engine and the bots take fast paths (precomputed tables, boards derived with
 
 ### CAD pieces
 
-`acequias/cad/` holds the build123d models; it is the only code that imports build123d or trimesh, and the game logic and the server never import it at module level, so a plain install stays CAD-free. CAD frame: `x` east, `y` north, `z` up, in mm, each piece centered at `x = y = 0` with its bottom on `z = 0`; outlines come from `Hex.corners`, each corner `(x, y)` used as `(x, -y)`, so each edge faces the same `Direction` as on the board. `hex_tile.py`: `hex_tile(side, height, clearance)` is the terrain prism and `export_stl(shape, path)` writes a binary STL. `channel.py`: `canal_piece(kind)` is the tile with a groove spoke to each edge the kind opens at rotation 0 (players rotate the printed piece) and a hole for the owner token; `floodgate()` is the gate as it sits in the groove; `owner_token()` is a cap with a peg, printed cap down. `tokens.py`: `grape_cluster()` is tiers of grapes on a flat round base, topped by a stem, that rests loose on a vineyard tile (no peg); `debt_token(value)` is a disc worth 1 or 5, marked with die-face pips (no text). Both have circle footprints for the plate layout. `pieces.py`: `build_piece(type, variant, **params)` maps each piece type to its generator. Defaults are those of the [Geometry profile](#geometry-profile); any size that would leave a wall under 0.8 mm raises `ValueError` naming it.
+`acequias/cad/` holds the build123d models; it is the only code that imports build123d or trimesh, and the game logic and the server never import it at module level, so a plain install stays CAD-free. CAD frame: `x` east, `y` north, `z` up, in mm, each piece centered at `x = y = 0` with its bottom on `z = 0`; outlines come from `Hex.corners`, each corner `(x, y)` used as `(x, -y)`, so each edge faces the same `Direction` as on the board. `hex_tile.py`: `hex_tile(side, height, clearance)` is the terrain prism and `export_stl(shape, path)` writes a binary STL. `channel.py`: `canal_piece(kind)` is the tile with a groove spoke to each edge the kind opens at rotation 0 (players rotate the printed piece) and a hole for the owner token; `floodgate()` is the gate as it sits in the groove: a base that fills the groove, flush with the top, and a grip fin flush with its outer face (the one on the hex edge) that rises to the total `height`; `owner_token()` is a cap with a peg, printed cap down. `tokens.py`: `grape_cluster()` is tiers of grapes on a flat round base, topped by a stem, that rests loose on a vineyard tile (no peg); `debt_token(value)` is a disc worth 1 or 5, marked with die-face pips (no text). Both have circle footprints for the plate layout. `pieces.py`: `build_piece(type, variant, **params)` maps each piece type to its generator, as laid on the plate (the floodgate lies on its flush outer face, so it needs no supports and its layers run along the fin). Defaults are those of the [Geometry profile](#geometry-profile); any size that would leave a wall under 0.8 mm raises `ValueError` naming it.
 
 ### Board JSON
 

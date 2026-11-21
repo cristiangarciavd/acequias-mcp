@@ -40,6 +40,7 @@ EVERY_PIECE = (
     + [{"type": "canal", "kind": "straight", "clearance": 0.2}]
     + [
         {"type": "floodgate"},
+        {"type": "floodgate", "thickness": 2.5, "fin_thickness": 1.2, "height": 6.0},
         {"type": "owner_token"},
         {"type": "grape_cluster"},
         {"type": "debt_token", "value": 1},
@@ -229,7 +230,7 @@ def test_footprint_module_needs_no_cad():
         sys.modules["trimesh"] = None
         from acequias.cad.footprints import piece_footprint
         print(piece_footprint("floodgate", tolerance=0.15, groove_width=6.0, groove_depth=1.5,
-                              thickness=2.0))
+                              thickness=3.0, fin_thickness=1.6, height=7.0))
     """
     result = subprocess.run(
         [sys.executable, "-c", textwrap.dedent(code)], capture_output=True, text=True, timeout=120
@@ -243,8 +244,8 @@ def test_footprint_formulas():
 
     hexes = piece_footprint("canal", None, side=16.0, clearance=0.2, height=4.0)
     assert hexes == HexFootprint(16.0 - 2 * 0.2 / math.sqrt(3))
-    gate = piece_footprint("floodgate", tolerance=0.15, groove_width=6.0, thickness=2.0)
-    assert gate.width == pytest.approx(5.70) and gate.depth == 2.0
+    gate = piece_footprint("floodgate", tolerance=0.15, groove_width=6.0, height=7.0)
+    assert gate.width == pytest.approx(5.70) and gate.depth == 7.0
     assert isinstance(gate, RectFootprint)
     assert piece_footprint("owner_token", cap_diameter=7.0) == CircleFootprint(7.0)
     assert piece_footprint("grape_cluster", base_diameter=14.0) == CircleFootprint(14.0)

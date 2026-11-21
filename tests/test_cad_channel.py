@@ -12,6 +12,9 @@ from build123d import Axis, Solid  # noqa: E402
 from acequias.cad.channel import (  # noqa: E402
     CAP_DIAMETER,
     FIT_TOLERANCE,
+    FLOODGATE_FIN_THICKNESS,
+    FLOODGATE_HEIGHT,
+    FLOODGATE_THICKNESS,
     HOLE_DEPTH,
     HOLE_DIAMETER,
     MIN_WALL,
@@ -358,35 +361,67 @@ def test_hole_too_close_to_the_groove_is_rejected():
 # Floodgate
 
 
+def test_floodgate_constants():
+    assert FLOODGATE_THICKNESS == 3.0
+    assert FLOODGATE_FIN_THICKNESS == 1.6
+    assert FLOODGATE_HEIGHT == 7.0
+
+
 def test_floodgate_bounding_box_at_defaults():
     bb = floodgate().bounding_box()
-    assert (bb.size.X, bb.size.Y, bb.size.Z) == pytest.approx((5.70, 2.00, 1.50), abs=TOL)
+    assert (bb.size.X, bb.size.Y, bb.size.Z) == pytest.approx((5.70, 3.00, 7.00), abs=TOL)
     assert bb.min.Z == pytest.approx(0, abs=TOL)
     assert (bb.min.X + bb.max.X, bb.min.Y + bb.max.Y) == pytest.approx((0, 0), abs=TOL)
 
 
+def test_floodgate_is_an_l_with_the_fin_on_the_outer_face():
+    gate = floodgate()
+    assert len(gate.solids()) == 1
+    # Base: 3.0 x 1.5; fin: the outer (+y) 1.6 mm, z 1.5 to 7.0.
+    assert gate.volume == pytest.approx(5.7 * (3.0 * 1.5 + 1.6 * 5.5), rel=1e-6)
+    fin_y = 1.5 - 1.6 / 2
+    inner_y = -1.5 + (3.0 - 1.6) / 2
+    for z in (2.0, 4.0, 6.9):
+        assert _solid(gate, 0, fin_y, z)
+        assert _solid(gate, 2.8, 1.45, z)
+        assert not _solid(gate, 0, inner_y, z)
+        assert not _solid(gate, 0, -0.1 - 0.05, z)
+        assert _solid(gate, 0, -0.1 + 0.05, z)
+    assert _solid(gate, 0, inner_y, 0.75)
+    assert not _solid(gate, 0, fin_y, 7.05)
+
+
 def test_floodgate_follows_its_parameters():
-    bb = floodgate(tolerance=0.2, groove_width=5, groove_depth=1.2, thickness=1.5)
-    bb = bb.bounding_box()
-    assert (bb.size.X, bb.size.Y, bb.size.Z) == pytest.approx((4.6, 1.5, 1.2), abs=TOL)
+    gate = floodgate(
+        tolerance=0.2, groove_width=5, groove_depth=1.2, thickness=1.5,
+        fin_thickness=1.0, height=4.0,
+    )
+    bb = gate.bounding_box()
+    assert (bb.size.X, bb.size.Y, bb.size.Z) == pytest.approx((4.6, 1.5, 4.0), abs=TOL)
+    assert gate.volume == pytest.approx(4.6 * (1.5 * 1.2 + 1.0 * 2.8), rel=1e-6)
 
 
 def test_floodgate_seated_in_the_e_opening_fits():
     tolerance = 0.15
-    thickness = 2.0
-    piece = _piece(PieceKind.STRAIGHT)
+    thickness = FLOODGATE_THICKNESS
+    piece = _piece(PieceKind.STRAIGHT)  # side 16, clearance 0
     apothem = edge_midpoints()[Direction.E][0]
-    # Turn the gate so its width runs across the E-W groove (along y), then
-    # put its outer face on the E face and its bottom on the groove floor.
-    gate = floodgate().rotate(Axis.Z, 90).translate(
+    # Turn the gate so its width runs across the E-W groove (along y) and its
+    # outer face (+y) points east, then put that face on the E edge and its
+    # bottom on the groove floor.
+    gate = floodgate().rotate(Axis.Z, -90).translate(
         (apothem - thickness / 2, 0, HEIGHT - GROOVE_DEPTH)
     )
     assert _intersection_volume(piece, gate) < 0.001
     gb = gate.bounding_box()
-    tb = piece.bounding_box()
+    # Outer face on the edge midpoint plane; base flush with the top.
     assert gb.max.X == pytest.approx(apothem, abs=TOL)
+    assert gb.min.X == pytest.approx(apothem - thickness, abs=TOL)
     assert gb.min.Z == pytest.approx(HEIGHT - GROOVE_DEPTH, abs=TOL)
-    assert gb.max.Z == pytest.approx(HEIGHT, abs=TOL)
+    assert gb.max.Z == pytest.approx(HEIGHT - GROOVE_DEPTH + FLOODGATE_HEIGHT, abs=TOL)
+    # The fin is on the outer side, above the tile.
+    assert _solid(gate, apothem - 0.1, 0, HEIGHT + 2)
+    assert not _solid(gate, apothem - thickness + 0.1, 0, HEIGHT + 0.5)
     # tolerance of clearance to each groove wall.
     assert gb.max.Y == pytest.approx(GROOVE_WIDTH / 2 - tolerance, abs=TOL)
     assert gb.min.Y == pytest.approx(-(GROOVE_WIDTH / 2 - tolerance), abs=TOL)
@@ -395,9 +430,12 @@ def test_floodgate_seated_in_the_e_opening_fits():
     assert _solid(piece, x, GROOVE_WIDTH / 2 + 0.05, MID_GROOVE)
     assert not _solid(piece, x, -(GROOVE_WIDTH / 2 - 0.05), MID_GROOVE)
     assert _solid(piece, x, -(GROOVE_WIDTH / 2 + 0.05), MID_GROOVE)
-    for axis in "XYZ":
-        assert getattr(gb.min, axis) >= getattr(tb.min, axis) - 1e-6
-        assert getattr(gb.max, axis) <= getattr(tb.max, axis) + 1e-6
+    # No vertex of the gate crosses the hex outline (each edge's line).
+    mids = edge_midpoints().values()
+    for v in gate.vertices():
+        for mid in mids:
+            ux, uy = _unit(mid)
+            assert v.X * ux + v.Y * uy <= math.hypot(*mid) + 1e-6
 
 
 @pytest.mark.parametrize(
@@ -407,11 +445,18 @@ def test_floodgate_seated_in_the_e_opening_fits():
         ({"tolerance": NAN}, "tolerance"),
         ({"tolerance": INF}, "tolerance"),
         ({"tolerance": 2.65}, "tolerance"),  # gate 0.7 mm wide
-        ({"thickness": 0.7}, "thickness"),
+        ({"thickness": 0.7, "fin_thickness": 0.7}, "thickness"),
         ({"thickness": NAN}, "thickness"),
         ({"thickness": 0}, "thickness"),
         ({"groove_width": 0}, "groove_width"),
         ({"groove_depth": INF}, "groove_depth"),
+        ({"fin_thickness": 0.7}, "fin_thickness"),
+        ({"fin_thickness": 0}, "fin_thickness"),
+        ({"fin_thickness": NAN}, "fin_thickness"),
+        ({"fin_thickness": 3.1}, "fin_thickness"),  # thicker than the base
+        ({"height": 2.2}, "height"),  # fin 0.7 mm above the base
+        ({"height": 0}, "height"),
+        ({"height": INF}, "height"),
     ],
 )
 def test_invalid_floodgate_raises_value_error_naming_them(kwargs, name):
@@ -420,8 +465,38 @@ def test_invalid_floodgate_raises_value_error_naming_them(kwargs, name):
 
 
 def test_floodgate_minimums_are_allowed():
-    floodgate(tolerance=0, thickness=MIN_WALL)
-    floodgate(tolerance=2.55, thickness=MIN_WALL)  # gate 0.9 mm wide
+    floodgate(tolerance=0, thickness=MIN_WALL, fin_thickness=MIN_WALL)
+    floodgate(tolerance=2.55, thickness=MIN_WALL, fin_thickness=MIN_WALL)  # 0.9 mm wide
+    floodgate(height=GROOVE_DEPTH + MIN_WALL)
+    floodgate(fin_thickness=FLOODGATE_THICKNESS)  # fin as thick as the base
+
+
+def test_floodgate_is_printed_on_its_outer_face():
+    from acequias.cad.pieces import build_piece
+
+    gate = build_piece("floodgate")
+    bb = gate.bounding_box()
+    assert (bb.size.X, bb.size.Y, bb.size.Z) == pytest.approx((5.70, 7.00, 3.00), abs=TOL)
+    assert bb.min.Z == pytest.approx(0, abs=TOL)
+    assert (bb.min.X + bb.max.X, bb.min.Y + bb.max.Y) == pytest.approx((0, 0), abs=TOL)
+    assert gate.volume == pytest.approx(floodgate().volume, rel=1e-6)
+    # The whole flush outer face (5.70 x 7.00) lies on the bed.
+    bed = sum(f.area for f in gate.faces() if f.normal_at().Z < -0.999)
+    assert bed == pytest.approx(5.7 * 7.0, rel=1e-6)
+
+
+def test_printed_floodgate_needs_no_supports():
+    from acequias.cad.pieces import build_piece
+
+    gate = build_piece("floodgate")
+    # Each face is on the bed, or no more than 45 degrees of overhang: its
+    # normal points at most 45 degrees below horizontal (upward faces pass).
+    limit = -math.sin(math.radians(45))
+    for face in gate.faces():
+        nz = face.normal_at().Z
+        on_bed = face.bounding_box().max.Z == pytest.approx(0, abs=TOL)
+        assert on_bed or nz >= limit - 1e-9, (face.center(), nz)
+    assert all(f.normal_at().Z > -1e-6 for f in gate.faces() if f.center().Z > TOL)
 
 
 # Owner token
@@ -543,7 +618,7 @@ def test_other_canal_volumes_lose_more_than_one_spoke(kind, tmp_path):
 def test_floodgate_stl_is_closed(tmp_path):
     mesh = _export_and_load(floodgate(), tmp_path, "floodgate")
     _assert_closed_single_body(mesh)
-    assert tuple(mesh.extents) == pytest.approx((5.70, 2.00, 1.50), abs=TOL)
+    assert tuple(mesh.extents) == pytest.approx((5.70, 3.00, 7.00), abs=TOL)
 
 
 def test_owner_token_stl_is_closed_with_its_bounding_box(tmp_path):

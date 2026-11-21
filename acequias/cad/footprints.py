@@ -6,8 +6,8 @@ covers on the print plate, for ``acequias.plate.layout_plates``:
 
 - ``"terrain"`` and ``"canal"``: ``HexFootprint(side - 2 * clearance / sqrt(3))``,
   the hex outline shrunk by ``clearance`` on every edge
-- ``"floodgate"``: ``RectFootprint(groove_width - 2 * tolerance, thickness)``,
-  the gate lying as it is printed
+- ``"floodgate"``: ``RectFootprint(groove_width - 2 * tolerance, height)``,
+  the gate lying on its flush outer face, as it is printed
 - ``"owner_token"``: ``CircleFootprint(cap_diameter)``
 - ``"grape_cluster"``: ``CircleFootprint(base_diameter)``
 - ``"debt_token"``: ``CircleFootprint(diameter)``
@@ -43,7 +43,7 @@ def piece_footprint(piece_type: str, variant: object = None, **params: Any) -> F
     if piece_type == "floodgate":
         groove_width = _size(piece_type, params, "groove_width")
         tolerance = _size(piece_type, params, "tolerance")
-        return RectFootprint(groove_width - 2 * tolerance, _size(piece_type, params, "thickness"))
+        return RectFootprint(groove_width - 2 * tolerance, _size(piece_type, params, "height"))
     if piece_type == "owner_token":
         return CircleFootprint(_size(piece_type, params, "cap_diameter"))
     if piece_type == "grape_cluster":
