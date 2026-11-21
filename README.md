@@ -19,7 +19,7 @@ Whoever scores the most points when the harvest ends, after a fixed number of ro
 | Component | Detail |
 | --- | --- |
 | Terrain hexes | River, vineyard, stone, empty |
-| Vineyards | Neutral, valued by varietal: Malbec 3 pts, Bonarda 2 pts, Torrontés 1 pt |
+| Vineyards | Neutral, valued by varietal: Malbec 3 pts, Bonarda 2 pts, Torrontés 1 pt (the default fixed rules; the [varietal roulette](#varietal-roulette) variant plants 8 varietals on claim instead) |
 | Canal pieces (neutral) | Six shapes: straight, gentle curve, sharp curve, symmetric Y, T branch, claw (see [Water flow](#water-flow)) |
 | Floodgates | Small gates that close one opening of a canal piece (see [Floodgate](#floodgate)) |
 | Owner tokens | One per placed canal, in each player's color |
@@ -106,7 +106,7 @@ Debt is subtracted from your final score, so a bribe is a gamble (it costs 1 to 
 
 ### Bodega bonus
 
-A player whose watered vineyards include **each** varietal (Malbec, Bonarda, Torrontés) earns **+2**: a winery wants its blend. In Flash it is **+1**, still for all three.
+A player whose watered vineyards include **each** varietal (Malbec, Bonarda, Torrontés) earns **+2**: a winery wants its blend. In Flash it is **+1**, still for all three. These are the default fixed rules; under the [varietal roulette](#varietal-roulette) the bonus needs watered vineyards of any 3 **different** varietals (two Malbecs count once).
 
 ### Game modes
 
@@ -133,6 +133,35 @@ Optional rules, off by default, kept only if the simulation shows they help:
 
 - **Flash race end:** the first player to claim a 2nd vineyard ends the round; then score.
 - **Drought (_sequía_):** in some mid-game rounds part of the river runs dry. It never falls on the last round, so final scoring always uses the full river.
+- **Varietal roulette:** vineyards start as blank plots and are planted by a roulette spin when claimed (below). It is implemented as a preset option (`varietal_rules = roulette`, see [Game config](#game-config)); the shipped Normal and Flash presets keep the fixed rules until #103.
+
+#### Varietal roulette
+
+The board's vineyards have no varietal. When a player claims a vineyard, they spin the roulette and that varietal is planted there for the rest of the game. The roulette has 14 equal sectors:
+
+| Varietal | Sectors | Points (provisional, to be tuned in #103) |
+| --- | --- | --- |
+| Malbec | 2 | 2 |
+| Cabernet Sauvignon | 2 | 2 |
+| Cabernet Franc | 1 | 3 |
+| Syrah | 2 | 2 |
+| Merlot | 2 | 2 |
+| Bonarda | 1 | 3 |
+| Torrontés | 2 | 2 |
+| Chardonnay | 2 | 2 |
+
+The rarer Bonarda and Cabernet Franc are worth a bit more; a spin is worth 30/14, about 2.14 points, on average. The bodega bonus needs watered vineyards of 3 **different** varietals. The point values are provisional until the re-tuning in #103 (with the scale from #111).
+
+The varietals, for the printed roulette and the rules sheet:
+
+- **Malbec:** Mendoza's flagship red, from Cahors in France. Deep color, plum and violet.
+- **Cabernet Sauvignon:** a Bordeaux red. Structured, blackcurrant, built to age.
+- **Cabernet Franc:** a Bordeaux red and the rising star of the Uco Valley. Red fruit with an herbal edge.
+- **Syrah:** a Rhône red, strong in Mendoza and San Juan. Spicy, dark fruit.
+- **Merlot:** a Bordeaux red. Soft and round, plum.
+- **Bonarda:** Argentina's second most planted red. Fruity and easy drinking.
+- **Torrontés:** Argentina's own white. Floral and aromatic.
+- **Chardonnay:** a Burgundy white, grown high in the Uco Valley. Fresh, from citrus to buttery.
 
 ## Physical pieces
 
@@ -195,7 +224,7 @@ A Python server built on `MCPServer` from the official `mcp` SDK (formerly FastM
 | Tool | Input | Output |
 | --- | --- | --- |
 | `generate_board` | `players` (2 to 5), `mode`, optional `seed` | `players`, `mode`, the `seed` used, `hexes`, and `assembly` instructions |
-| `calculate_score` | `mode`, `hexes`, `players` (id and debt), optional `canals`, `floodgates`, `claims` | `mode`, `scores` per player by term (vineyards + bodega − rights paid + rights collected − debt) with the watered vineyards and their paths, and `winners` |
+| `calculate_score` | `mode`, `hexes`, `players` (id and debt), optional `canals`, `floodgates`, `claims`, `overrides` (preset values, as in `simulate_game`; e.g. roulette rules) | `mode`, `scores` per player by term (vineyards + bodega − rights paid + rights collected − debt) with the watered vineyards and their paths, and `winners` |
 | `simulate_game` | `mode`, `players`, optional `games` (1 to `MAX_GAMES`, default 10), `policies` (one per seat, default all `"greedy"`), `overrides` (preset values, in the shape of the result's `preset` without `mode`), `seed` | `SimResult.to_json()` unchanged: the statistics, plus the inputs, the `seed` used, and every preset value after overrides |
 | `generate_piece_stl` | `piece`: one `PieceJSON` object, chosen by `type` (`terrain`, `canal`, `floodgate`, `owner_token`, `grape_cluster`, `debt_token`), with optional sizes in mm | `path` of the STL written, `piece` with every default filled in, and the mesh's `size`, `volume`, `triangles`, and `watertight` |
 | `build_plate` | `entries`: 1 to 50 `{piece, count, color}` (`piece` as in `generate_piece_stl`, `color` the plate's color group and filament, at most 500 pieces in total), optional `bed_width`, `bed_depth`, `margin`, `gap` in mm | `folder` and `job`, `plates` (each with `number`, `color`, the 3MF `path`, and `placements` giving every piece id, its entry, its full `piece`, and `x`, `y`, `rotation`), and a `summary` of pieces and plates per color |
@@ -210,11 +239,11 @@ A Python server built on `MCPServer` from the official `mcp` SDK (formerly FastM
 
 ### Domain model
 
-`acequias/model.py`: types and their invariants, no game logic. Every value is immutable, so an update builds a new one, and collections are kept in hex order, so two boards with the same contents are equal whatever order they were built in. Players are referenced by string id: canal owners, claims, and the start and current player. Claims live on the board as vineyard hex → player id; a vineyard with no claim is unclaimed. A canal's openings at a rotation (0 to 5, each 60° counterclockwise) are a `frozenset` of `Direction`s, so rotations that open the same edges compare equal. A floodgate sits on an edge, not a hex: it is identified by that edge, so the same gate given from either side is equal, and an edge holds at most one. `Board` checks where pieces may sit; `GameState` checks that every id belongs to one of its 2 to 5 players.
+`acequias/model.py`: types and their invariants, no game logic. Every value is immutable, so an update builds a new one, and collections are kept in hex order, so two boards with the same contents are equal whatever order they were built in. Players are referenced by string id: canal owners, claims, and the start and current player. Claims live on the board as vineyard hex → player id; a vineyard with no claim is unclaimed. A vineyard tile has a varietal under fixed rules and none under roulette rules; `Board.plantings` holds vineyard hex → the varietal the roulette planted on a claimed blank vineyard, and `Board.varietal_at(hex)` reads the tile's varietal, else the planting, else `None`. A canal's openings at a rotation (0 to 5, each 60° counterclockwise) are a `frozenset` of `Direction`s, so rotations that open the same edges compare equal. A floodgate sits on an edge, not a hex: it is identified by that edge, so the same gate given from either side is equal, and an edge holds at most one. `Board` checks where pieces may sit (a planting only on a claimed vineyard with a blank tile); `GameState` checks that every id belongs to one of its 2 to 5 players, and that the varietals fit its preset's rules: under fixed rules every vineyard tile has a varietal with points and nothing is planted, under roulette rules no vineyard tile has one.
 
 ### Game config
 
-`acequias/config.py`: every number the game needs, as one immutable `Preset` per mode, fetched with `preset(mode)`. Board generation, setup, scoring, the round loop, and the simulation read their values from it and hard-code none. Tuning changes the shipped values there; experiments build variants with `with_overrides`, which validates them like the shipped presets. Shares (stone hexes, bag mix) are whole-number percentages, and rounds are set per player count (they differ since #20).
+`acequias/config.py`: every number the game needs, as one immutable `Preset` per mode, fetched with `preset(mode)`. Board generation, setup, scoring, the round loop, and the simulation read their values from it and hard-code none. Tuning changes the shipped values there; experiments build variants with `with_overrides`, which validates them like the shipped presets. Shares (stone hexes, bag mix) are whole-number percentages, and rounds are set per player count (they differ since #20). `varietal_rules` is `VarietalRules.FIXED` (the shipped default: the generator deals the varietals of `varietal_points` onto the board) or `ROULETTE` (blank plots, planted on claim from the `roulette` sectors). `varietal_points` maps each varietal in play to its points (shipped: Malbec 3, Bonarda 2, Torrontés 1); `roulette` lists the sectors in order (`ROULETTE_SECTORS`). `roulette_rules(p)` switches a preset to roulette rules with the provisional `ROULETTE_POINTS`. Validation: under fixed rules `bodega_varietals` is at most the number of varietals in `varietal_points`; under roulette rules every sector needs points, and `bodega_varietals` is at most the number of distinct sector varietals.
 
 ### Water reach
 
@@ -222,15 +251,15 @@ A Python server built on `MCPServer` from the official `mcp` SDK (formerly FastM
 
 ### Board generator
 
-`acequias/board.py`: `generate_board(players, seed, mode, *, preset=None)` returns a `Board` with tiles only. Equal arguments give an equal board, in any process; all randomness comes from one `random.Random(seed)`. `preset` (from `with_overrides`) replaces the shipped one for the simulation, and must have the same mode. Each row is a river hex on the west followed by an unbroken run of hexes east, and the river zigzags south as one chain, so a hex `k` steps east of its river hex is `k` from the river. Vineyards are placed in the preset's distance range and a layout is kept only if at least as many vineyards as players are reachable through empty hexes; a preset that cannot be met (e.g. a distance range the rows cannot hold, or no layout within the retry cap) raises `ValueError`.
+`acequias/board.py`: `generate_board(players, seed, mode, *, preset=None)` returns a `Board` with tiles only. Equal arguments give an equal board, in any process; all randomness comes from one `random.Random(seed)`. `preset` (from `with_overrides`) replaces the shipped one for the simulation, and must have the same mode. Each row is a river hex on the west followed by an unbroken run of hexes east, and the river zigzags south as one chain, so a hex `k` steps east of its river hex is `k` from the river. Vineyards are placed in the preset's distance range (under fixed rules dealt the varietals of `varietal_points` as evenly as possible; under roulette rules left blank, with the two varietal shuffles skipped) and a layout is kept only if at least as many vineyards as players are reachable through empty hexes; a preset that cannot be met (e.g. a distance range the rows cannot hold, or no layout within the retry cap) raises `ValueError`.
 
 ### Assembly instructions
 
-`acequias/assembly.py`: `assembly_instructions(board)` lists one `AssemblyStep` per tile, ignoring canals, floodgates, and claims. Steps go row by row from north to south and west to east; rows and positions count from 1 (row 1 is the northernmost, whatever its `r`). Each step holds `row`, `position`, the axial `hex` for programs, `terrain`, `varietal` (vineyards only), and the `text` a person reads, e.g. `"Row 2, hex 3: vineyard, Malbec"`. Because rows are staggered, hex 1 of every row after row 1 also names the hex above it that it touches (`"south-east of row 1, hex 1"`, the north-west neighbour preferred); on generated boards that is the river, hex 1 of the row above. A board that cannot be laid out row by row (a skipped `r`, a gap in a row, or a row that does not touch the one above) raises `ValueError` naming the row.
+`acequias/assembly.py`: `assembly_instructions(board)` lists one `AssemblyStep` per tile, ignoring canals, floodgates, and claims. Steps go row by row from north to south and west to east; rows and positions count from 1 (row 1 is the northernmost, whatever its `r`). Each step holds `row`, `position`, the axial `hex` for programs, `terrain`, `varietal` (`Board.varietal_at`, so `None` on a blank roulette vineyard), and the `text` a person reads, e.g. `"Row 2, hex 3: vineyard, Malbec"`, or `"Row 2, hex 3: vineyard"` for a blank one. Because rows are staggered, hex 1 of every row after row 1 also names the hex above it that it touches (`"south-east of row 1, hex 1"`, the north-west neighbour preferred); on generated boards that is the river, hex 1 of the row above. A board that cannot be laid out row by row (a skipped `r`, a gap in a row, or a row that does not touch the one above) raises `ValueError` naming the row.
 
 ### Scoring
 
-`acequias/scoring.py`: `calculate_score(state, preset=None)` scores a `GameState` as given, whatever its round, and changes nothing; with `preset=None` the bodega values come from `state.preset`, or `preset(state.mode)` when that is `None`, and an explicit preset from `with_overrides` replaces them. It returns a read-only mapping of player id → `Score`, in seat order, with the terms `vineyards`, `bodega`, `rights_paid`, `rights_collected`, `debt`, and `total` (the names the MCP tool exposes), plus `watered` (the tie-break count) and `watered_vineyards`: each watered claimed vineyard in hex order, with its varietal, its `WaterPath`, and the rivals it `pays` in seat order. `winners(scores)` returns the winning ids in seat order: highest `total`, then highest `watered`, otherwise a shared win. Debt is only read from `Player.debt`; bribes add to it.
+`acequias/scoring.py`: `calculate_score(state, preset=None)` scores a `GameState` as given, whatever its round, and changes nothing; with `preset=None` the varietal points and bodega values come from `state.preset`, or `preset(state.mode)` when that is `None`, and an explicit preset from `with_overrides` replaces them. A vineyard's varietal is `board.varietal_at(hex)` and its points `preset.varietal_points`; a watered claimed vineyard with no varietal (never planted) raises `ValueError`. It returns a read-only mapping of player id → `Score`, in seat order, with the terms `vineyards`, `bodega`, `rights_paid`, `rights_collected`, `debt`, and `total` (the names the MCP tool exposes), plus `watered` (the tie-break count) and `watered_vineyards`: each watered claimed vineyard in hex order, with its varietal, its `WaterPath`, and the rivals it `pays` in seat order. `winners(scores)` returns the winning ids in seat order: highest `total`, then highest `watered`, otherwise a shared win. Debt is only read from `Player.debt`; bribes add to it.
 
 ### Game setup
 
@@ -238,7 +267,7 @@ A Python server built on `MCPServer` from the official `mcp` SDK (formerly FastM
 
 ### Turn engine
 
-`acequias/turn.py`: the actions are frozen dataclasses `PlaceCanal(kind, hex, rotation)`, `PlaceFloodgate(hex, direction)`, `Bribe(hex, direction, to=None)` (`to=(hex, direction)` moves the floodgate, `None` removes it), and `Pass()`. `apply(state, player, action, rng)` returns a new state and never changes its input; it leaves `current_player`, `start_player`, and `round` untouched, since turn order belongs to the round loop. The caller owns `rng`: only a legal bribe draws from it, with exactly one `rng.randint(1, die_faces)` after every check, so replaying a game needs the same `rng` stream. A placement takes the first copy of its kind from the market and appends `bag[0]`. An illegal action raises `IllegalAction` (a `ValueError`) naming the broken rule; an unknown player raises `ValueError` and a non-action `TypeError`. `legal_actions(state, player)` returns every legal action once, in a fixed order (canals, floodgates, bribes, then pass), in a canonical spelling: the smallest rotation that opens the same edges, and a floodgate edge named from the canal side with the smaller hex. `apply` accepts any equivalent spelling and gives the same state.
+`acequias/turn.py`: the actions are frozen dataclasses `PlaceCanal(kind, hex, rotation)`, `PlaceFloodgate(hex, direction)`, `Bribe(hex, direction, to=None)` (`to=(hex, direction)` moves the floodgate, `None` removes it), and `Pass()`. `apply(state, player, action, rng)` returns a new state and never changes its input; it leaves `current_player`, `start_player`, and `round` untouched, since turn order belongs to the round loop. The caller owns `rng`, drawn from only after every check has passed, so a rejected action leaves it untouched and replaying a game needs the same `rng` stream. A bribe first rolls `rng.randint(1, die_faces)`. Then, under roulette rules only, each vineyard the action newly claims gets one `rng.choice(preset.roulette)`, in ascending hex order, recorded in `Board.plantings`; under fixed rules nothing else is drawn, so fixed-rules games draw exactly as before. A placement takes the first copy of its kind from the market and appends `bag[0]`. An illegal action raises `IllegalAction` (a `ValueError`) naming the broken rule; an unknown player raises `ValueError` and a non-action `TypeError`. `legal_actions(state, player)` returns every legal action once, in a fixed order (canals, floodgates, bribes, then pass), in a canonical spelling: the smallest rotation that opens the same edges, and a floodgate edge named from the canal side with the smaller hex. `apply` accepts any equivalent spelling and gives the same state.
 
 ### Round loop
 
@@ -246,11 +275,11 @@ A Python server built on `MCPServer` from the official `mcp` SDK (formerly FastM
 
 ### Bots
 
-`acequias/bots.py`: a bot is a plain function `decide(state, player, rng)` (the `Bot` type in `game.py`) that returns one element of `legal_actions(state, player)`, keeps no state, and draws only from `rng`. `POLICIES` maps names to bots (read-only) and `policy(name)` looks one up, listing the valid names when it is unknown. `random` picks with one `rng.choice` over every legal action. `greedy` weighs only this move and only vineyard points, with no lookahead: the canal that claims the most points now, else the one nearest the most valuable unclaimed vineyard, else a floodgate on a rival's canal; it never bribes, passing instead, and breaks ties with `rng.choice`. `saboteur` values each non-pass action by its swing in watered vineyard points (own minus rivals'), minus the expected bribe cost `(die_faces + 1) / 2` for a bribe; it plays the best action worth more than 0 and otherwise falls back to `greedy`.
+`acequias/bots.py`: a bot is a plain function `decide(state, player, rng)` (the `Bot` type in `game.py`) that returns one element of `legal_actions(state, player)`, keeps no state, and draws only from `rng`. `POLICIES` maps names to bots (read-only) and `policy(name)` looks one up, listing the valid names when it is unknown. `random` picks with one `rng.choice` over every legal action. `greedy` weighs only this move and only vineyard points, with no lookahead: the canal that claims the most points now, else the one nearest the most valuable unclaimed vineyard, else a floodgate on a rival's canal; it never bribes, passing instead, and breaks ties with `rng.choice`. A vineyard is worth the points of `board.varietal_at`; under roulette rules one with no varietal yet (unclaimed, or newly claimed on the board a move would give, before its spin) is worth the roulette's mean points. `saboteur` values each non-pass action by its swing in watered vineyard points (own minus rivals'), minus the expected bribe cost `(die_faces + 1) / 2` for a bribe; it plays the best action worth more than 0 and otherwise falls back to `greedy`.
 
 ### Simulation
 
-`acequias/sim.py`: `simulate_game(rules, n, seed)` plays `n` bot games of one mode and returns a `SimResult`. `SimRules` holds `mode`, `players`, `policies` (`policies[k]` plays seat `k + 1`, whatever the start player), and `overrides` for `with_overrides`; the resulting preset is passed only to `new_game`, and every later step reads it from `state.preset`. Game `i` uses `game_seed(seed, i)`, and `play_one(rules, game_seed)` replays any single game of a run. A board the preset cannot satisfy raises `ValueError` naming the game index and seed, with no partial result. A shared win among `k` players gives each `1/k` win credit, so each game hands out exactly 1. Position `j` is the place in round 1's turn order, and `turn_order_advantage` is `max_j |win_rate_by_position[j] − 1/P| × P` (0.10 means a position wins 10% more or less than its fair share). Each statistic is defined in its field's docstring; `SimResult.to_json()` gives plain JSON with the names of `server/schemas.py`.
+`acequias/sim.py`: `simulate_game(rules, n, seed)` plays `n` bot games of one mode and returns a `SimResult`. `SimRules` holds `mode`, `players`, `policies` (`policies[k]` plays seat `k + 1`, whatever the start player), and `overrides` for `with_overrides`; the resulting preset is passed only to `new_game`, and every later step reads it from `state.preset`. Game `i` uses `game_seed(seed, i)`, and `play_one(rules, game_seed)` replays any single game of a run. A board the preset cannot satisfy raises `ValueError` naming the game index and seed, with no partial result. A shared win among `k` players gives each `1/k` win credit, so each game hands out exactly 1. Position `j` is the place in round 1's turn order, and `turn_order_advantage` is `max_j |win_rate_by_position[j] − 1/P| × P` (0.10 means a position wins 10% more or less than its fair share). Each statistic is defined in its field's docstring; `SimResult.to_json()` gives plain JSON with the names of `server/schemas.py`. `winner_varietal_rate` has a key only for each varietal in play: those of `varietal_points` under fixed rules (3 keys for the shipped presets), the roulette's 8 under roulette rules.
 
 ### Performance
 
@@ -262,7 +291,7 @@ The engine and the bots take fast paths (precomputed tables, boards derived with
 
 ### Board JSON
 
-`server/schemas.py`: the JSON shapes every tool shares, so a board means the same JSON everywhere. A hex is `q`, `r`, `terrain`, and `varietal` (null except on vineyards). Enum strings are lowercase ASCII: terrain `"river"`, `"vineyard"`, `"stone"`, `"empty"`; varietal `"malbec"`, `"bonarda"`, `"torrontes"`; canal `kind` `"straight"`, `"gentle_curve"`, `"sharp_curve"`, `"symmetric_y"`, `"t_branch"`, `"claw"` (the floodgate is not a kind). Directions are the case-sensitive names `"E"`, `"NE"`, `"NW"`, `"W"`, `"SW"`, `"SE"`. A canal is `q`, `r`, `kind`, `rotation` (0 to 5), `owner`; a floodgate is the canal's `q`, `r` and the `direction` it closes; a claim is `q`, `r`, `player`; a player is `id` and `debt`, and the list order gives seats 1 to N. From a `generate_board` result only `mode` and `hexes` carry over to `calculate_score`: its `players` is a count, not a list, and `seed` and `assembly` are not inputs. Inputs are strict (`"3"`, `3.0`, or `true` is not an int), and the server only maps JSON to `acequias` types; every check comes from the model.
+`server/schemas.py`: the JSON shapes every tool shares, so a board means the same JSON everywhere. A hex is `q`, `r`, `terrain`, and `varietal` (null except on vineyards, and null on a blank vineyard under roulette rules). Enum strings are lowercase ASCII: terrain `"river"`, `"vineyard"`, `"stone"`, `"empty"`; varietal `"malbec"`, `"cabernet_sauvignon"`, `"cabernet_franc"`, `"syrah"`, `"merlot"`, `"bonarda"`, `"torrontes"`, `"chardonnay"`; varietal rules `"fixed"`, `"roulette"`; canal `kind` `"straight"`, `"gentle_curve"`, `"sharp_curve"`, `"symmetric_y"`, `"t_branch"`, `"claw"` (the floodgate is not a kind). Directions are the case-sensitive names `"E"`, `"NE"`, `"NW"`, `"W"`, `"SW"`, `"SE"`. A canal is `q`, `r`, `kind`, `rotation` (0 to 5), `owner`; a floodgate is the canal's `q`, `r` and the `direction` it closes; a claim is `q`, `r`, `player`, and an optional `varietal` (default null): the varietal the roulette planted there, which becomes a `Board.plantings` entry; a player is `id` and `debt`, and the list order gives seats 1 to N. The preset shape (`simulate_game`'s result `preset`, and `overrides` without `mode` in both `simulate_game` and `calculate_score`) adds `varietal_rules`, `varietal_points` keyed by varietal name, and `roulette` as a list of names; `calculate_score` with `overrides={"varietal_rules": "roulette", "varietal_points": {...}}` scores a roulette board with planted claims, and without `overrides` uses the shipped preset. From a `generate_board` result only `mode` and `hexes` carry over to `calculate_score`: its `players` is a count, not a list, and `seed` and `assembly` are not inputs. Inputs are strict (`"3"`, `3.0`, or `true` is not an int), and the server only maps JSON to `acequias` types; every check comes from the model.
 
 ### Tech stack
 
