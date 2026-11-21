@@ -11,9 +11,11 @@ from build123d import Axis, Solid  # noqa: E402
 
 from acequias.cad.channel import (  # noqa: E402
     CAP_DIAMETER,
+    FIT_TOLERANCE,
     HOLE_DEPTH,
     HOLE_DIAMETER,
     MIN_WALL,
+    TOKEN_TOLERANCE,
     canal_piece,
     edge_midpoints,
     floodgate,
@@ -453,6 +455,17 @@ def test_owner_token_peg_fits_the_hole(tolerance):
     peg_length = bb.max.Z - cap_height
     assert HOLE_DEPTH - 0.5 <= peg_length <= HOLE_DEPTH
     assert (bb.size.X, bb.size.Y) == pytest.approx((CAP_DIAMETER, CAP_DIAMETER), abs=TOL)
+
+
+def test_default_tolerances_follow_test_print_1():
+    # #34: owner token 0.20 (0.15 stuck in the hole), floodgate kept at 0.15.
+    assert TOKEN_TOLERANCE == 0.20
+    assert FIT_TOLERANCE == 0.15
+    z = 1.2 + 0.5
+    token = owner_token()
+    assert _solid(token, 1.8 - TOL / 2, 0, z)
+    assert not _solid(token, 1.8 + TOL / 2, 0, z)
+    assert floodgate().bounding_box().size.X == pytest.approx(5.7, abs=TOL)
 
 
 @pytest.mark.parametrize(

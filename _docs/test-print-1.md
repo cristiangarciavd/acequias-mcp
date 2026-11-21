@@ -13,6 +13,13 @@ the Bambu Lab A1. It has three parts:
 Nothing in this report changes the code. Every piece is printed at today's
 default sizes, except where a row below says otherwise.
 
+**Results.** The owner (Cabe) printed all three plates on 2026-11-15 and
+filled in the owner sections and the Decisions below. Fields the owner did
+not answer say "not recorded". Part B of #34 applied the two changed
+decisions: owner-token tolerance 0.15 -> 0.20 mm (D6) and debt-token pip
+depth 0.6 -> 1.0 mm (D9). The plate maps below show the values as printed,
+so "(default)" there means the default at the time of the print.
+
 ## Contents
 
 - [Before you start](#before-you-start)
@@ -56,10 +63,9 @@ default sizes, except where a row below says otherwise.
 
 Generated on 2026-11-08 by calling `build_plate` with the inputs in
 [How to regenerate the files](#how-to-regenerate-the-files). The 3MF files are
-not in the repo (they are git-ignored); they were written here:
+not in the repo: they are under the project's git-ignored `output` folder.
 
-Test print (job `3da015ded30f`), folder
-`C:\Users\user\AppData\Local\Temp\claude\d16f78fbdea62aa0\8f447e24-6b4c-45bd-93ac-cbc876f3ac62\scratchpad\print34\plates-3da015ded30f\`:
+Test print (job `3da015ded30f`), folder `output/test-print-1/plates-3da015ded30f/`:
 
 | File | Plate | Color | Pieces | Print it? |
 | --- | --- | --- | --- | --- |
@@ -67,8 +73,7 @@ Test print (job `3da015ded30f`), folder
 | `plate-2-neutral.3mf` | 2 | neutral | 4 floodgates, 2 debt tokens | Yes |
 | `plate-3-red.3mf` | 3 | red (any player color) | 8 owner tokens, 2 grape clusters | Yes |
 
-Estimate set (job `87f58eaa41bf`), folder
-`C:\Users\user\AppData\Local\Temp\claude\d16f78fbdea62aa0\8f447e24-6b4c-45bd-93ac-cbc876f3ac62\scratchpad\print34\plates-87f58eaa41bf\`:
+Estimate set (job `87f58eaa41bf`), folder `output/test-print-1/plates-87f58eaa41bf/`:
 
 | File | Plate | Color | Pieces | Print it? |
 | --- | --- | --- | --- | --- |
@@ -80,8 +85,10 @@ Estimate set (job `87f58eaa41bf`), folder
 | `plate-6-yellow.3mf` | 6 | yellow | 12 owner tokens, 2 grape clusters | No, slice only |
 | `plate-7-green.3mf` | 7 | green | 12 owner tokens, 2 grape clusters | No, slice only |
 
-That folder is temporary. Copy both `plates-...` folders somewhere safe
-before you start; if they are gone, regenerate them (same input, same files).
+If the folders are gone, regenerate them. Since part B the defaults differ
+(D6, D9): an input that leaves the owner-token tolerance at its default
+(the estimate set) now gets a new job id and folder name, and regenerated
+debt tokens have the deeper pips, not the ones that were printed.
 
 ## Plate 1: neutral hexes
 
@@ -183,9 +190,9 @@ No, write what is different, and attach a screenshot to a comment on #34.
 
 | Plate | Every piece on the bed, in the right place? (Yes / No) | Note if No | Screenshot link |
 | --- | --- | --- | --- |
-| 1 (`plate-1-neutral.3mf`) | | | |
-| 2 (`plate-2-neutral.3mf`) | | | |
-| 3 (`plate-3-red.3mf`) | | | |
+| 1 (`plate-1-neutral.3mf`) | not recorded | not recorded | not recorded |
+| 2 (`plate-2-neutral.3mf`) | not recorded | not recorded | not recorded |
+| 3 (`plate-3-red.3mf`) | not recorded | not recorded | not recorded |
 
 ## Owner: setup
 
@@ -193,41 +200,50 @@ Fill in once per plate where it differs (D10). Supports: none.
 
 | Field | Plate 1 | Plate 2 | Plate 3 |
 | --- | --- | --- | --- |
-| Printer | | | |
-| Nozzle | | | |
-| Filament brand | | | |
-| Filament type | | | |
-| Filament color | | | |
-| Bambu Studio version | | | |
-| Printer / filament / process profile | | | |
-| Layer height (mm) | | | |
-| Infill (% and pattern) | | | |
-| Wall count | | | |
-| Brim (yes / no) | | | |
+| Printer | Bambu Lab A1 | Bambu Lab A1 | Bambu Lab A1 |
+| Nozzle | 0.4 mm | 0.4 mm | 0.4 mm |
+| Filament brand | Printalot | Printalot | Printalot |
+| Filament type | PLA | PLA | PLA |
+| Filament color | not recorded | not recorded | not recorded |
+| Bambu Studio version | not recorded | not recorded | not recorded |
+| Printer / filament / process profile | not recorded | not recorded | not recorded |
+| Layer height (mm) | 0.2 (first layer and the rest) | 0.2 (first layer and the rest) | 0.2 (first layer and the rest) |
+| Infill (% and pattern) | 15% Grid | 15% Grid | 15% Grid |
+| Wall count | 2 (wall generator Classic) | 2 (wall generator Classic) | 2 (wall generator Classic) |
+| Top surface | Monotonic | Monotonic | Monotonic |
+| Brim (yes / no) | not recorded | not recorded | not recorded |
 | Supports | none | none | none |
 
 ## Owner: time and weight
 
 Test print (D11):
 
-| Plate | Sliced time | Sliced weight (g) | Actual time | Actual weight (g) |
-| --- | --- | --- | --- | --- |
-| 1 | | | | |
-| 2 | | | | |
-| 3 | | | | |
+The owner recorded one time and weight per plate, without saying whether
+it is the sliced or the actual one. Times are for the models only, without
+the ~6 min of printer prep and the timelapse.
+
+| Plate | Time | Weight (g) | Sliced or actual |
+| --- | --- | --- | --- |
+| 1 (14 hexes) | ~55.5 min | 27.19 | not recorded |
+| 2 (4 floodgates, 2 debt tokens) | ~2.5 min | 0.66 | not recorded |
+| 3 (8 owner tokens, 2 grape clusters) | 11 min 17 s | 2.11 | not recorded |
 
 Estimate set, sliced only (D11):
 
 | Plate | Sliced time | Sliced weight (g) |
 | --- | --- | --- |
-| 1 (neutral hexes) | | |
-| 2 (neutral hexes) | | |
-| 3 (neutral floodgates and debt tokens) | | |
-| 4 (red) | | |
-| 5 (blue) | | |
-| 6 (yellow) | | |
-| 7 (green) | | |
-| **Total** | | |
+| 1 (neutral hexes) | not recorded | not recorded |
+| 2 (neutral hexes) | not recorded | not recorded |
+| 3 (neutral floodgates and debt tokens) | not recorded | not recorded |
+| 4 (red) | not recorded | not recorded |
+| 5 (blue) | not recorded | not recorded |
+| 6 (yellow) | not recorded | not recorded |
+| 7 (green) | not recorded | not recorded |
+| **Total** | not sliced | not sliced |
+
+The estimate set was not sliced. The owner's estimate, scaled from plate 1
+(96 hexes at ~1.94 g and ~4 min each): **~190-200 g, ~7 h of models** for a
+4-player set. Slicing the set to confirm it is #106.
 
 ## Owner: fit checks
 
@@ -236,36 +252,36 @@ comment on #34 and paste the links in the "Photo" column.
 
 | # | Check | Yes / No | Note | Photo |
 | --- | --- | --- | --- | --- |
-| 1 | Nothing needed supports, and every piece came off the bed whole | | | |
-| 2 | Tile to tile, clearance 0 (T0 and C0): neighboring hexes sit flush on a table, no gap you can see through, no forcing (D2) | | | |
-| 3 | Tile to tile, clearance 0.2 (T0.2 and C0.2): same check (D2) | | | |
-| 4 | Elephant's foot: no flared bottom edge that stops tiles sitting flush (D3) | | | |
-| 5 | Canal grooves line up across every shared edge when neighboring canal pieces are turned to connect, at clearance 0 (D4) | | | |
-| 6 | Same, with the two C0.2 straight canals next to each other and next to a C0 canal (D2, D4) | | | |
-| 7 | Owner token cap lies flat on the piece and does not cover the groove | | | |
-| 8 | Grape cluster stays upright on a terrain hex and does not slide off when the tile is nudged (D8) | | | |
-| 9 | Debt tokens: 1 and 5 can be told apart at arm's length (D9) | | | |
-| 10 | Debt tokens: the two tokens stack flat (D9) | | | |
+| 1 | Nothing needed supports, and every piece came off the bed whole | Yes | All 3 plates printed with no supports; coming off whole not recorded | not recorded |
+| 2 | Tile to tile, clearance 0 (T0 and C0): neighboring hexes sit flush on a table, no gap you can see through, no forcing (D2) | Yes | All hexes fit well. T0 and T0.2 got mixed up off the bed; sorted afterwards by caliper (see measurements) | not recorded |
+| 3 | Tile to tile, clearance 0.2 (T0.2 and C0.2): same check (D2) | Yes | Same as row 2; in a honeycomb the difference is barely visible | not recorded |
+| 4 | Elephant's foot: no flared bottom edge that stops tiles sitting flush (D3) | Yes | No problem | not recorded |
+| 5 | Canal grooves line up across every shared edge when neighboring canal pieces are turned to connect, at clearance 0 (D4) | Yes | Grooves line up across neighboring pieces | photo taken, link not recorded |
+| 6 | Same, with the two C0.2 straight canals next to each other and next to a C0 canal (D2, D4) | not recorded | Not recorded separately from row 5 | not recorded |
+| 7 | Owner token cap lies flat on the piece and does not cover the groove | Yes | not recorded | not recorded |
+| 8 | Grape cluster stays upright on a terrain hex and does not slide off when the tile is nudged (D8) | Yes | Stands upright on the empty hex; nudge test not recorded | not recorded |
+| 9 | Debt tokens: 1 and 5 can be told apart at arm's length (D9) | Yes | Surface looks scratched; owner wants deeper pips | not recorded |
+| 10 | Debt tokens: the two tokens stack flat (D9) | Yes | not recorded | not recorded |
 
 Floodgate in a canal groove, one row per tolerance (D7). Try each floodgate
 in a C0 canal piece:
 
 | Floodgate | Slots in by hand? | Closes the opening fully? | Neighbors still sit flush? | Lifts out by hand, no tools? | Note |
 | --- | --- | --- | --- | --- | --- |
-| F0.10 (`floodgate-01`) | | | | | |
-| F0.15 (`floodgate-02`) | | | | | |
-| F0.20 (`floodgate-03`) | | | | | |
-| F0.25 (`floodgate-04`) | | | | | |
+| F0.10 (`floodgate-01`) | Yes | not recorded | not recorded | not recorded | Works well in any canal |
+| F0.15 (`floodgate-02`) | Yes | not recorded | not recorded | not recorded | Works well in any canal |
+| F0.20 (`floodgate-03`) | Yes | not recorded | not recorded | not recorded | Works well in any canal |
+| F0.25 (`floodgate-04`) | Yes | not recorded | not recorded | not recorded | Works well in any canal |
 
 Owner token in a canal piece's hole, one row per tolerance (D5, D6). Try both
 tokens of each pair:
 
 | Owner token | Goes in by hand? | Stays in when the piece is turned over? | Comes out by hand? | Note |
 | --- | --- | --- | --- | --- |
-| O0.10 (`owner_token-01`, `-02`) | | | | |
-| O0.15 (`owner_token-03`, `-04`) | | | | |
-| O0.20 (`owner_token-05`, `-06`) | | | | |
-| O0.25 (`owner_token-07`, `-08`) | | | | |
+| O0.10 (`owner_token-01`, `-02`) | not recorded | not recorded | not recorded | not recorded |
+| O0.15 (`owner_token-03`, `-04`) | Yes, tight | Yes | Hard if pushed fully in | Tried `owner_token-04` |
+| O0.20 (`owner_token-05`, `-06`) | Yes, easily | No, falls out (pieces never need turning over) | Yes, easily | Tried `owner_token-05` |
+| O0.25 (`owner_token-07`, `-08`) | not recorded | not recorded | not recorded | not recorded |
 
 ## Owner: measurements
 
@@ -273,19 +289,30 @@ With calipers if you have them; otherwise write `n/a`.
 
 | What | Nominal (mm) | Measured (mm) |
 | --- | --- | --- |
-| Terrain hex T0, flat to flat | 27.71 | |
-| Terrain hex T0, corner to corner | 32.00 | |
-| Terrain hex T0.2, flat to flat | 27.31 | |
-| Terrain hex T0.2, corner to corner | 31.54 | |
-| Canal groove width (C0 straight) | 6.00 | |
-| Floodgate F0.10 width | 5.80 | |
-| Floodgate F0.15 width | 5.70 | |
-| Floodgate F0.20 width | 5.60 | |
-| Floodgate F0.25 width | 5.50 | |
-| Owner token O0.10 peg diameter | 3.80 | |
-| Owner token O0.15 peg diameter | 3.70 | |
-| Owner token O0.20 peg diameter | 3.60 | |
-| Owner token O0.25 peg diameter | 3.50 | |
+| Terrain hex T0, flat to flat | 27.71 | 27.48-27.49, 27.60, 27.70 |
+| Terrain hex T0, corner to corner | 32.00 | not recorded |
+| Terrain hex T0.2, flat to flat | 27.31 | 27.20, 27.2, 27.2 |
+| Terrain hex T0.2, corner to corner | 31.54 | not recorded |
+| Canal groove width (C0 straight) | 6.00 | 6.05 |
+| Floodgate F0.10 width | 5.80 | not recorded |
+| Floodgate F0.15 width | 5.70 | not recorded |
+| Floodgate F0.20 width | 5.60 | not recorded |
+| Floodgate F0.25 width | 5.50 | not recorded |
+| Owner token O0.10 peg diameter | 3.80 | not recorded |
+| Owner token O0.15 peg diameter | 3.70 | not recorded |
+| Owner token O0.20 peg diameter | 3.60 | 3.28 (`owner_token-05`) |
+| Owner token O0.25 peg diameter | 3.50 | not recorded |
+| Terrain hex, variant unknown, flat to flat | 27.71 or 27.31 | 27.24 |
+| Floodgate, variant unknown, width | 5.50-5.80 | 5.49 |
+| Floodgate, variant unknown, thickness | 2.00 | 1.37 and 1.97 |
+| Owner token O0.20 cap diameter (`owner_token-05`) | 7.00 | 6.79-6.80 |
+| Debt token diameter | 12.00 | 11.96 |
+| Debt token thickness | 2.00 | 1.93 |
+
+The T0 / T0.2 split is the owner's: the plain hexes measured in two groups,
+~27.5-27.7 (T0) and ~27.2 (T0.2). Owner's note: the printer shrinks small
+diameters by ~0.2-0.3 mm (the O0.20 peg is 0.32 under nominal), and the 4 mm
+hole is likely smaller too, so the real fit is close to nominal.
 
 ## Decisions
 
@@ -294,17 +321,17 @@ initials. The agent applies every changed value in part B of #34.
 
 | # | Decision | Current default | Values printed | Chosen value | Initials |
 | --- | --- | --- | --- | --- | --- |
-| D1 | Hex side: 16 mm, or the 18 mm fallback | 16 mm | 16 mm | | |
-| D2 | Tile clearance (gap between neighboring tiles) | 0 mm | 0, 0.2 mm | | |
-| D3 | Bottom chamfer against elephant's foot: needed or not | none | none | | |
-| D4 | Groove width and depth | 6 mm x 1.5 mm | 6 mm x 1.5 mm | | |
-| D5 | Owner-token hole size (`hole_diameter`, `hole_depth`) | 4 mm x 2 mm | 4 mm x 2 mm | | |
-| D6 | Owner-token tolerance | 0.15 mm | 0.10, 0.15, 0.20, 0.25 mm | | |
-| D7 | Floodgate tolerance, and whether it needs a grip to lift it out | 0.15 mm, no grip | 0.10, 0.15, 0.20, 0.25 mm, no grip | | |
-| D8 | Grape cluster size, and whether it needs a peg or hole to stay put | base 14 mm, height 15 mm, rests loose | base 14 mm, height 15 mm, loose | | |
-| D9 | Debt token size and pip depth (legibility of 1 and 5) | 12 mm x 2 mm, pips 2 mm x 0.6 mm | 12 mm x 2 mm, pips 2 mm x 0.6 mm | | |
-| D10 | Slicer settings (layer height, infill, walls, filament profile) | not recorded | see [Owner: setup](#owner-setup) | | |
-| D11 | Sliced weight and time for a 4-player set | ~150-200 g, ~8-12 h (rough) | see [Owner: time and weight](#owner-time-and-weight) | | |
+| D1 | Hex side: 16 mm, or the 18 mm fallback | 16 mm | 16 mm | 16 mm (everything fits) | Cabe |
+| D2 | Tile clearance (gap between neighboring tiles) | 0 mm | 0, 0.2 mm | 0 mm, one size for all hexes | Cabe |
+| D3 | Bottom chamfer against elephant's foot: needed or not | none | none | None (no elephant's foot problem) | Cabe |
+| D4 | Groove width and depth | 6 mm x 1.5 mm | 6 mm x 1.5 mm | Keep default (not stated; grooves line up, groove measured 6.05 mm) | Cabe |
+| D5 | Owner-token hole size (`hole_diameter`, `hole_depth`) | 4 mm x 2 mm | 4 mm x 2 mm | Keep default (not stated) | Cabe |
+| D6 | Owner-token tolerance | 0.15 mm | 0.10, 0.15, 0.20, 0.25 mm | **0.20 mm** (0.15 is tight and hard to remove; 0.20 goes in and out easily) | Cabe |
+| D7 | Floodgate tolerance, and whether it needs a grip to lift it out | 0.15 mm, no grip | 0.10, 0.15, 0.20, 0.25 mm, no grip | Keep 0.15 mm, no grip (all four tolerances work) | Cabe |
+| D8 | Grape cluster size, and whether it needs a peg or hole to stay put | base 14 mm, height 15 mm, rests loose | base 14 mm, height 15 mm, loose | Keep: base 14 mm, height 15 mm, rests loose | Cabe |
+| D9 | Debt token size and pip depth (legibility of 1 and 5) | 12 mm x 2 mm, pips 2 mm x 0.6 mm | 12 mm x 2 mm, pips 2 mm x 0.6 mm | Keep 12 mm x 2 mm, pips 2 mm; **pip depth 1.0 mm**. Print the debt tokens with one extra top layer or ironing | Cabe |
+| D10 | Slicer settings (layer height, infill, walls, filament profile) | not recorded | see [Owner: setup](#owner-setup) | See [Owner: setup](#owner-setup): Bambu Lab A1, 0.4 mm nozzle, Printalot PLA, 0.2 mm layers, Classic walls x 2, Monotonic top, 15% Grid infill, no supports | Cabe |
+| D11 | Sliced weight and time for a 4-player set | ~150-200 g, ~8-12 h (rough) | see [Owner: time and weight](#owner-time-and-weight) | Test print in [Owner: time and weight](#owner-time-and-weight). 4-player set: ~190-200 g, ~7 h of models, scaled from plate 1, not sliced (#106) | Cabe |
 
 ## Reprint at 18 mm (only if D1 is 18 mm)
 
@@ -313,8 +340,7 @@ plates at side 18 mm and adds them here; the owner then fills in the same
 plate check, setup, time and weight, fit checks, and measurements for the
 reprint before part B starts.
 
-- Reprint files: 
-- Reprint results: 
+Not needed: D1 is 16 mm.
 
 ## How to regenerate the files
 

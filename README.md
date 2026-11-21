@@ -149,18 +149,19 @@ All pieces are parametric build123d models printed on the Bambu Lab A1 (256 × 2
 
 | Parameter | Value |
 | --- | --- |
-| Hex side | 16 mm (~32 mm corner to corner); fallback 18 mm if the groove or fit is too tight |
+| Hex side | 16 mm (~32 mm corner to corner); final, confirmed by test print 1 (#34, D1) |
+| Tile clearance | 0 mm: tiles print at full size, one size for all hexes (#34, D2) |
 | Tile height (functional) | 4 mm, plus decorative relief on top |
 | Canal groove | 6 mm wide, 1.5 mm deep |
-| Owner token | hole 4 mm across, 2 mm deep; cap 7 mm across, 1.2 mm high |
+| Owner token | hole 4 mm across, 2 mm deep; peg 3.60 mm across (0.20 mm fit tolerance per side); cap 7 mm across, 1.2 mm high |
 | Floodgate | 5.70 × 2.00 × 1.50 mm (groove width minus a 0.15 mm fit tolerance per side, flush with the top) |
 | Grape cluster | 14 mm base, 15 mm high, grapes at least 2 mm across |
-| Debt token | 12 mm across, 2 mm thick; pips 2 mm across, 0.6 mm deep |
+| Debt token | 12 mm across, 2 mm thick; pips 2 mm across, 1.0 mm deep |
 | Thinnest wall | 0.8 mm (two widths of the 0.4 mm nozzle) |
 | Board footprint (4p) | ~18–20 cm across |
-| Print estimate (4p set, ~50–70 hexes) | ~150–200 g PLA, ~8–12 h; rough until the real STL is sliced |
+| Print estimate (4p set) | ~190–200 g PLA, ~7 h of printing, scaled from test print 1 (about 1.94 g and 4 min per hex); not yet confirmed by slicing the full set |
 
-The bag of canal pieces is sized to the board's canalizable capacity, which caps how many canals need printing. The piece sizes are the code's defaults and stay provisional until the first test print (#34) validates the groove and the fit tolerance.
+The bag of canal pieces is sized to the board's canalizable capacity, which caps how many canals need printing. The piece sizes are the code's defaults; test print 1 (#34, [`_docs/test-print-1.md`](_docs/test-print-1.md)) confirmed them, raising the owner-token tolerance to 0.20 mm and the pip depth to 1.0 mm.
 
 ### Aesthetics
 
@@ -182,6 +183,10 @@ Pieces are placed on a deterministic hex grid on the 256 × 256 mm plate, spilli
 ### Plate export
 
 `acequias/cad/plate_export.py`: `export_plate(plate, solids, path, bed=...)` writes one laid-out plate as a 3MF file in mm through build123d's `Mesher`: one separate object per placement, in placement order, named after its piece id, rotated by its `rotation` and moved to its `x`, `y` with its lowest point at z = 0. The plate number and color group go in as metadata (`acequias:plate`, `acequias:color_group`); no 3MF colors or filament assignments are written yet (#76), so the filament is picked in the slicer. UUIDs come from the piece ids, so the same plate exports to the same objects. A piece outside the bed, a missing solid, or a path not ending in `.3mf` raises `ValueError`, and a failed export leaves no file behind and any existing file unchanged.
+
+### Printing
+
+Profile used for test print 1 (#34): Bambu Lab A1, 0.4 mm nozzle, PLA; 0.2 mm layers (first layer too), Classic wall generator, 2 wall loops, Monotonic top surface, 15% Grid infill, no supports. For the debt tokens, add one extra top layer or turn on ironing in the slicer: with the default top the face around the pips looks scratched.
 
 ## MCP architecture
 
@@ -346,7 +351,7 @@ Provisional defaults let work start; the simulation (or CAD, for physical values
 - [x] Vineyard distance from the river: 4 hexes (3 canals) in both modes
 - [x] Die: the d6 is kept (a d4 makes bribes common, a d8 nearly removes them); a success threshold waits for smarter bots (#42, #67)
 - [x] Flash bodega bonus: +1 for all three varietals (kept)
-- [ ] Hex side: 16 mm, or the 18 mm fallback (validated in CAD and by printing)
+- [x] Hex side: 16 mm, settled by test print 1 (#34, D1); the 18 mm fallback is not needed
 - [ ] Flash race-end variant: evaluate in the simulation before committing (see [Variants](#variants-under-evaluation))
 
 ## Development

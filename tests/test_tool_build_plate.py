@@ -201,7 +201,7 @@ def test_job_hash_ignores_written_defaults_and_int_floats_but_not_any_value():
     explicit = [
         {"piece": {**TERRAIN, "side": 16, "height": 4.0, "clearance": 0}, "count": 10,
          "color": "neutral"},
-        {"piece": {**TOKEN, "tolerance": 0.15, "cap_diameter": 7}, "count": 4, "color": "red"},
+        {"piece": {**TOKEN, "tolerance": 0.2, "cap_diameter": 7}, "count": 4, "color": "red"},
         KNOWN[2],
     ]
     assert job(explicit, bed=(256, 256), margin=5, gap=3) == base
@@ -323,7 +323,7 @@ async def test_known_list_gives_three_plates_matching_layout_plates(out, monkeyp
     assert first["piece"] == {**TERRAIN, "side": 16.0, "height": 4.0, "clearance": 0.0}
     assert [p["entry"] for p in data["plates"][2]["placements"]] == [2] * 4
     assert data["plates"][1]["placements"][0]["piece"] == {
-        **TOKEN, "tolerance": 0.15, "cap_diameter": 7.0, "cap_height": 1.2
+        **TOKEN, "tolerance": 0.2, "cap_diameter": 7.0, "cap_height": 1.2
     }
 
     names = sorted(path.name for path in folder.iterdir())

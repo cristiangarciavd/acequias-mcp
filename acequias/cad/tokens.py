@@ -229,8 +229,9 @@ DEBT_VALUES = (1, 5)
 PIP_DIAMETER = 2.0
 """Diameter in mm of a debossed pip."""
 
-PIP_DEPTH = 0.6
-"""Depth in mm of a debossed pip; each pip has a flat bottom."""
+PIP_DEPTH = 1.0
+"""Depth in mm of a debossed pip; each pip has a flat bottom. 1.0 from test
+print 1 (#34): 0.6 was too shallow to read well."""
 
 PIP_OFFSET = 0.2
 """The outer pips of a 5 sit at (+-PIP_OFFSET, +-PIP_OFFSET) x diameter."""

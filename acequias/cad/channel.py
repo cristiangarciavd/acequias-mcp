@@ -49,7 +49,11 @@ CAP_HEIGHT = 1.2
 """Height in mm of the owner token's cap."""
 
 FIT_TOLERANCE = 0.15
-"""Gap in mm on each side between a floodgate or token peg and its slot."""
+"""Gap in mm on each side between a floodgate and its groove."""
+
+TOKEN_TOLERANCE = 0.20
+"""Gap in mm on each side between an owner token's peg and its hole; 0.20
+from test print 1 (#34): it goes in and out by hand, 0.15 sticks."""
 
 FLOODGATE_THICKNESS = 2.0
 """Size in mm of the floodgate along the groove."""
@@ -338,7 +342,7 @@ def floodgate(
 
 
 def owner_token(
-    tolerance: float = FIT_TOLERANCE,
+    tolerance: float = TOKEN_TOLERANCE,
     cap_diameter: float = CAP_DIAMETER,
     cap_height: float = CAP_HEIGHT,
 ) -> Solid:
