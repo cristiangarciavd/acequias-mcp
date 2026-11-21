@@ -185,7 +185,7 @@ COMBOS = {
     "die": lambda p: action_die_rules(roulette_rules(p)),
     "die_scaled": lambda p: scaled(action_die_rules(roulette_rules(p)), 3),
 }
-SEATS = ("score_aware", "random", "score_aware", "greedy", "score_aware")
+SEATS = ("score_aware", "random", "greedy", "random", "greedy")
 
 
 def _checked(bot):
