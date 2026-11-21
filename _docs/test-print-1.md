@@ -252,16 +252,16 @@ comment on #34 and paste the links in the "Photo" column.
 
 | # | Check | Yes / No | Note | Photo |
 | --- | --- | --- | --- | --- |
-| 1 | Nothing needed supports, and every piece came off the bed whole | Yes | All 3 plates printed with no supports; coming off whole not recorded |  |
-| 2 | Tile to tile, clearance 0 (T0 and C0): neighboring hexes sit flush on a table, no gap you can see through, no forcing (D2) | Yes | All hexes fit well. T0 and T0.2 got mixed up off the bed; sorted afterwards by caliper (see measurements) |  |
-| 3 | Tile to tile, clearance 0.2 (T0.2 and C0.2): same check (D2) | Yes | Same as row 2; in a honeycomb the difference is barely visible |  |
-| 4 | Elephant's foot: no flared bottom edge that stops tiles sitting flush (D3) | Yes | No problem |  |
+| 1 | Nothing needed supports, and every piece came off the bed whole | Yes | All 3 plates printed with no supports; coming off whole not recorded | not recorded |
+| 2 | Tile to tile, clearance 0 (T0 and C0): neighboring hexes sit flush on a table, no gap you can see through, no forcing (D2) | Yes | All hexes fit well. T0 and T0.2 got mixed up off the bed; sorted afterwards by caliper (see measurements) | not recorded |
+| 3 | Tile to tile, clearance 0.2 (T0.2 and C0.2): same check (D2) | Yes | Same as row 2; in a honeycomb the difference is barely visible | not recorded |
+| 4 | Elephant's foot: no flared bottom edge that stops tiles sitting flush (D3) | Yes | No problem | not recorded |
 | 5 | Canal grooves line up across every shared edge when neighboring canal pieces are turned to connect, at clearance 0 (D4) | Yes | Grooves line up across neighboring pieces | photo taken, link not recorded |
-| 6 | Same, with the two C0.2 straight canals next to each other and next to a C0 canal (D2, D4) | not recorded | Not recorded separately from row 5 |  |
-| 7 | Owner token cap lies flat on the piece and does not cover the groove | Yes |  |  |
-| 8 | Grape cluster stays upright on a terrain hex and does not slide off when the tile is nudged (D8) | Yes | Stands upright on the empty hex; nudge test not recorded |  |
-| 9 | Debt tokens: 1 and 5 can be told apart at arm's length (D9) | Yes | Surface looks scratched; owner wants deeper pips |  |
-| 10 | Debt tokens: the two tokens stack flat (D9) | Yes |  |  |
+| 6 | Same, with the two C0.2 straight canals next to each other and next to a C0 canal (D2, D4) | not recorded | Not recorded separately from row 5 | not recorded |
+| 7 | Owner token cap lies flat on the piece and does not cover the groove | Yes | not recorded | not recorded |
+| 8 | Grape cluster stays upright on a terrain hex and does not slide off when the tile is nudged (D8) | Yes | Stands upright on the empty hex; nudge test not recorded | not recorded |
+| 9 | Debt tokens: 1 and 5 can be told apart at arm's length (D9) | Yes | Surface looks scratched; owner wants deeper pips | not recorded |
+| 10 | Debt tokens: the two tokens stack flat (D9) | Yes | not recorded | not recorded |
 
 Floodgate in a canal groove, one row per tolerance (D7). Try each floodgate
 in a C0 canal piece:
@@ -278,10 +278,10 @@ tokens of each pair:
 
 | Owner token | Goes in by hand? | Stays in when the piece is turned over? | Comes out by hand? | Note |
 | --- | --- | --- | --- | --- |
-| O0.10 (`owner_token-01`, `-02`) | not recorded | not recorded | not recorded | |
+| O0.10 (`owner_token-01`, `-02`) | not recorded | not recorded | not recorded | not recorded |
 | O0.15 (`owner_token-03`, `-04`) | Yes, tight | Yes | Hard if pushed fully in | Tried `owner_token-04` |
 | O0.20 (`owner_token-05`, `-06`) | Yes, easily | No, falls out (pieces never need turning over) | Yes, easily | Tried `owner_token-05` |
-| O0.25 (`owner_token-07`, `-08`) | not recorded | not recorded | not recorded | |
+| O0.25 (`owner_token-07`, `-08`) | not recorded | not recorded | not recorded | not recorded |
 
 ## Owner: measurements
 

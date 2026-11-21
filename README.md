@@ -149,7 +149,8 @@ All pieces are parametric build123d models printed on the Bambu Lab A1 (256 × 2
 
 | Parameter | Value |
 | --- | --- |
-| Hex side | 16 mm (~32 mm corner to corner); fallback 18 mm if the groove or fit is too tight |
+| Hex side | 16 mm (~32 mm corner to corner); final, confirmed by test print 1 (#34, D1) |
+| Tile clearance | 0 mm: tiles print at full size, one size for all hexes (#34, D2) |
 | Tile height (functional) | 4 mm, plus decorative relief on top |
 | Canal groove | 6 mm wide, 1.5 mm deep |
 | Owner token | hole 4 mm across, 2 mm deep; peg 3.60 mm across (0.20 mm fit tolerance per side); cap 7 mm across, 1.2 mm high |
@@ -350,7 +351,7 @@ Provisional defaults let work start; the simulation (or CAD, for physical values
 - [x] Vineyard distance from the river: 4 hexes (3 canals) in both modes
 - [x] Die: the d6 is kept (a d4 makes bribes common, a d8 nearly removes them); a success threshold waits for smarter bots (#42, #67)
 - [x] Flash bodega bonus: +1 for all three varietals (kept)
-- [ ] Hex side: 16 mm, or the 18 mm fallback (validated in CAD and by printing)
+- [x] Hex side: 16 mm, settled by test print 1 (#34, D1); the 18 mm fallback is not needed
 - [ ] Flash race-end variant: evaluate in the simulation before committing (see [Variants](#variants-under-evaluation))
 
 ## Development
