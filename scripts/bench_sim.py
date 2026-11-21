@@ -32,12 +32,17 @@ def as_overrides(p: Preset) -> dict[str, object]:
 
 
 DIE_PRESET = scaled(action_die_rules(roulette_rules(NORMAL)), 3)
-"""The B3 preset: roulette, the action die, and the score scale x3 (#111)."""
+"""The B3 and B4 preset: roulette, the action die, and the score scale x3 (#111)."""
 
 BENCHMARKS = (
     ("B1", SimRules(Mode.NORMAL, 5, ("greedy",) * 5), 20),
     ("B2", SimRules(Mode.NORMAL, 5, ("saboteur", "greedy", "saboteur", "greedy", "saboteur")), 10),
     ("B3", SimRules(Mode.NORMAL, 5, ("score_aware",) * 5, as_overrides(DIE_PRESET)), 10),
+    (
+        "B4",
+        SimRules(Mode.NORMAL, 5, ("lookahead",) + ("score_aware",) * 4, as_overrides(DIE_PRESET)),
+        5,
+    ),
 )
 """Each benchmark: its name, the rules, and the number of games ``n``."""
 SEED = 84

@@ -6,7 +6,7 @@ of ``acequias.game``) that returns one element of
 calls, never change the state they are given, and draw random numbers only
 from ``rng``.
 
-Three policies for the MVP, and a fourth after it:
+Three policies for the MVP, and two more after it:
 
 - ``random_bot``: ``rng.choice`` over every legal action, bribes and
   floodgates included.
@@ -73,6 +73,28 @@ draw when one is left; that is its only use of ``rng``. Claims come from
 ``_board_after``, so the cluster cap applies: a vineyard it waters but
 cannot claim is worth nothing to it.
 
+``lookahead_bot`` (#42) plans ``depth`` of its own moves (default 2;
+``depth=1`` is ``score_aware_bot``'s choice). At each own move it keeps
+the ``beam`` best actions (default 3) by score_aware's one-move value,
+ties in ``legal_actions`` order; after each, the rivals reply in turn
+order with score_aware's choice made without ``rng`` (ties to the first
+legal action), then it plays its next move. The leaf value is
+score_aware's: its own expected total minus the best rival's, with
+planned debt counted. The end of the game cuts the search. Chance counts
+by expectation, never by sampling: the d6 at its mean, new claims at the
+roulette's mean, and a ``RollActionDie`` (its own or a rival's) as the
+mean, over the die's faces, of the best line for that face, declining
+allowed; a die turn is one own move. It never reads the ``bag``: planned
+moves see only the visible market, less the pieces taken, with no refill.
+Planned boards come from ``_board_after``, and the turn order from
+``act`` on a private fixed-seed ``random.Random`` whose draws are
+discarded; the game's dice rng and ``rng`` are never passed in. Its only
+draw from ``rng`` is one ``rng.choice`` over tied root actions in
+``legal_actions`` order (a pending face no use beats is declined with no
+draw, as score_aware does). ``POLICIES`` registers it as ``"lookahead"``
+with its defaults; ``beam`` is 3, not 5, to stay under 5 s per Normal
+5-player game (``scripts/bench_sim.py`` B4).
+
 ``POLICIES`` maps policy names to bots, and ``policy(name)`` looks one up.
 Standard library only; no global randomness.
 """
@@ -82,6 +104,7 @@ from __future__ import annotations
 import random
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import replace
+from functools import partial
 from fractions import Fraction
 from types import MappingProxyType
 from typing import TypeVar
@@ -89,7 +112,7 @@ from typing import TypeVar
 from acequias.config import Preset, VarietalRules
 from acequias.config import preset as shipped_preset
 from acequias.flow import _watered
-from acequias.game import Bot
+from acequias.game import Bot, act, game_over
 from acequias.hex import Hex
 from acequias.model import Board, GameState, Terrain
 from acequias.scoring import Score, calculate_score
@@ -106,7 +129,15 @@ from acequias.turn import (
     legal_actions,
 )
 
-__all__ = ["random_bot", "greedy_bot", "saboteur_bot", "score_aware_bot", "POLICIES", "policy"]
+__all__ = [
+    "random_bot",
+    "greedy_bot",
+    "saboteur_bot",
+    "score_aware_bot",
+    "lookahead_bot",
+    "POLICIES",
+    "policy",
+]
 
 T = TypeVar("T")
 
@@ -181,19 +212,32 @@ def score_aware_bot(state: GameState, player: str, rng: random.Random) -> Action
     with no action (a pending face that is someone else's). Evaluation
     never draws from ``rng``; only a tie does, once.
     """
+    return _pick(_score_aware_ties(state, player), rng)
+
+
+def _score_aware_ties(
+    state: GameState,
+    player: str,
+    extra: Mapping[str, Fraction] | None = None,
+    shared: dict | None = None,
+) -> list[Action]:
+    """The actions ``score_aware_bot`` ties between, in ``legal_actions`` order.
+
+    ``extra`` and ``shared`` are ``lookahead_bot``'s, for ``_Evaluator``.
+    """
     actions = legal_actions(state, player)
     if not actions:
         raise ValueError(f"{player!r} has no die face to resolve; it is {state.current_player}'s")
     if len(actions) == 1 and state.pending_face is None:
-        return actions[0]  # Pass alone
-    evaluator = _Evaluator(state, player)
+        return [actions[0]]  # Pass alone
+    evaluator = _Evaluator(state, player, extra, shared)
     if state.pending_face is not None:
         uses = [a for a in actions if not isinstance(a, DeclineFace)]
         values = [evaluator.value(state, a) for a in uses]
         best = max(values, default=Fraction(0))
         if best <= 0:
-            return DeclineFace()
-        return _pick([a for a, v in zip(uses, values) if v == best], rng)
+            return [DeclineFace()]
+        return [a for a, v in zip(uses, values) if v == best]
     values = [
         evaluator.roll_value() if isinstance(a, RollActionDie)
         else Fraction(0) if isinstance(a, Pass)
@@ -201,7 +245,35 @@ def score_aware_bot(state: GameState, player: str, rng: random.Random) -> Action
         for a in actions
     ]
     best = max(values)
-    return _pick([a for a, v in zip(actions, values) if v == best], rng)
+    return [a for a, v in zip(actions, values) if v == best]
+
+
+def lookahead_bot(
+    state: GameState, player: str, rng: random.Random, *, depth: int = 2, beam: int = 3
+) -> Action:
+    """The action with the best planned outcome over ``depth`` own moves; see the module docstring.
+
+    ``depth`` is the number of own moves planned (``depth=1`` is
+    ``score_aware_bot``'s choice); ``beam`` the number of actions searched
+    at each own move. Raises ``ValueError`` for a ``player`` that is not in
+    the game, one with no action, or a ``depth`` or ``beam`` below 1. Only
+    a tie at the root draws from ``rng``, once.
+    """
+    for name, value in (("depth", depth), ("beam", beam)):
+        if not isinstance(value, int) or isinstance(value, bool):
+            raise TypeError(f"{name} must be an int, got {value!r}")
+        if value < 1:
+            raise ValueError(f"{name} must be at least 1, got {value}")
+    actions = legal_actions(state, player)
+    if not actions:
+        raise ValueError(f"{player!r} has no die face to resolve; it is {state.current_player}'s")
+    if len(actions) == 1:
+        return actions[0]  # Pass alone, or DeclineFace with no use
+    options = _Lookahead(state, player, beam).options(state, {}, depth)
+    best = max(v for _, v in options)
+    if state.pending_face is not None and (DeclineFace(), best) in options:
+        return DeclineFace()  # a face no use beats is declined, as score_aware does
+    return _pick([a for a, v in options if v == best], rng)
 
 
 POLICIES = MappingProxyType(
@@ -210,6 +282,7 @@ POLICIES = MappingProxyType(
         "greedy": greedy_bot,
         "saboteur": saboteur_bot,
         "score_aware": score_aware_bot,
+        "lookahead": partial(lookahead_bot, depth=2, beam=3),
     }
 )
 """Every bot policy by name, read-only."""
@@ -370,11 +443,24 @@ class _Evaluator:
     ``_board_after`` gives, scored by ``calculate_score`` as if the game
     ended there. Values are cached by action, so a use weighed for the die
     is scored once.
+
+    ``extra`` is planned debt per player that the state does not hold, taken
+    off every total; ``shared`` a dict that caches boards and scorings by
+    board across evaluators (players, preset, and tiles must not change
+    between them). ``lookahead_bot`` passes both; ``score_aware_bot`` neither.
     """
 
-    def __init__(self, state: GameState, player: str) -> None:
+    def __init__(
+        self,
+        state: GameState,
+        player: str,
+        extra: Mapping[str, Fraction] | None = None,
+        shared: dict | None = None,
+    ) -> None:
         preset = state.preset or shipped_preset(state.mode)
         self.state = state
+        self.extra = extra or {}
+        self.shared = shared
         self.player = player
         self.preset: Preset = preset
         self.rivals = [p.id for p in state.players if p.id != player]
@@ -394,7 +480,7 @@ class _Evaluator:
         cached = self._cache.get(action)
         if cached is not None:
             return cached
-        after, watered = _board_after(state, self.player, action)  # no draw
+        after, watered = self._board_after(state, action)
         if isinstance(action, Resow):  # weighed blank: the respin's mean points
             after = after._derive(plantings=tuple(p for p in after.plantings if p[0] != action.hex))
         totals = self._totals(after, watered)
@@ -437,7 +523,8 @@ class _Evaluator:
             h for h in watered if board.claimant(h) is not None and board.varietal_at(h) is None
         ]
         if not blanks:
-            return {pid: Fraction(s.total) for pid, s in self._score(board).items()}
+            totals = {pid: Fraction(s.total) for pid, s in self._score(board).items()}
+            return self._less_extra(totals)
         placeholder = self.preset.roulette[0]
         blank_set = set(blanks)
         planted = board._derive(plantings=board.plantings + tuple((h, placeholder) for h in blanks))
@@ -450,10 +537,172 @@ class _Evaluator:
                 s.total - s.vineyards - s.bodega
                 + known[pid].vineyards + known[pid].bodega + self.mean * count
             )
+        return self._less_extra(totals)
+
+    def _less_extra(self, totals: dict[str, Fraction]) -> dict[str, Fraction]:
+        """``totals`` less the planned debt in ``extra`` (none for ``score_aware_bot``)."""
+        for pid, debt in self.extra.items():
+            totals[pid] -= debt
         return totals
 
+    def _board_after(self, state: GameState, action: Action) -> tuple[Board, list[Hex]]:
+        """``_board_after`` for a legal action (no draw); cached when ``shared`` is given."""
+        if self.shared is None:
+            return _board_after(state, self.player, action)
+        board = state.board
+        key = (board.canals, board.floodgates, board.claims, board.plantings, self.player, action)
+        after = self.shared.get(key)
+        if after is None:
+            after = _board_after(state, self.player, action)
+            self.shared[key] = after
+        return after
+
     def _score(self, board: Board) -> Mapping[str, Score]:
+        if self.shared is None:
+            return self._scored(board)
+        key = (board.canals, board.floodgates, board.claims, board.plantings)  # tiles are fixed
+        score = self.shared.get(key)
+        if score is None:
+            score = self.shared[key] = self._scored(board)
+        return score
+
+    def _scored(self, board: Board) -> Mapping[str, Score]:
         return calculate_score(replace(self.state, board=board, pending_face=None), self.preset)
+
+
+# --- Lookahead ---------------------------------------------------------------
+
+
+Extra = Mapping[str, Fraction]
+"""Planned debt per player that a planned state does not hold (bribes at the mean, roll costs)."""
+
+
+class _Lookahead:
+    """``lookahead_bot``'s search for one player, from one state.
+
+    A planned state is the state ``act`` gives with an empty bag (no
+    refill: later moves see only the visible market, less the pieces
+    taken) and the board ``_board_after`` gives (new claims stay blank,
+    so they count at the roulette's mean; a ``Resow`` blanks its
+    vineyard). ``act`` runs on a private fixed-seed ``random.Random`` for
+    the turn order only: its draws (bribe roll, spins) are replaced, and
+    planned debt goes in ``extra`` at the expected value. The search
+    never reads the bag, the game's dice rng, or the bot's rng.
+    """
+
+    def __init__(self, state: GameState, player: str, beam: int) -> None:
+        self.me = player
+        self.beam = beam
+        preset = state.preset or shipped_preset(state.mode)
+        faces = preset.action_die
+        self.faces = {face: faces.count(face) for face in dict.fromkeys(faces)}  # die order
+        self.die_size = len(preset.action_die)
+        self.roll_cost = Fraction(preset.action_die_cost)
+        self.bribe_debt = Fraction(preset.die_faces + 1, 2)
+        self.rng = random.Random(0)
+        self._lines: dict[tuple, Fraction] = {}
+        self.shared: dict[tuple, object] = {}
+
+    def options(self, state: GameState, extra: Extra, k: int) -> list[tuple[Action, Fraction]]:
+        """The bot's candidate actions at its own move, with their planned values.
+
+        ``k`` own moves are left, this one included. A value is the leaf
+        value (own expected total minus the best rival's) of the best
+        line. With ``k == 1`` every legal action is a candidate, valued as
+        ``score_aware`` does (plus the leaf value of ``state``); otherwise
+        the ``beam`` best by that one-move value (ties in ``legal_actions``
+        order), each searched on, in ``legal_actions`` order.
+        """
+        evaluator = _Evaluator(state, self.me, extra, self.shared)
+        base = evaluator.own_now - evaluator.rival_now
+        one = [
+            (a, base + (
+                evaluator.roll_value() if isinstance(a, RollActionDie)
+                else Fraction(0) if isinstance(a, (Pass, DeclineFace))
+                else evaluator.value(state, a)
+            ))
+            for a in legal_actions(state, self.me)
+        ]
+        if k == 1:
+            return one
+        order = sorted(range(len(one)), key=lambda i: -one[i][1])[: self.beam]
+        return [
+            (a, self._roll(state, extra, k) if isinstance(a, RollActionDie)
+             else self._continue(*self._step(state, extra, self.me, a), k - 1))
+            for a, _ in (one[i] for i in sorted(order))
+        ]
+
+    def _roll(self, state: GameState, extra: Extra, k: int) -> Fraction:
+        """The mean, over the die's faces, of the face's best planned line (declining allowed)."""
+        def best(rolled: GameState, planned: Extra) -> Fraction:
+            return max(v for _, v in self.options(rolled, planned, k))
+
+        return self._chance(state, extra, self.me, best)
+
+    def _chance(
+        self,
+        state: GameState,
+        extra: Extra,
+        player: str,
+        value: Callable[[GameState, Extra], Fraction],
+    ) -> Fraction:
+        """The mean of ``value(rolled state, extra)`` over the faces ``player`` may roll."""
+        extra = _add(extra, player, self.roll_cost)
+        total = sum(
+            count * value(replace(state, pending_face=face), extra)
+            for face, count in self.faces.items()
+        )
+        return Fraction(total, self.die_size)
+
+    def _continue(self, state: GameState, extra: Extra, k: int) -> Fraction:
+        """The planned value once the bot's move is done: rivals reply, then its next move.
+
+        ``k`` own moves are left. The end of the game cuts the search.
+        Rivals play ``score_aware``'s choice, ties to the first in
+        ``legal_actions`` order; a rival's roll counts by expectation.
+        Memoized, since a declined face gives the same line for every face.
+        """
+        board = state.board  # tiles are fixed; so are the players, the preset and the bag (empty)
+        key = (
+            board.canals, board.floodgates, board.claims, board.plantings, state.market,
+            state.round, state.current_player, state.pending_face, frozenset(extra.items()), k,
+        )
+        if key not in self._lines:
+            self._lines[key] = self._line(state, extra, k)
+        return self._lines[key]
+
+    def _line(self, state: GameState, extra: Extra, k: int) -> Fraction:
+        """``_continue``, not memoized."""
+        if game_over(state):
+            evaluator = _Evaluator(state, self.me, extra, self.shared)
+            return evaluator.own_now - evaluator.rival_now
+        player = state.current_player
+        if player == self.me:
+            return max(v for _, v in self.options(state, extra, k))
+        choice = _score_aware_ties(state, player, extra, self.shared)[0]
+        if isinstance(choice, RollActionDie):
+            return self._chance(state, extra, player, lambda s, e: self._continue(s, e, k))
+        return self._continue(*self._step(state, extra, player, choice), k)
+
+    def _step(
+        self, state: GameState, extra: Extra, player: str, action: Action
+    ) -> tuple[GameState, Extra]:
+        """The planned state after ``player`` takes ``action`` (not a roll), and planned debt."""
+        after = act(replace(state, bag=()), player, action, self.rng)
+        if isinstance(action, (Pass, DeclineFace)):
+            return after, extra
+        board, _ = _board_after(state, player, action)
+        if isinstance(action, Resow):  # weighed blank: the respin's mean points
+            board = board._derive(plantings=tuple(p for p in board.plantings if p[0] != action.hex))
+        after = replace(after, board=board, players=state.players)
+        if isinstance(action, Bribe):
+            extra = _add(extra, player, self.bribe_debt)
+        return after, extra
+
+
+def _add(extra: Extra, player: str, debt: Fraction) -> Extra:
+    """``extra`` with ``debt`` more for ``player``; ``extra`` is not changed."""
+    return {**extra, player: extra.get(player, Fraction(0)) + debt}
 
 
 def _pick(candidates: Sequence[T], rng: random.Random) -> T:
