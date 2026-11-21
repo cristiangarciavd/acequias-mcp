@@ -15,7 +15,10 @@ Three policies for the MVP:
   possible, the canal nearest an unclaimed vineyard, preferring the most
   valuable one at that distance. With no canal to place it puts a
   floodgate on a rival's canal if it can, any floodgate otherwise. It never
-  bribes. Ties go to ``rng.choice`` over the tied candidates in
+  bribes. A player with no grape clusters left (``Preset.grape_clusters_per_player``)
+  values every unclaimed vineyard at 0, so it skips the canal step and
+  places a floodgate as above; with no floodgate to place it picks any
+  canal. Ties go to ``rng.choice`` over the tied candidates in
   ``legal_actions`` order, with no draw when only one is left.
 - ``saboteur_bot``: places floodgates and bribes on purpose. Every legal
   action but ``Pass`` gets a swing: the change in watered vineyard points
@@ -26,6 +29,10 @@ Three policies for the MVP:
   values are exact ``Fraction``s. It plays the highest value above 0 (ties
   by one ``rng.choice``) and falls back to ``greedy_bot`` when nothing is
   worth more than 0.
+
+Claims come from ``_board_after``, which follows the cluster cap, so the
+saboteur's swing counts only vineyards the player can claim: one a move
+waters but leaves unclaimed counts for nobody.
 
 Greedy and saboteur count only vineyard points: water rights, the bodega bonus, and
 debt are left out on purpose for the MVP. A vineyard is worth the points of
@@ -81,9 +88,12 @@ def greedy_bot(state: GameState, player: str, rng: random.Random) -> Action:
     """
     actions = legal_actions(state, player)
     canals = [a for a in actions if isinstance(a, PlaceCanal)]
-    if canals:
-        return _pick(_best_canals(state, player, canals, rng), rng)
     gates = [a for a in actions if isinstance(a, PlaceFloodgate)]
+    out_of_clusters = _out_of_clusters(state, player)
+    if canals and not (out_of_clusters and gates):
+        if out_of_clusters:
+            return _pick(canals, rng)
+        return _pick(_best_canals(state, player, canals, rng), rng)
     if gates:
         on_rival = [g for g in gates if _touches_rival_canal(state, player, g)]
         return _pick(on_rival or gates, rng)
@@ -178,6 +188,14 @@ def _gain(state, player, canal, unclaimed, worth) -> Fraction | int:
     """Points of the unclaimed vineyards that ``canal`` claims for ``player``."""
     after, _ = _board_after(state, player, canal)  # the board apply would give; no draw
     return sum(worth(after, t.hex) for t in unclaimed if after.claimant(t.hex) == player)
+
+
+def _out_of_clusters(state: GameState, player: str) -> bool:
+    """Whether ``player`` already holds as many claims as the preset's cluster cap."""
+    cap = (state.preset or shipped_preset(state.mode)).grape_clusters_per_player
+    if cap is None:
+        return False
+    return sum(1 for _, p in state.board.claims if p == player) >= cap
 
 
 Worth = Callable[[Board, Hex], "Fraction | int"]

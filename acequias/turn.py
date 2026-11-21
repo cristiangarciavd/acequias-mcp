@@ -14,6 +14,12 @@ varietal rules only, each vineyard the action newly claims is planted with
 one ``rng.choice(preset.roulette)`` spin, in ascending hex order, and
 recorded in ``Board.plantings``. Under fixed rules nothing else is drawn.
 
+After a placement or a bribe (not a ``Pass``) the acting player claims the
+unclaimed watered vineyards in ascending hex order. With a
+``Preset.grape_clusters_per_player`` cap they stop once they hold that many
+claims; the rest stay unclaimed for the next player who places or bribes.
+A vineyard left unclaimed gets no roulette spin.
+
 ``legal_actions(state, player)`` lists every legal action once, in a fixed
 order: canal placements, floodgate placements, bribes, then pass. Actions
 that mean the same move are listed once in a canonical spelling (the
@@ -195,7 +201,8 @@ def _board_after(
         board = _floodgate_board(state, action)
     else:
         board = _bribe_board(state, action)
-    return _claim(board, player)
+    cap = (state.preset or shipped_preset(state.mode)).grape_clusters_per_player
+    return _claim(board, player, cap)
 
 
 # --- Place a canal -----------------------------------------------------------
@@ -338,13 +345,21 @@ def _bribe_board(state: GameState, action: Bribe) -> Board:
 # --- Shared ------------------------------------------------------------------
 
 
-def _claim(board: Board, player: str) -> tuple[Board, list[Hex]]:
-    """``player`` claims every newly watered vineyard; also returns the watered vineyards."""
+def _claim(board: Board, player: str, cap: int | None) -> tuple[Board, list[Hex]]:
+    """``player`` claims the unclaimed watered vineyards; also returns the watered vineyards.
+
+    Claims go in ascending hex order and stop once ``player`` holds ``cap``
+    claims (``None``: no cap). The rest stay unclaimed.
+    """
     watered = _watered(board)
     claims = list(board.claims)
+    held = sum(1 for _, p in claims if p == player) if cap is not None else 0
     for vineyard in watered:
+        if cap is not None and held >= cap:
+            break
         if board.claimant(vineyard) is None:
             claims.append((vineyard, player))
+            held += 1
     return board._derive(claims=tuple(claims)), watered
 
 

@@ -82,6 +82,7 @@ README_VALUES = {
         varietal_rules=VarietalRules.FIXED,
         varietal_points=README_VARIETAL_POINTS,
         roulette=ROULETTE_SECTORS,
+        grape_clusters_per_player=None,
     ),
     Mode.FLASH: dict(
         rounds={2: 6, 3: 6, 4: 4, 5: 4},
@@ -97,6 +98,7 @@ README_VALUES = {
         varietal_rules=VarietalRules.FIXED,
         varietal_points=README_VARIETAL_POINTS,
         roulette=ROULETTE_SECTORS,
+        grape_clusters_per_player=None,
     ),
 }
 
