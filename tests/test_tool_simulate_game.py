@@ -300,3 +300,21 @@ async def test_session_survives_a_tool_error():
         result = await call(client, **BASE)
     assert not result.is_error, text_of(result)
     assert result.structured_content["n"] == 1
+
+
+async def test_water_right_points_is_echoed_and_checked():
+    async with Client(app) as client:
+        shipped = await call(client, mode="flash", players=2, games=1, seed=5)
+        doubled = await call(
+            client, mode="flash", players=2, games=1, seed=5,
+            overrides={"water_right_points": 2},
+        )
+        zero = await call(client, mode="flash", players=2, games=1, seed=5,
+                          overrides={"water_right_points": 0})
+        text = await call(client, mode="flash", players=2, games=1, seed=5,
+                          overrides={"water_right_points": "2"})
+    assert shipped.structured_content["preset"]["water_right_points"] == 1
+    assert doubled.structured_content["preset"]["water_right_points"] == 2
+    for result in (zero, text):
+        assert result.is_error
+        assert "water_right_points" in text_of(result)

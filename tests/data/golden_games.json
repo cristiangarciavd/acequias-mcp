@@ -1703,7 +1703,8 @@
      4,
      5
     ],
-    "vineyards_per_player": 2
+    "vineyards_per_player": 2,
+    "water_right_points": 1
    },
    "score_terms": {
     "bodega": {
@@ -2857,7 +2858,8 @@
      4,
      5
     ],
-    "vineyards_per_player": 2
+    "vineyards_per_player": 2,
+    "water_right_points": 1
    },
    "score_terms": {
     "bodega": {
@@ -5183,7 +5185,8 @@
      4,
      5
     ],
-    "vineyards_per_player": 2
+    "vineyards_per_player": 2,
+    "water_right_points": 1
    },
    "score_terms": {
     "bodega": {
@@ -6881,7 +6884,8 @@
      2,
      3
     ],
-    "vineyards_per_player": 2
+    "vineyards_per_player": 2,
+    "water_right_points": 1
    },
    "score_terms": {
     "bodega": {
@@ -9197,7 +9201,8 @@
      2,
      3
     ],
-    "vineyards_per_player": 2
+    "vineyards_per_player": 2,
+    "water_right_points": 1
    },
    "score_terms": {
     "bodega": {
@@ -10229,7 +10234,8 @@
      2,
      3
     ],
-    "vineyards_per_player": 2
+    "vineyards_per_player": 2,
+    "water_right_points": 1
    },
    "score_terms": {
     "bodega": {

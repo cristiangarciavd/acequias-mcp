@@ -116,6 +116,8 @@ class Preset:
     non-river hexes that are stone, and ``bag_mix`` the percentage of the bag
     for each ``PieceKind``. A player whose watered vineyards include
     ``bodega_varietals`` distinct varietals earns ``bodega_points``.
+    ``water_right_points`` is what a watered claimed vineyard pays each
+    distinct rival who owns a canal on its water path.
 
     ``varietal_rules`` says how vineyards get their varietal (fixed on the
     board, or planted by the roulette on claim). ``varietal_points`` maps
@@ -148,6 +150,7 @@ class Preset:
     die_faces: int
     bodega_points: int
     bodega_varietals: int
+    water_right_points: int
     varietal_rules: VarietalRules
     varietal_points: Mapping[Varietal, int]
     roulette: tuple[Varietal, ...]
@@ -166,6 +169,7 @@ class Preset:
             "die_faces",
             "bodega_points",
             "bodega_varietals",
+            "water_right_points",
         ):
             _check_count(name, getattr(self, name))
         _check_share("stone_share", self.stone_share)
@@ -370,6 +374,7 @@ NORMAL = Preset(
     die_faces=6,
     bodega_points=2,
     bodega_varietals=3,
+    water_right_points=1,
     varietal_rules=VarietalRules.FIXED,
     varietal_points={Varietal.MALBEC: 3, Varietal.BONARDA: 2, Varietal.TORRONTES: 1},
     roulette=ROULETTE_SECTORS,
@@ -391,6 +396,7 @@ FLASH = Preset(
     die_faces=6,
     bodega_points=1,
     bodega_varietals=3,
+    water_right_points=1,
     varietal_rules=VarietalRules.FIXED,
     varietal_points=NORMAL.varietal_points,
     roulette=ROULETTE_SECTORS,
@@ -453,3 +459,23 @@ def action_die_rules(p: Preset) -> Preset:
         mix[k] += 1
     mix[PieceKind.FLOODGATE] = 0
     return with_overrides(p, bribe_rules=BribeRules.ACTION_DIE, bag_mix=mix)
+
+
+def scaled(p: Preset, factor: int) -> Preset:
+    """A copy of ``p`` with every scoring value multiplied by ``factor``.
+
+    ``varietal_points`` (each value), ``bodega_points`` and
+    ``water_right_points`` are multiplied; everything else is kept,
+    including ``bodega_varietals``, the roulette and the rounds. Debt is
+    **not** scaled: the bribe d6 (``die_faces``) and ``action_die_cost``
+    stay as they are, and #103 picks them against the scale. ``factor``
+    must be an int of at least 1; ``p`` is unchanged.
+    """
+    _check_type("p", p, Preset)
+    _check_count("factor", factor)
+    return with_overrides(
+        p,
+        varietal_points={v: points * factor for v, points in p.varietal_points.items()},
+        bodega_points=p.bodega_points * factor,
+        water_right_points=p.water_right_points * factor,
+    )

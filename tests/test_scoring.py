@@ -5,7 +5,7 @@ from types import MappingProxyType
 
 import pytest
 
-from acequias.config import FLASH, NORMAL, preset, with_overrides
+from acequias.config import FLASH, NORMAL, preset, scaled, with_overrides
 from acequias.flow import water
 from acequias.hex import Direction, Hex
 from acequias.model import (
@@ -488,6 +488,63 @@ def test_a_three_player_game_uses_every_term():
     assert_rights_balance(scores)
     assert_total_formula(scores)
     assert winners(scores) == ("a",)
+
+
+# --- Score scale (#111) ------------------------------------------------------
+
+
+def rights_board():
+    """a's Malbec crosses b and c; a's Torrontés crosses b again: 3 rival-vineyard
+    pairs. b has its own Bonarda. Debts are non-zero so the debt term shows."""
+    return make_state(
+        [
+            lane(0, ["b", "c", "a"], MALBEC, "a"),
+            lane(1, ["b", "a"], TORRONTES, "a"),
+            lane(2, ["b"], BONARDA, "b"),
+        ],
+        debts={"a": 2, "b": 1},
+    )
+
+
+def test_water_right_points_set_the_price_per_rival():
+    state = rights_board()
+    scores = calculate_score(state, with_overrides(NORMAL, water_right_points=3))
+    assert scores["a"].rights_paid == 9
+    assert scores["b"].rights_collected == 6
+    assert scores["c"].rights_collected == 3
+    assert terms(scores["a"]) == (4, 0, 9, 0, 2, -7)
+    assert terms(scores["b"]) == (2, 0, 0, 6, 1, 7)
+    assert_rights_balance(scores)
+    assert_total_formula(scores)
+
+
+def test_water_right_points_keep_the_rivals_paid():
+    state = rights_board()
+    one = calculate_score(state)
+    three = calculate_score(state, with_overrides(NORMAL, water_right_points=3))
+    for pid in "abc":
+        assert [v.pays for v in three[pid].watered_vineyards] == [
+            v.pays for v in one[pid].watered_vineyards
+        ]
+    # Hex order: the Torrontés (3, 2) before the Malbec (4, 0).
+    assert [v.pays for v in one["a"].watered_vineyards] == [("b",), ("b", "c")]
+    assert one["a"].rights_paid == 3
+
+
+@pytest.mark.parametrize("k", [2, 3, 5])
+def test_a_scaled_preset_multiplies_every_term_but_debt(k):
+    state, _ = three_player_game()
+    base = calculate_score(state, NORMAL)
+    big = calculate_score(state, scaled(NORMAL, k))
+    for pid in "abc":
+        b, s = base[pid], big[pid]
+        assert s.vineyards == k * b.vineyards
+        assert s.bodega == k * b.bodega
+        assert s.rights_paid == k * b.rights_paid
+        assert s.rights_collected == k * b.rights_collected
+        assert s.debt == b.debt
+        assert s.watered_vineyards == b.watered_vineyards
+    assert_total_formula(big)
 
 
 # --- Constraints -------------------------------------------------------------

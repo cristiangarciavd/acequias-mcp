@@ -17,6 +17,7 @@ from acequias.config import (
     action_die_rules,
     preset,
     roulette_rules,
+    scaled,
     with_overrides,
 )
 from acequias.model import MAX_PLAYERS, MIN_PLAYERS, DieFace, Mode, PieceKind, Varietal
@@ -30,6 +31,7 @@ COUNT_FIELDS = [
     "die_faces",
     "bodega_points",
     "bodega_varietals",
+    "water_right_points",
 ]
 ids = pytest.mark.parametrize("p", PRESETS, ids=lambda p: p.mode.name)
 
@@ -82,6 +84,7 @@ README_VALUES = {
         die_faces=6,
         bodega_points=2,
         bodega_varietals=3,
+        water_right_points=1,
         varietal_rules=VarietalRules.FIXED,
         varietal_points=README_VARIETAL_POINTS,
         roulette=ROULETTE_SECTORS,
@@ -101,6 +104,7 @@ README_VALUES = {
         die_faces=6,
         bodega_points=1,
         bodega_varietals=3,
+        water_right_points=1,
         varietal_rules=VarietalRules.FIXED,
         varietal_points=README_VARIETAL_POINTS,
         roulette=ROULETTE_SECTORS,
@@ -592,3 +596,59 @@ def test_d6_rules_ignore_the_action_die_checks():
     assert DieFace.RESOW in NORMAL.action_die
     with pytest.raises(ValueError, match="action_die_cost"):
         with_overrides(NORMAL, action_die_cost=0)
+
+
+# --- Score scale (#111) ------------------------------------------------------
+
+
+@pytest.mark.parametrize("bad", [0, -1, True, 1.0])
+def test_water_right_points_rejects(bad):
+    exc = ValueError if bad in (0, -1) and not isinstance(bad, (bool, float)) else TypeError
+    assert_raises(NORMAL, exc, "water_right_points", water_right_points=bad)
+
+
+def test_scaled_doubles_every_scoring_value():
+    p = scaled(NORMAL, 2)
+    assert dict(p.varietal_points) == {
+        Varietal.MALBEC: 6,
+        Varietal.BONARDA: 4,
+        Varietal.TORRONTES: 2,
+    }
+    assert p.bodega_points == 4
+    assert p.water_right_points == 2
+    scoring = {"varietal_points", "bodega_points", "water_right_points"}
+    for name, value in fields_of(p).items():
+        if name not in scoring:
+            assert value == getattr(NORMAL, name), name
+
+
+def test_scaled_triples_every_roulette_varietal():
+    p = roulette_rules(NORMAL)
+    tripled = scaled(p, 3)
+    assert len(tripled.varietal_points) == 8
+    assert dict(tripled.varietal_points) == {v: 3 * n for v, n in ROULETTE_POINTS.items()}
+
+
+def test_scaled_keeps_the_action_die_cost():
+    p = scaled(action_die_rules(roulette_rules(NORMAL)), 2)
+    assert p.action_die_cost == 2
+    assert p.die_faces == NORMAL.die_faces
+
+
+@ids
+def test_scaled_by_one_is_equal_and_leaves_the_original(p):
+    before = fields_of(p)
+    assert scaled(p, 1) == p
+    scaled(p, 3)
+    assert fields_of(p) == before
+
+
+@pytest.mark.parametrize(("bad", "exc"), [(0, ValueError), (-1, ValueError), (True, TypeError), (1.5, TypeError)])
+def test_scaled_rejects_bad_factors(bad, exc):
+    with pytest.raises(exc, match="factor"):
+        scaled(NORMAL, bad)
+
+
+def test_scaled_needs_a_preset():
+    with pytest.raises(TypeError):
+        scaled("normal", 2)

@@ -309,8 +309,12 @@ class ScoreJSON(BaseModel):
     seat: int = Field(description="Seat number, 1 to N in the order of the input players.")
     vineyards: int = Field(description="Points from the player's watered claimed vineyards.")
     bodega: int = Field(description="Bodega bonus for watering enough different varietals.")
-    rights_paid: int = Field(description="Water rights paid to rivals, 1 point per rival per vineyard.")
-    rights_collected: int = Field(description="Water rights collected from rivals.")
+    rights_paid: int = Field(
+        description=(
+            "Water rights paid to rivals, in points: water_right_points per rival per vineyard."
+        )
+    )
+    rights_collected: int = Field(description="Water rights collected from rivals, in points.")
     debt: int = Field(description="Bribe debt.")
     total: int = Field(description="vineyards + bodega - rights_paid + rights_collected - debt.")
     watered: int = Field(description="Number of watered claimed vineyards (the tie-break).")
@@ -343,6 +347,7 @@ _BRIBE_RULES_DESCRIPTION = (
     'move a floodgate) or "action_die" (pay action_die_cost in debt, roll the action die, '
     "use its face; floodgates come only from the die, so bag_mix gives them 0)."
 )
+_WATER_RIGHT_DESCRIPTION = "Points a vineyard pays each distinct rival on its water path."
 _DIE_COST_DESCRIPTION = "Debt one roll of the action die costs (action_die rules)."
 _ACTION_DIE_DESCRIPTION = (
     'The faces of the action die in order, each "floodgate", "release", or "resow" '
@@ -368,6 +373,7 @@ class PresetJSON(BaseModel):
     die_faces: int = Field(description="Faces of the bribe d6 (d6 rules).")
     bodega_points: int = Field(description="Points of the bodega bonus.")
     bodega_varietals: int = Field(description="Distinct watered varietals the bodega bonus needs.")
+    water_right_points: int = Field(description=_WATER_RIGHT_DESCRIPTION)
     varietal_rules: VarietalRulesName = Field(description=_RULES_DESCRIPTION)
     varietal_points: dict[VarietalName, int] = Field(description=_POINTS_DESCRIPTION)
     roulette: list[VarietalName] = Field(description=_ROULETTE_DESCRIPTION)
@@ -417,6 +423,9 @@ class PresetOverridesJSON(TypedDict, total=False):
                 "under roulette rules)."
             )
         ),
+    ]
+    water_right_points: Annotated[
+        StrictInt, Field(description=_WATER_RIGHT_DESCRIPTION + " 1 or more.")
     ]
     varietal_rules: Annotated[VarietalRulesName, Field(description=_RULES_DESCRIPTION)]
     varietal_points: Annotated[

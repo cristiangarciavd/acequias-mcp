@@ -12,9 +12,10 @@ come from ``acequias.flow.water``; a vineyard's varietal from
 varietal points and the bodega bonus from the game's ``Preset`` in
 ``acequias.config``.
 
-For each watered claimed vineyard, the claimant pays 1 point to each
-distinct other player who owns a canal on its path, and each of them
-collects 1 point. Unclaimed vineyards score nothing and cause no rights.
+For each watered claimed vineyard, the claimant pays
+``preset.water_right_points`` (1 in the shipped presets) to each distinct
+other player who owns a canal on its path, and each of them collects the
+same. Unclaimed vineyards score nothing and cause no rights.
 
 This module is pure: it reads a ``GameState``, changes nothing, and has no
 randomness.
@@ -36,8 +37,9 @@ from acequias.model import GameState, Varietal
 class WateredVineyard:
     """One watered claimed vineyard of a player.
 
-    ``pays`` holds the rivals the claimant pays 1 point each: the path's
-    owners minus the claimant, in seat order.
+    ``pays`` holds the rivals the claimant pays ``water_right_points``
+    each, once per rival: the path's owners minus the claimant, in seat
+    order.
     """
 
     hex: Hex
@@ -51,6 +53,8 @@ class Score:
     """A player's final score, by term.
 
     ``total == vineyards + bodega - rights_paid + rights_collected - debt``.
+    Every term is in points: ``rights_paid`` and ``rights_collected`` are
+    the rival-vineyard pairs times the preset's ``water_right_points``.
     ``watered`` is the number of the player's claimed vineyards that are
     watered (the tie-break), and ``watered_vineyards`` lists them in hex
     order.
@@ -72,7 +76,7 @@ def calculate_score(state: GameState, preset: Preset | None = None) -> Mapping[s
     """Every player's score on ``state``, keyed by player id, in seat order.
 
     The state is scored as given, whatever its round. With ``preset=None``
-    the bodega values come from ``state.preset`` when it is set, and from
+    the scoring values come from ``state.preset`` when it is set, and from
     ``preset(state.mode)`` otherwise; an explicit ``preset`` always wins.
     Raises ``ValueError`` for a watered claimed vineyard with no varietal
     (never planted) or one with no points in the preset.
@@ -96,7 +100,7 @@ def calculate_score(state: GameState, preset: Preset | None = None) -> Mapping[s
             continue
         pays = tuple(sorted(path.owners - {claimant}, key=seat_of.__getitem__))
         for rival in pays:
-            collected[rival] += 1
+            collected[rival] += preset.water_right_points
         varietal = board.varietal_at(hex)
         if varietal is None:
             raise ValueError(f"the claimed vineyard on {hex} has no varietal planted")
@@ -111,7 +115,7 @@ def calculate_score(state: GameState, preset: Preset | None = None) -> Mapping[s
         vineyards = sum(points[v.varietal] for v in mine)
         varietals = {v.varietal for v in mine}
         bodega = preset.bodega_points if len(varietals) >= preset.bodega_varietals else 0
-        paid = sum(len(v.pays) for v in mine)
+        paid = sum(len(v.pays) for v in mine) * preset.water_right_points
         total = vineyards + bodega - paid + collected[p.id] - p.debt
         scores[p.id] = Score(
             player=p.id,

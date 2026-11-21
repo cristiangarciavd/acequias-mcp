@@ -525,3 +525,38 @@ def test_sim_uses_no_global_random_hash_or_clock():
             names = [a.name for a in node.names]
             module = getattr(node, "module", None) or ""
             assert not {"time", "os", "datetime", "server"} & {module.split(".")[0], *names}
+
+
+# --- Score scale (#111) ------------------------------------------------------
+
+
+def _scaled_overrides(mode, factor):
+    from acequias.config import scaled
+
+    p = scaled(shipped_preset(mode), factor)
+    names = ("varietal_points", "bodega_points", "water_right_points")
+    return {name: getattr(p, name) for name in names}
+
+
+@pytest.mark.parametrize("mode", list(Mode), ids=lambda m: m.name)
+def test_scaled_overrides_are_deterministic(mode):
+    r = rules(mode, 3, ("random", "greedy", "saboteur"), **_scaled_overrides(mode, 3))
+    a = simulate_game(r, 4, 11)
+    assert a == simulate_game(r, 4, 11)
+    assert a.to_json()["preset"]["water_right_points"] == 3
+
+
+@pytest.mark.parametrize("mode", list(Mode), ids=lambda m: m.name)
+def test_scaling_keeps_the_random_and_greedy_games(mode):
+    # Greedy ranks moves by vineyard points; scaling them all keeps its order.
+    policies = ("random", "greedy", "greedy")
+    one = rules(mode, 3, policies)
+    two = rules(mode, 3, policies, **_scaled_overrides(mode, 2))
+    for i in range(4):
+        seed = game_seed(7, i)
+        a, b = play_one(one, seed), play_one(two, seed)
+        assert a.log == b.log
+        assert a.final.board == b.final.board
+        assert a.final.players == b.final.players
+        for pid, s in a.scores.items():
+            assert b.scores[pid].total == 2 * (s.total + s.debt) - s.debt
