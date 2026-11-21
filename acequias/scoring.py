@@ -7,8 +7,10 @@ Each player scores
     + water rights collected - bribe debt
 
 Only watered claimed vineyards count. Watering and the path the water takes
-come from ``acequias.flow.water``; varietal points from ``Varietal.points``;
-the bodega bonus from the mode's ``Preset`` in ``acequias.config``.
+come from ``acequias.flow.water``; a vineyard's varietal from
+``Board.varietal_at`` (its tile, or what the roulette planted there); the
+varietal points and the bodega bonus from the game's ``Preset`` in
+``acequias.config``.
 
 For each watered claimed vineyard, the claimant pays 1 point to each
 distinct other player who owns a canal on its path, and each of them
@@ -72,6 +74,8 @@ def calculate_score(state: GameState, preset: Preset | None = None) -> Mapping[s
     The state is scored as given, whatever its round. With ``preset=None``
     the bodega values come from ``state.preset`` when it is set, and from
     ``preset(state.mode)`` otherwise; an explicit ``preset`` always wins.
+    Raises ``ValueError`` for a watered claimed vineyard with no varietal
+    (never planted) or one with no points in the preset.
     """
     if not isinstance(state, GameState):
         raise TypeError(f"calculate_score needs a GameState, got {state!r}")
@@ -93,12 +97,18 @@ def calculate_score(state: GameState, preset: Preset | None = None) -> Mapping[s
         pays = tuple(sorted(path.owners - {claimant}, key=seat_of.__getitem__))
         for rival in pays:
             collected[rival] += 1
-        owned[claimant].append(WateredVineyard(hex, board.tile_at(hex).varietal, path, pays))
+        varietal = board.varietal_at(hex)
+        if varietal is None:
+            raise ValueError(f"the claimed vineyard on {hex} has no varietal planted")
+        if varietal not in preset.varietal_points:
+            raise ValueError(f"{varietal.display_name} on {hex} has no points in the preset")
+        owned[claimant].append(WateredVineyard(hex, varietal, path, pays))
 
+    points = preset.varietal_points
     scores: dict[str, Score] = {}
     for p in players:
         mine = tuple(owned[p.id])
-        vineyards = sum(v.varietal.points for v in mine)
+        vineyards = sum(points[v.varietal] for v in mine)
         varietals = {v.varietal for v in mine}
         bodega = preset.bodega_points if len(varietals) >= preset.bodega_varietals else 0
         paid = sum(len(v.pays) for v in mine)

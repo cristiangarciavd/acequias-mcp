@@ -13,6 +13,8 @@ from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from acequias.config import preset as shipped_preset
+from acequias.config import with_overrides
 from acequias.model import MAX_PLAYERS, MIN_PLAYERS, Board, GameState
 from acequias.scoring import calculate_score as score_state
 from acequias.scoring import winners as winners_of
@@ -23,6 +25,7 @@ from server.schemas import (
     HexJSON,
     ModeName,
     PlayerJSON,
+    PresetOverridesJSON,
     ScoreJSON,
     canal_from_json,
     claim_from_json,
@@ -30,6 +33,8 @@ from server.schemas import (
     hexes_to_board,
     mode_from_json,
     mode_to_json,
+    overrides_from_json,
+    planting_from_json,
     players_from_json,
     score_to_json,
 )
@@ -80,8 +85,24 @@ def calculate_score(
     ] = [],
     claims: Annotated[
         list[ClaimJSON],
-        Field(description="Vineyard claims, at most one per vineyard; any order."),
+        Field(
+            description=(
+                "Vineyard claims, at most one per vineyard; any order. Under roulette rules "
+                "each gives the varietal planted there."
+            )
+        ),
     ] = [],
+    overrides: Annotated[
+        PresetOverridesJSON,
+        Field(
+            description=(
+                "Optional preset values to replace (default: none, the mode's shipped "
+                "preset), in the shape of simulate_game's preset without mode; e.g. "
+                '{"varietal_rules": "roulette", "varietal_points": {...}} scores a '
+                "roulette board."
+            ),
+        ),
+    ] = {},  # noqa: B006 - never mutated; overrides_from_json copies it
 ) -> ScoreResult:
     """Score an Acequias board state: each player's points by term, and the winners.
 
@@ -96,23 +117,30 @@ def calculate_score(
         canals=tuple(canal_from_json(item) for item in canals),
         floodgates=tuple(floodgate_from_json(item) for item in floodgates),
         claims=tuple(claim_from_json(item) for item in claims),
+        plantings=tuple(
+            planting
+            for planting in (planting_from_json(item) for item in claims)
+            if planting is not None
+        ),
     )
+    game_mode = mode_from_json(mode)
+    preset = with_overrides(shipped_preset(game_mode), **overrides_from_json(overrides))
     game_players = players_from_json(players)
     first = game_players[0].id if game_players else ""
-    # Scoring reads only the board, the players, and the mode. The fields the
+    # Scoring reads only the board, the players, and the preset. The fields the
     # input does not carry get fixed values: round 1, the first player as
     # start and current player, and an empty market and bag.
     state = GameState(
         board=board,
         players=game_players,
-        mode=mode_from_json(mode),
+        mode=game_mode,
         round=1,
         start_player=first,
         current_player=first,
         market=(),
         bag=(),
+        preset=preset,
     )
-    # No preset override: the bodega values come from preset(mode).
     scores = score_state(state)
     return ScoreResult.model_validate(
         {

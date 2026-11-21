@@ -210,7 +210,16 @@ async def test_session_survives_a_tool_error():
 
 def test_string_mappings_round_trip():
     assert [terrain_to_json(t) for t in Terrain] == ["river", "vineyard", "stone", "empty"]
-    assert [varietal_to_json(v) for v in Varietal] == ["malbec", "bonarda", "torrontes"]
+    assert [varietal_to_json(v) for v in Varietal] == [
+        "malbec",
+        "cabernet_sauvignon",
+        "cabernet_franc",
+        "syrah",
+        "merlot",
+        "bonarda",
+        "torrontes",
+        "chardonnay",
+    ]
     assert [mode_to_json(m) for m in Mode] == ["normal", "flash"]
     assert varietal_to_json(None) is None
     for terrain in Terrain:
@@ -229,7 +238,9 @@ def test_string_mappings_round_trip():
         (terrain_from_json, "River"),
         (varietal_from_json, "Malbec"),
         (varietal_from_json, "Torrontés"),
-        (varietal_from_json, "syrah"),
+        (varietal_from_json, "Syrah"),
+        (varietal_from_json, "cabernet franc"),
+        (varietal_from_json, "pinot_noir"),
         (mode_from_json, "Normal"),
         (mode_from_json, 1),
     ],
@@ -267,12 +278,13 @@ def test_unknown_terrain_raises():
 
 def test_unknown_varietal_raises():
     with pytest.raises(ValueError, match="varietal"):
-        hexes_to_board(hexes({"q": 2, "r": 0, "terrain": "vineyard", "varietal": "syrah"}))
+        hexes_to_board(hexes({"q": 2, "r": 0, "terrain": "vineyard", "varietal": "pinot_noir"}))
 
 
-def test_vineyard_without_varietal_raises():
-    with pytest.raises(ValueError, match="varietal"):
-        hexes_to_board(hexes({"q": 2, "r": 0, "terrain": "vineyard", "varietal": None}))
+def test_vineyard_with_a_null_varietal_is_a_blank_plot():
+    board = hexes_to_board(hexes({"q": 2, "r": 0, "terrain": "vineyard", "varietal": None}))
+    assert board.tile_at(Hex(2, 0)) == Tile(Hex(2, 0), Terrain.VINEYARD)
+    assert board.varietal_at(Hex(2, 0)) is None
 
 
 def test_varietal_on_a_non_vineyard_raises():

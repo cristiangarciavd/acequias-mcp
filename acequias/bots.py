@@ -11,7 +11,7 @@ Three policies for the MVP:
 - ``random_bot``: ``rng.choice`` over every legal action, bribes and
   floodgates included.
 - ``greedy_bot``: one move, no lookahead. It places the canal that claims
-  the most vineyard points this turn (``Varietal.points``); with no claim
+  the most vineyard points this turn (``Preset.varietal_points``); with no claim
   possible, the canal nearest an unclaimed vineyard, preferring the most
   valuable one at that distance. With no canal to place it puts a
   floodgate on a rival's canal if it can, any floodgate otherwise. It never
@@ -28,7 +28,11 @@ Three policies for the MVP:
   worth more than 0.
 
 Greedy and saboteur count only vineyard points: water rights, the bodega bonus, and
-debt are left out on purpose for the MVP. Boards and claims come from
+debt are left out on purpose for the MVP. A vineyard is worth the points of
+``Board.varietal_at``; under roulette rules one with no varietal yet
+(unclaimed, or newly claimed on the board ``_board_after`` gives, before
+its spin) is worth the roulette's mean points, an exact ``Fraction``.
+Boards and claims come from
 ``acequias.turn`` (the private ``_board_after`` that ``apply`` uses too),
 so no rule is reimplemented here.
 
@@ -39,11 +43,12 @@ Standard library only; no global randomness.
 from __future__ import annotations
 
 import random
-from collections.abc import Iterable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from fractions import Fraction
 from types import MappingProxyType
 from typing import TypeVar
 
+from acequias.config import VarietalRules
 from acequias.config import preset as shipped_preset
 from acequias.flow import _watered
 from acequias.game import Bot
@@ -98,7 +103,8 @@ def saboteur_bot(state: GameState, player: str, rng: random.Random) -> Action:
         return Pass()
     die_faces = (state.preset or shipped_preset(state.mode)).die_faces
     bribe_cost = Fraction(die_faces + 1, 2)
-    own_before, rivals_before = _balance(state.board, _watered(state.board), player)
+    worth = _worth(state)
+    own_before, rivals_before = _balance(state.board, _watered(state.board), player, worth)
 
     candidates: list[Action] = []
     values: list[Fraction] = []
@@ -106,7 +112,7 @@ def saboteur_bot(state: GameState, player: str, rng: random.Random) -> Action:
         if isinstance(action, Pass):
             continue
         after, watered = _board_after(state, player, action)  # the board apply would give
-        own_after, rivals_after = _balance(after, watered, player)
+        own_after, rivals_after = _balance(after, watered, player, worth)
         value = Fraction((own_after - own_before) - (rivals_after - rivals_before))
         if isinstance(action, Bribe):
             value -= bribe_cost
@@ -151,13 +157,14 @@ def _best_canals(
     if not unclaimed:
         return canals
 
-    gains = [_gain(state, player, canal, unclaimed) for canal in canals]
+    worth = _worth(state)
+    gains = [_gain(state, player, canal, unclaimed, worth) for canal in canals]
     best_gain = max(gains)
     if best_gain > 0:
         return [c for c, g in zip(canals, gains) if g == best_gain]
 
-    def closeness(canal: PlaceCanal) -> tuple[int, int]:
-        distances = [(canal.hex.distance(t.hex), t.varietal.points) for t in unclaimed]
+    def closeness(canal: PlaceCanal) -> tuple[int, Fraction | int]:
+        distances = [(canal.hex.distance(t.hex), worth(board, t.hex)) for t in unclaimed]
         nearest = min(d for d, _ in distances)
         best_value = max(p for d, p in distances if d == nearest)
         return (-nearest, best_value)
@@ -167,10 +174,33 @@ def _best_canals(
     return [c for c, k in zip(canals, keys) if k == top]
 
 
-def _gain(state, player, canal, unclaimed) -> int:
+def _gain(state, player, canal, unclaimed, worth) -> Fraction | int:
     """Points of the unclaimed vineyards that ``canal`` claims for ``player``."""
     after, _ = _board_after(state, player, canal)  # the board apply would give; no draw
-    return sum(t.varietal.points for t in unclaimed if after.claimant(t.hex) == player)
+    return sum(worth(after, t.hex) for t in unclaimed if after.claimant(t.hex) == player)
+
+
+Worth = Callable[[Board, Hex], "Fraction | int"]
+
+
+def _worth(state: GameState) -> Worth:
+    """The bots' value of the vineyard at a hex of a board, under the game's preset.
+
+    The points of ``board.varietal_at(hex)``; under roulette rules a
+    vineyard with no varietal yet is worth the roulette's mean points.
+    """
+    preset = state.preset or shipped_preset(state.mode)
+    points = preset.varietal_points
+    if preset.varietal_rules is not VarietalRules.ROULETTE:
+        return lambda board, hex: points[board.varietal_at(hex)]
+    sectors = preset.roulette
+    mean = Fraction(sum(points[v] for v in sectors), len(sectors))
+
+    def worth(board: Board, hex: Hex) -> Fraction | int:
+        varietal = board.varietal_at(hex)
+        return mean if varietal is None else points[varietal]
+
+    return worth
 
 
 def _touches_rival_canal(state: GameState, player: str, gate: PlaceFloodgate) -> bool:
@@ -186,18 +216,21 @@ def _touches_rival_canal(state: GameState, player: str, gate: PlaceFloodgate) ->
 # --- Saboteur ----------------------------------------------------------------
 
 
-def _balance(board: Board, watered: Iterable[Hex], player: str) -> tuple[int, int]:
+def _balance(
+    board: Board, watered: Iterable[Hex], player: str, worth: Worth
+) -> tuple[Fraction | int, Fraction | int]:
     """``(own, rivals)``: points of watered vineyards claimed by ``player``, and by anyone else.
 
     ``watered`` is the board's watered vineyards (the keys of ``water(board)``).
     Unclaimed vineyards count in neither.
     """
-    own = rivals = 0
+    own: Fraction | int = 0
+    rivals: Fraction | int = 0
     for hex in watered:
         claimant = board.claimant(hex)
         if claimant is None:
             continue
-        points = board.tile_at(hex).varietal.points
+        points = worth(board, hex)
         if claimant == player:
             own += points
         else:

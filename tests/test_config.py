@@ -5,8 +5,18 @@ from pathlib import Path
 import pytest
 
 from acequias import config
-from acequias.config import FLASH, NORMAL, Preset, preset, with_overrides
-from acequias.model import MAX_PLAYERS, MIN_PLAYERS, Mode, PieceKind
+from acequias.config import (
+    FLASH,
+    NORMAL,
+    ROULETTE_POINTS,
+    ROULETTE_SECTORS,
+    Preset,
+    VarietalRules,
+    preset,
+    roulette_rules,
+    with_overrides,
+)
+from acequias.model import MAX_PLAYERS, MIN_PLAYERS, Mode, PieceKind, Varietal
 
 PRESETS = [NORMAL, FLASH]
 PLAYER_COUNTS = range(MIN_PLAYERS, MAX_PLAYERS + 1)
@@ -55,6 +65,8 @@ README_BAG_MIX = {
     PieceKind.FLOODGATE: 10,
 }
 
+README_VARIETAL_POINTS = {Varietal.MALBEC: 3, Varietal.BONARDA: 2, Varietal.TORRONTES: 1}
+
 README_VALUES = {
     Mode.NORMAL: dict(
         rounds={2: 10, 3: 15, 4: 12, 5: 10},
@@ -67,6 +79,9 @@ README_VALUES = {
         die_faces=6,
         bodega_points=2,
         bodega_varietals=3,
+        varietal_rules=VarietalRules.FIXED,
+        varietal_points=README_VARIETAL_POINTS,
+        roulette=ROULETTE_SECTORS,
     ),
     Mode.FLASH: dict(
         rounds={2: 6, 3: 6, 4: 4, 5: 4},
@@ -79,6 +94,9 @@ README_VALUES = {
         die_faces=6,
         bodega_points=1,
         bodega_varietals=3,
+        varietal_rules=VarietalRules.FIXED,
+        varietal_points=README_VARIETAL_POINTS,
+        roulette=ROULETTE_SECTORS,
     ),
 }
 
@@ -89,7 +107,7 @@ def test_shipped_values_match_readme(mode):
     expected = README_VALUES[mode]
     actual = fields_of(p)
     assert actual.pop("mode") is mode
-    assert {k: dict(v) if k in ("rounds", "bag_mix") else v for k, v in actual.items()} == expected
+    assert {k: dict(v) if k in ("rounds", "bag_mix", "varietal_points") else v for k, v in actual.items()} == expected
 
 
 def test_readme_distances_need_the_readme_canal_counts():

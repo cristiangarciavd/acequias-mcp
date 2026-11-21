@@ -1648,6 +1648,22 @@
     "hexes_per_player": 12,
     "market_size": 4,
     "mode": "normal",
+    "roulette": [
+     "malbec",
+     "malbec",
+     "cabernet_sauvignon",
+     "cabernet_sauvignon",
+     "syrah",
+     "syrah",
+     "merlot",
+     "merlot",
+     "torrontes",
+     "torrontes",
+     "chardonnay",
+     "chardonnay",
+     "bonarda",
+     "cabernet_franc"
+    ],
     "rounds": {
      "2": 12,
      "3": 12,
@@ -1655,6 +1671,12 @@
      "5": 12
     },
     "stone_share": 10,
+    "varietal_points": {
+     "bonarda": 2,
+     "malbec": 3,
+     "torrontes": 1
+    },
+    "varietal_rules": "fixed",
     "vineyard_distance": [
      4,
      5
@@ -2758,6 +2780,22 @@
     "hexes_per_player": 12,
     "market_size": 4,
     "mode": "normal",
+    "roulette": [
+     "malbec",
+     "malbec",
+     "cabernet_sauvignon",
+     "cabernet_sauvignon",
+     "syrah",
+     "syrah",
+     "merlot",
+     "merlot",
+     "torrontes",
+     "torrontes",
+     "chardonnay",
+     "chardonnay",
+     "bonarda",
+     "cabernet_franc"
+    ],
     "rounds": {
      "2": 12,
      "3": 12,
@@ -2765,6 +2803,12 @@
      "5": 12
     },
     "stone_share": 10,
+    "varietal_points": {
+     "bonarda": 2,
+     "malbec": 3,
+     "torrontes": 1
+    },
+    "varietal_rules": "fixed",
     "vineyard_distance": [
      4,
      5
@@ -5040,6 +5084,22 @@
     "hexes_per_player": 12,
     "market_size": 4,
     "mode": "normal",
+    "roulette": [
+     "malbec",
+     "malbec",
+     "cabernet_sauvignon",
+     "cabernet_sauvignon",
+     "syrah",
+     "syrah",
+     "merlot",
+     "merlot",
+     "torrontes",
+     "torrontes",
+     "chardonnay",
+     "chardonnay",
+     "bonarda",
+     "cabernet_franc"
+    ],
     "rounds": {
      "2": 12,
      "3": 12,
@@ -5047,6 +5107,12 @@
      "5": 12
     },
     "stone_share": 10,
+    "varietal_points": {
+     "bonarda": 2,
+     "malbec": 3,
+     "torrontes": 1
+    },
+    "varietal_rules": "fixed",
     "vineyard_distance": [
      4,
      5
@@ -6694,6 +6760,22 @@
     "hexes_per_player": 7,
     "market_size": 4,
     "mode": "flash",
+    "roulette": [
+     "malbec",
+     "malbec",
+     "cabernet_sauvignon",
+     "cabernet_sauvignon",
+     "syrah",
+     "syrah",
+     "merlot",
+     "merlot",
+     "torrontes",
+     "torrontes",
+     "chardonnay",
+     "chardonnay",
+     "bonarda",
+     "cabernet_franc"
+    ],
     "rounds": {
      "2": 5,
      "3": 5,
@@ -6701,6 +6783,12 @@
      "5": 5
     },
     "stone_share": 10,
+    "varietal_points": {
+     "bonarda": 2,
+     "malbec": 3,
+     "torrontes": 1
+    },
+    "varietal_rules": "fixed",
     "vineyard_distance": [
      2,
      3
@@ -8966,6 +9054,22 @@
     "hexes_per_player": 7,
     "market_size": 4,
     "mode": "flash",
+    "roulette": [
+     "malbec",
+     "malbec",
+     "cabernet_sauvignon",
+     "cabernet_sauvignon",
+     "syrah",
+     "syrah",
+     "merlot",
+     "merlot",
+     "torrontes",
+     "torrontes",
+     "chardonnay",
+     "chardonnay",
+     "bonarda",
+     "cabernet_franc"
+    ],
     "rounds": {
      "2": 5,
      "3": 5,
@@ -8973,6 +9077,12 @@
      "5": 5
     },
     "stone_share": 10,
+    "varietal_points": {
+     "bonarda": 2,
+     "malbec": 3,
+     "torrontes": 1
+    },
+    "varietal_rules": "fixed",
     "vineyard_distance": [
      2,
      3
@@ -9954,6 +10064,22 @@
     "hexes_per_player": 7,
     "market_size": 4,
     "mode": "flash",
+    "roulette": [
+     "malbec",
+     "malbec",
+     "cabernet_sauvignon",
+     "cabernet_sauvignon",
+     "syrah",
+     "syrah",
+     "merlot",
+     "merlot",
+     "torrontes",
+     "torrontes",
+     "chardonnay",
+     "chardonnay",
+     "bonarda",
+     "cabernet_franc"
+    ],
     "rounds": {
      "2": 5,
      "3": 5,
@@ -9961,6 +10087,12 @@
      "5": 5
     },
     "stone_share": 10,
+    "varietal_points": {
+     "bonarda": 2,
+     "malbec": 3,
+     "torrontes": 1
+    },
+    "varietal_rules": "fixed",
     "vineyard_distance": [
      2,
      3

@@ -21,6 +21,7 @@ from __future__ import annotations
 import dataclasses
 from collections.abc import Mapping
 from dataclasses import dataclass
+from enum import Enum
 from types import MappingProxyType
 
 from acequias.model import MAX_PLAYERS, MIN_PLAYERS, Mode, PieceKind, Varietal
@@ -28,6 +29,53 @@ from acequias.model import MAX_PLAYERS, MIN_PLAYERS, Mode, PieceKind, Varietal
 PLAYER_COUNTS = tuple(range(MIN_PLAYERS, MAX_PLAYERS + 1))
 MIN_VINEYARD_DISTANCE = 2
 MIN_DIE_FACES = 2
+
+
+class VarietalRules(Enum):
+    """How vineyards get their varietal.
+
+    ``FIXED``: the board generator puts a varietal from ``varietal_points``
+    on every vineyard tile (the shipped game). ``ROULETTE``: vineyard tiles
+    are blank, and a player who claims one spins the roulette to plant it.
+    """
+
+    FIXED = "fixed"
+    ROULETTE = "roulette"
+
+
+ROULETTE_SECTORS: tuple[Varietal, ...] = (
+    Varietal.MALBEC,
+    Varietal.MALBEC,
+    Varietal.CABERNET_SAUVIGNON,
+    Varietal.CABERNET_SAUVIGNON,
+    Varietal.SYRAH,
+    Varietal.SYRAH,
+    Varietal.MERLOT,
+    Varietal.MERLOT,
+    Varietal.TORRONTES,
+    Varietal.TORRONTES,
+    Varietal.CHARDONNAY,
+    Varietal.CHARDONNAY,
+    Varietal.BONARDA,
+    Varietal.CABERNET_FRANC,
+)
+"""The roulette's 14 equal sectors, in order: Bonarda and Cabernet Franc
+have one each, every other varietal two."""
+
+# Provisional points under roulette rules: Bonarda and Cabernet Franc are
+# worth a bit more. The final values are tuned in #103 (with #111's scale).
+ROULETTE_POINTS: Mapping[Varietal, int] = MappingProxyType(
+    {
+        Varietal.MALBEC: 2,
+        Varietal.CABERNET_SAUVIGNON: 2,
+        Varietal.CABERNET_FRANC: 3,
+        Varietal.SYRAH: 2,
+        Varietal.MERLOT: 2,
+        Varietal.BONARDA: 3,
+        Varietal.TORRONTES: 2,
+        Varietal.CHARDONNAY: 2,
+    }
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -40,6 +88,14 @@ class Preset:
     non-river hexes that are stone, and ``bag_mix`` the percentage of the bag
     for each ``PieceKind``. A player whose watered vineyards include
     ``bodega_varietals`` distinct varietals earns ``bodega_points``.
+
+    ``varietal_rules`` says how vineyards get their varietal (fixed on the
+    board, or planted by the roulette on claim). ``varietal_points`` maps
+    each varietal in play to the points a watered vineyard of it scores
+    (read-only, in the order given); under fixed rules its keys are the
+    varietals the board generator deals. ``roulette`` lists the roulette's
+    sectors in order, one varietal each; it is used only under roulette
+    rules.
     """
 
     mode: Mode
@@ -53,6 +109,9 @@ class Preset:
     die_faces: int
     bodega_points: int
     bodega_varietals: int
+    varietal_rules: VarietalRules
+    varietal_points: Mapping[Varietal, int]
+    roulette: tuple[Varietal, ...]
 
     def __post_init__(self) -> None:
         _check_type("mode", self.mode, Mode)
@@ -72,10 +131,24 @@ class Preset:
 
         if self.die_faces < MIN_DIE_FACES:
             raise ValueError(f"die_faces must be at least {MIN_DIE_FACES}, got {self.die_faces}")
-        if self.bodega_varietals > len(Varietal):
+        _check_type("varietal_rules", self.varietal_rules, VarietalRules)
+        _set(self, "varietal_points", _varietal_points(self.varietal_points))
+        _set(self, "roulette", _roulette(self.roulette))
+        if self.varietal_rules is VarietalRules.FIXED:
+            in_play = len(self.varietal_points)
+            where = "varietal_points"
+        else:
+            unscored = sorted({v.name for v in self.roulette if v not in self.varietal_points})
+            if unscored:
+                raise ValueError(
+                    f"roulette sectors {unscored} have no entry in varietal_points"
+                )
+            in_play = len(set(self.roulette))
+            where = "roulette"
+        if self.bodega_varietals > in_play:
             raise ValueError(
-                f"bodega_varietals must be 1 to {len(Varietal)} (the number of varietals), "
-                f"got {self.bodega_varietals}"
+                f"bodega_varietals must be 1 to {in_play} (the distinct varietals in "
+                f"{where} under {self.varietal_rules.value} rules), got {self.bodega_varietals}"
             )
         for players in PLAYER_COUNTS:
             hexes = players * self.hexes_per_player
@@ -181,6 +254,29 @@ def _bag_mix(value: object) -> Mapping[PieceKind, int]:
     return MappingProxyType({kind: value[kind] for kind in PieceKind})
 
 
+def _varietal_points(value: object) -> Mapping[Varietal, int]:
+    _check_type("varietal_points", value, Mapping)
+    if not value:
+        raise ValueError("varietal_points must give points to at least one varietal")
+    unknown = [k for k in value if not isinstance(k, Varietal)]
+    if unknown:
+        raise ValueError(f"varietal_points has unknown varietals {unknown!r}")
+    for varietal, points in value.items():
+        _check_count(f"varietal_points[{varietal.name}]", points)
+    return MappingProxyType(dict(value))
+
+
+def _roulette(value: object) -> tuple[Varietal, ...]:
+    if isinstance(value, (str, bytes, Mapping)) or not hasattr(value, "__iter__"):
+        raise TypeError(f"roulette must be a sequence of varietals, got {value!r}")
+    sectors = tuple(value)
+    if not sectors:
+        raise ValueError("roulette must have at least one sector")
+    for sector in sectors:
+        _check_type("roulette sector", sector, Varietal)
+    return sectors
+
+
 # --- Presets and access ----------------------------------------------------
 
 
@@ -204,6 +300,9 @@ NORMAL = Preset(
     die_faces=6,
     bodega_points=2,
     bodega_varietals=3,
+    varietal_rules=VarietalRules.FIXED,
+    varietal_points={Varietal.MALBEC: 3, Varietal.BONARDA: 2, Varietal.TORRONTES: 1},
+    roulette=ROULETTE_SECTORS,
 )
 
 FLASH = Preset(
@@ -218,6 +317,9 @@ FLASH = Preset(
     die_faces=6,
     bodega_points=1,
     bodega_varietals=3,
+    varietal_rules=VarietalRules.FIXED,
+    varietal_points=NORMAL.varietal_points,
+    roulette=ROULETTE_SECTORS,
 )
 
 _PRESETS: Mapping[Mode, Preset] = MappingProxyType({Mode.NORMAL: NORMAL, Mode.FLASH: FLASH})
@@ -243,3 +345,10 @@ def with_overrides(p: Preset, **changes: object) -> Preset:
         if name == "mode":
             raise ValueError("mode cannot be overridden")
     return dataclasses.replace(p, **changes)
+
+
+def roulette_rules(p: Preset) -> Preset:
+    """``p`` under roulette rules, with the provisional ``ROULETTE_POINTS``."""
+    return with_overrides(
+        p, varietal_rules=VarietalRules.ROULETTE, varietal_points=ROULETTE_POINTS
+    )

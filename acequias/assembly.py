@@ -3,7 +3,9 @@
 ``assembly_instructions`` turns a ``Board`` into one step per tile, row by
 row from north to south and west to east within a row. Rows and positions
 are numbered from 1 for people; each step also keeps the axial ``Hex`` for
-programs. Only tiles matter: canals, floodgates, and claims are ignored.
+programs. Only tiles matter: canals, floodgates, and claims are ignored. A
+vineyard's varietal is ``Board.varietal_at``, so a blank roulette vineyard
+reads just ``"vineyard"``.
 
 Rows are staggered (the river steps south-east or south-west from row to
 row, see ``acequias.board``), so hex 1 of every row after the first also
@@ -71,7 +73,8 @@ def assembly_instructions(board: Board) -> list[AssemblyStep]:
 
         current: dict[Hex, int] = {}
         for position, tile in enumerate(tiles, start=1):
-            text = f"Row {row}, hex {position}: {_describe(tile)}"
+            varietal = board.varietal_at(tile.hex)
+            text = f"Row {row}, hex {position}: {_describe(tile, varietal)}"
             if position == 1 and row > 1:
                 text += ", " + _anchor(tile.hex, row, above)
             steps.append(
@@ -80,7 +83,7 @@ def assembly_instructions(board: Board) -> list[AssemblyStep]:
                     position=position,
                     hex=tile.hex,
                     terrain=tile.terrain,
-                    varietal=tile.varietal,
+                    varietal=varietal,
                     text=text,
                 )
             )
@@ -89,9 +92,9 @@ def assembly_instructions(board: Board) -> list[AssemblyStep]:
     return steps
 
 
-def _describe(tile: Tile) -> str:
-    if tile.varietal is not None:
-        return f"{tile.terrain.value}, {tile.varietal.display_name}"
+def _describe(tile: Tile, varietal: Varietal | None) -> str:
+    if varietal is not None:
+        return f"{tile.terrain.value}, {varietal.display_name}"
     return tile.terrain.value
 
 

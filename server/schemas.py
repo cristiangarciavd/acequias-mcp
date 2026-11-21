@@ -6,8 +6,11 @@ same JSON everywhere (`generate_board` writes it, `calculate_score` reads it).
 String mappings (`acequias` enum -> JSON string):
 
 - `Terrain`: its value, `"river"`, `"vineyard"`, `"stone"`, or `"empty"`
-- `Varietal`: its lowercase enum name, ASCII only: `"malbec"`, `"bonarda"`,
-  `"torrontes"` (not the display name `"Torrontés"`)
+- `Varietal`: its lowercase enum name, ASCII only: `"malbec"`,
+  `"cabernet_sauvignon"`, `"cabernet_franc"`, `"syrah"`, `"merlot"`,
+  `"bonarda"`, `"torrontes"`, `"chardonnay"` (not the display names
+  `"Torrontés"` or `"Cabernet Sauvignon"`)
+- `VarietalRules`: its value, `"fixed"` or `"roulette"`
 - `Mode`: its value, `"normal"` or `"flash"`
 - `PieceKind` (canal shapes only): its lowercase enum name, ASCII only:
   `"straight"`, `"gentle_curve"`, `"sharp_curve"`, `"symmetric_y"`,
@@ -17,7 +20,8 @@ String mappings (`acequias` enum -> JSON string):
   `"SW"`, `"SE"`
 
 A hex is `{"q": int, "r": int, "terrain": str, "varietal": str | null}`, where
-`varietal` is a string only on vineyards. `board_to_hexes` writes one per
+`varietal` is null on every terrain but a vineyard, and on a vineyard too
+under roulette rules (a blank plot). `board_to_hexes` writes one per
 `Board.tiles` entry, in the board's order; `hexes_to_board` reads them back.
 
 The other shapes, read and written by `calculate_score`:
@@ -25,7 +29,9 @@ The other shapes, read and written by `calculate_score`:
 - canal: `{"q", "r", "kind", "rotation", "owner"}`, one `PlacedCanal`
 - floodgate: `{"q", "r", "direction"}`, a `Floodgate` on the canal at `q`,
   `r`, closing its opening `direction`
-- claim: `{"q", "r", "player"}`, one vineyard claim
+- claim: `{"q", "r", "player", "varietal"}`, one vineyard claim; `varietal`
+  (optional, default null) is what the roulette planted there, a
+  `Board.plantings` entry
 - player: `{"id", "debt"}`; the list order is the seat order (seats 1 to N)
 - score: one `Score`, its `watered_vineyards` each with the canal path in the
   canal shape
@@ -34,9 +40,12 @@ The preset shape, written by `simulate_game` (the `preset` of
 `SimResult.to_json()`) and read back as its `overrides`: `mode` by value,
 `rounds` keyed by player count as a string (`"2"` to `"5"`), `bag_mix` keyed
 by the lowercase `PieceKind` name (`"straight"` ... `"floodgate"`, the
-floodgate included), `vineyard_distance` as `[low, high]`, the rest as ints.
-`overrides_from_json` turns those keys back into `int` and `PieceKind` and
-the pair into a tuple; every value check is left to `Preset`.
+floodgate included), `vineyard_distance` as `[low, high]`, `varietal_rules`
+by value, `varietal_points` keyed by varietal name, `roulette` as a list of
+varietal names, the rest as ints. `overrides_from_json` turns those keys
+back into `int`, `PieceKind`, and `Varietal`, the names into `VarietalRules`
+and `Varietal`, and the lists into tuples; every value check is left to
+`Preset`.
 
 The piece shape, read by `generate_piece_stl` (and `build_plate`): `PieceJSON`,
 one object per printable piece, told apart by `type` (`"terrain"`,
@@ -61,7 +70,7 @@ from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, StrictInt, w
 from typing_extensions import TypedDict
 
 from acequias.assembly import AssemblyStep
-from acequias.config import PLAYER_COUNTS
+from acequias.config import PLAYER_COUNTS, VarietalRules
 from acequias.hex import Direction, Hex
 from acequias.model import (
     ROTATIONS,
@@ -78,7 +87,17 @@ from acequias.model import (
 from acequias.scoring import Score, WateredVineyard
 
 TerrainName = Literal["river", "vineyard", "stone", "empty"]
-VarietalName = Literal["malbec", "bonarda", "torrontes"]
+VarietalName = Literal[
+    "malbec",
+    "cabernet_sauvignon",
+    "cabernet_franc",
+    "syrah",
+    "merlot",
+    "bonarda",
+    "torrontes",
+    "chardonnay",
+]
+VarietalRulesName = Literal["fixed", "roulette"]
 ModeName = Literal["normal", "flash"]
 KindName = Literal["straight", "gentle_curve", "sharp_curve", "symmetric_y", "t_branch", "claw"]
 DirectionName = Literal["E", "NE", "NW", "W", "SW", "SE"]
@@ -91,6 +110,7 @@ HEX_KEYS = frozenset({"q", "r", "terrain", "varietal"})
 _TERRAIN_BY_NAME = {terrain.value: terrain for terrain in Terrain}
 _VARIETAL_BY_NAME = {varietal.name.lower(): varietal for varietal in Varietal}
 _MODE_BY_NAME = {mode.value: mode for mode in Mode}
+_RULES_BY_NAME = {rules.value: rules for rules in VarietalRules}
 _KIND_BY_NAME = {kind.name.lower(): kind for kind in PieceKind if kind.is_canal}
 _DIRECTION_BY_NAME = {direction.name: direction for direction in Direction}
 _PIECE_BY_NAME = {kind.name.lower(): kind for kind in PieceKind}
@@ -176,7 +196,10 @@ class HexJSON(BaseModel):
     r: int = Field(description="Axial r coordinate; rows run north (smallest r) to south.")
     terrain: TerrainName = Field(description="The hex terrain.")
     varietal: VarietalName | None = Field(
-        description="The grape on a vineyard (lowercase ASCII); null on every other terrain."
+        description=(
+            "The grape on a vineyard (lowercase ASCII); null on every other terrain, "
+            "and on a blank vineyard under roulette rules."
+        )
     )
 
 
@@ -234,6 +257,13 @@ class ClaimJSON(BaseModel):
     q: int = Field(description="Axial q coordinate of the vineyard.")
     r: int = Field(description="Axial r coordinate of the vineyard.")
     player: str = Field(description="Id of the player who claimed it.")
+    varietal: VarietalName | None = Field(
+        default=None,
+        description=(
+            "Under roulette rules, the grape the roulette planted on this blank vineyard "
+            "(lowercase ASCII); null under fixed rules, where the hex has the varietal."
+        ),
+    )
 
 
 class PlayerJSON(BaseModel):
@@ -286,6 +316,15 @@ _BAG_MIX_DESCRIPTION = (
     '"sharp_curve", "symmetric_y", "t_branch", "claw", "floodgate".'
 )
 _DISTANCE_DESCRIPTION = "[low, high]: how far, in hexes, a vineyard lies from the river."
+_RULES_DESCRIPTION = (
+    'How vineyards get their varietal: "fixed" (dealt on the board) or "roulette" '
+    "(blank plots, planted by a roulette spin when claimed)."
+)
+_POINTS_DESCRIPTION = (
+    "Points of a watered vineyard by varietal name; under fixed rules its keys are "
+    "the varietals dealt on the board."
+)
+_ROULETTE_DESCRIPTION = "The roulette's sectors in order, one varietal name each."
 
 
 class PresetJSON(BaseModel):
@@ -306,6 +345,9 @@ class PresetJSON(BaseModel):
     die_faces: int = Field(description="Faces of the bribe die.")
     bodega_points: int = Field(description="Points of the bodega bonus.")
     bodega_varietals: int = Field(description="Distinct watered varietals the bodega bonus needs.")
+    varietal_rules: VarietalRulesName = Field(description=_RULES_DESCRIPTION)
+    varietal_points: dict[VarietalName, int] = Field(description=_POINTS_DESCRIPTION)
+    roulette: list[VarietalName] = Field(description=_ROULETTE_DESCRIPTION)
 
 
 @with_config(ConfigDict(extra="forbid"))
@@ -338,17 +380,37 @@ class PresetOverridesJSON(TypedDict, total=False):
     die_faces: Annotated[StrictInt, Field(description="Faces of the bribe die, 2 or more.")]
     bodega_points: Annotated[StrictInt, Field(description="Points of the bodega bonus.")]
     bodega_varietals: Annotated[
-        StrictInt, Field(description="Distinct watered varietals the bodega bonus needs, 1 to 3.")
+        StrictInt,
+        Field(
+            description=(
+                "Distinct watered varietals the bodega bonus needs, 1 to the number of "
+                "varietals in play (varietal_points under fixed rules, the roulette's "
+                "under roulette rules)."
+            )
+        ),
+    ]
+    varietal_rules: Annotated[VarietalRulesName, Field(description=_RULES_DESCRIPTION)]
+    varietal_points: Annotated[
+        dict[VarietalName, StrictInt],
+        Field(description=_POINTS_DESCRIPTION + " Each value is 1 or more."),
+    ]
+    roulette: Annotated[
+        list[VarietalName],
+        Field(
+            description=_ROULETTE_DESCRIPTION
+            + " Not empty; under roulette rules every sector needs a varietal_points entry."
+        ),
     ]
 
 
 def overrides_from_json(overrides: Mapping[str, Any]) -> dict[str, Any]:
     """The `with_overrides` keyword arguments for an overrides JSON object.
 
-    `rounds` keys become `int`, `bag_mix` keys `PieceKind`, and
-    `vineyard_distance` a tuple; every other value is passed on as is, for
-    `Preset` to check. Raises `ValueError` on a `rounds` or `bag_mix` key
-    that is not one.
+    `rounds` keys become `int`, `bag_mix` keys `PieceKind`, `varietal_points`
+    keys `Varietal`, `varietal_rules` a `VarietalRules`, `roulette` a tuple
+    of `Varietal`, and `vineyard_distance` a tuple; every other value is
+    passed on as is, for `Preset` to check. Raises `ValueError` on a key or
+    name that is not one.
     """
     if not isinstance(overrides, Mapping):
         raise TypeError(f"overrides must be an object, got {overrides!r}")
@@ -365,6 +427,19 @@ def overrides_from_json(overrides: Mapping[str, Any]) -> dict[str, Any]:
         }
     if isinstance(changes.get("vineyard_distance"), (list, tuple)):
         changes["vineyard_distance"] = tuple(changes["vineyard_distance"])
+    if "varietal_rules" in changes:
+        changes["varietal_rules"] = _lookup(
+            "varietal_rules", changes["varietal_rules"], _RULES_BY_NAME
+        )
+    if isinstance(changes.get("varietal_points"), Mapping):
+        changes["varietal_points"] = {
+            _lookup("varietal_points key", key, _VARIETAL_BY_NAME): value
+            for key, value in changes["varietal_points"].items()
+        }
+    if isinstance(changes.get("roulette"), (list, tuple)):
+        changes["roulette"] = tuple(
+            _lookup("roulette sector", name, _VARIETAL_BY_NAME) for name in changes["roulette"]
+        )
     return changes
 
 
@@ -699,6 +774,27 @@ def claim_from_json(item: Mapping[str, Any] | ClaimJSON) -> tuple[Hex, str]:
     """The `(hex, player id)` claim pair for one claim JSON object."""
     item = ClaimJSON.model_validate(item)
     return (Hex(item.q, item.r), item.player)
+
+
+def planting_from_json(item: Mapping[str, Any] | ClaimJSON) -> tuple[Hex, Varietal] | None:
+    """The `(hex, varietal)` planting of one claim JSON object, or None if it has no varietal."""
+    item = ClaimJSON.model_validate(item)
+    varietal = varietal_from_json(item.varietal)
+    return None if varietal is None else (Hex(item.q, item.r), varietal)
+
+
+def claims_to_json(board: Board) -> list[dict[str, Any]]:
+    """The claims list for `board`, in its order, each with what was planted there (or null)."""
+    planted = dict(board.plantings)
+    return [
+        {
+            "q": hex.q,
+            "r": hex.r,
+            "player": player,
+            "varietal": varietal_to_json(planted.get(hex)),
+        }
+        for hex, player in board.claims
+    ]
 
 
 def players_from_json(items: Iterable[Mapping[str, Any] | PlayerJSON]) -> tuple[Player, ...]:
