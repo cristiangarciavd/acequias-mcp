@@ -83,7 +83,7 @@ MIXED = {
     "terrain-stone-01": ("terrain", Terrain.STONE, HexFootprint(16.0)),
     "canal-straight-03": ("canal", PieceKind.STRAIGHT, HexFootprint(16.0)),
     "canal-claw-01": ("canal", PieceKind.CLAW, HexFootprint(16.0)),
-    "floodgate-01": ("floodgate", None, RectFootprint(5.7, 2.0)),
+    "floodgate-01": ("floodgate", None, RectFootprint(5.7, 7.0)),
     "owner-token-01": ("owner_token", None, CircleFootprint(7.0)),
     "grape-cluster-01": ("grape_cluster", None, CircleFootprint(14.0)),
     "debt-token-1-01": ("debt_token", 1, CircleFootprint(12.0)),
@@ -229,7 +229,7 @@ def test_lowest_point_goes_to_z_zero_for_a_raised_solid(tmp_path):
     _, shapes = _reload(export_plate(plate, {"gate": raised}, tmp_path / "raised.3mf"))
     box = shapes[0].bounding_box()
     assert box.min.Z == pytest.approx(0.0, abs=FLAT_TOLERANCE)
-    assert box.max.Z == pytest.approx(1.5, abs=FLAT_TOLERANCE)
+    assert box.max.Z == pytest.approx(3.0, abs=FLAT_TOLERANCE)
 
 
 def _hex_plate(count):

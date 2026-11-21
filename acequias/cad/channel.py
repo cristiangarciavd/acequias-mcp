@@ -55,8 +55,14 @@ TOKEN_TOLERANCE = 0.20
 """Gap in mm on each side between an owner token's peg and its hole; 0.20
 from test print 1 (#34): it goes in and out by hand, 0.15 sticks."""
 
-FLOODGATE_THICKNESS = 2.0
-"""Size in mm of the floodgate along the groove."""
+FLOODGATE_THICKNESS = 3.0
+"""Size in mm of the floodgate's base along the groove."""
+
+FLOODGATE_FIN_THICKNESS = 1.6
+"""Size in mm of the floodgate's grip fin along the groove (4 nozzle widths)."""
+
+FLOODGATE_HEIGHT = 7.0
+"""Total height in mm of the floodgate, base and fin, from the groove floor."""
 
 MIN_WALL = 0.8
 """Thinnest printable wall in mm: two widths of a 0.4 mm nozzle."""
@@ -307,21 +313,32 @@ def floodgate(
     groove_width: float = GROOVE_WIDTH,
     groove_depth: float = GROOVE_DEPTH,
     thickness: float = FLOODGATE_THICKNESS,
+    fin_thickness: float = FLOODGATE_FIN_THICKNESS,
+    height: float = FLOODGATE_HEIGHT,
 ) -> Solid:
-    """A rectangular gate, modeled as it sits in a groove, all sizes in mm.
+    """An L-shaped gate with a grip fin, modeled as it sits in a groove, in mm.
 
-    Bottom face on ``z = 0``, centered at ``x = y = 0``: ``x`` is across the
-    groove (``groove_width - 2 * tolerance``), ``y`` along it
-    (``thickness``), and ``z`` its height (``groove_depth``, so its top is
-    flush with the tile's top).
+    Bottom face on ``z = 0``, centered at ``x = y = 0``. ``x`` is across the
+    groove: the whole gate is ``groove_width - 2 * tolerance`` wide. ``y``
+    is along it, with the outer face (the one that lies on the hex edge) at
+    ``+y``. The base is ``thickness`` long in ``y`` and ``groove_depth``
+    high, so it fills the groove with its top flush with the tile. The fin
+    is the outer ``fin_thickness`` of ``y``, flush with the outer face, and
+    rises from the base to a total ``height``.
+
+    ``acequias.cad.pieces.build_piece("floodgate")`` lays it on that outer
+    face to print: no overhangs, and layers along the fin's height.
 
     Raises ``ValueError`` naming the parameter for a size that is not finite
     or not above 0, a negative tolerance, a gate narrower than ``MIN_WALL``,
-    or a ``thickness`` below ``MIN_WALL``.
+    a ``thickness`` or ``fin_thickness`` below ``MIN_WALL``, a fin thicker
+    than the base, or a fin rising less than ``MIN_WALL`` above the base.
     """
     _check_positive("groove_width", groove_width)
     _check_positive("groove_depth", groove_depth)
     _check_positive("thickness", thickness)
+    _check_positive("fin_thickness", fin_thickness)
+    _check_positive("height", height)
     _check_tolerance(tolerance)
     width = groove_width - 2 * tolerance
     if width < MIN_WALL:
@@ -333,9 +350,26 @@ def floodgate(
         raise ValueError(
             f"thickness must be at least {MIN_WALL} mm, got {thickness!r}"
         )
-    return Solid.make_box(width, thickness, groove_depth).translate(
+    if fin_thickness < MIN_WALL:
+        raise ValueError(
+            f"fin_thickness must be at least {MIN_WALL} mm, got {fin_thickness!r}"
+        )
+    if fin_thickness > thickness:
+        raise ValueError(
+            f"fin_thickness {fin_thickness!r} must not exceed thickness {thickness!r}"
+        )
+    if height < groove_depth + MIN_WALL:
+        raise ValueError(
+            f"height {height!r} leaves the fin {height - groove_depth:.2f} mm above "
+            f"the base; needs at least {MIN_WALL} mm"
+        )
+    base = Solid.make_box(width, thickness, groove_depth).translate(
         (-width / 2, -thickness / 2, 0)
     )
+    fin = Solid.make_box(width, fin_thickness, height - groove_depth).translate(
+        (-width / 2, thickness / 2 - fin_thickness, groove_depth)
+    )
+    return _single_solid(base + fin)
 
 
 # --- Owner token -------------------------------------------------------------

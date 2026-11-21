@@ -38,13 +38,15 @@ EVERY_PIECE = (
     + [{"type": "canal", "kind": kind} for kind in KINDS]
     + [
         {"type": "floodgate"},
+        {"type": "floodgate", "thickness": 2.5, "fin_thickness": 1.2, "height": 6.0},
         {"type": "owner_token"},
         {"type": "grape_cluster"},
         {"type": "debt_token", "value": 1},
         {"type": "debt_token", "value": 5},
     ]
 )
-LENGTHS = {"side", "height", "groove_width", "groove_depth", "thickness", "cap_diameter",
+LENGTHS = {"side", "height", "groove_width", "groove_depth", "thickness", "fin_thickness",
+           "cap_diameter",
            "cap_height", "base_diameter", "diameter"}
 FITS = {"clearance", "tolerance"}
 
@@ -155,13 +157,18 @@ async def test_output_schema_is_published():
 @needs_cad
 def test_defaults_are_the_cad_generators_defaults():
     from acequias.cad.pieces import GENERATORS, PIECE_TYPES
-    from acequias.cad.channel import canal_piece
+    from acequias.cad.channel import canal_piece, floodgate
     from acequias.cad.hex_tile import hex_tile
     from acequias.cad.tokens import debt_token
 
     assert list(PIECE_TYPES) == TYPES == list(PIECE_MODELS)
     # The wrappers pass their sizes on to these generators.
-    signatures = {"terrain": hex_tile, "canal": canal_piece, "debt_token": debt_token}
+    signatures = {
+        "terrain": hex_tile,
+        "canal": canal_piece,
+        "floodgate": floodgate,
+        "debt_token": debt_token,
+    }
     for piece_type, model in PIECE_MODELS.items():
         generator = signatures.get(piece_type, GENERATORS[piece_type][0])
         parameters = inspect.signature(generator).parameters
@@ -237,7 +244,7 @@ async def test_file_name_follows_type_variant_and_every_parameter(out):
     assert names == [
         "canal-symmetric_y-side16-height4-clearance0-groove_width6-groove_depth1.5.stl",
         "debt_token-5-diameter12-thickness2.stl",
-        "floodgate-tolerance0.15-groove_width6-groove_depth1.5-thickness2.stl",
+        "floodgate-tolerance0.15-groove_width6-groove_depth1.5-thickness3-fin_thickness1.6-height7.stl",
         "owner_token-tolerance0.2-cap_diameter7-cap_height1.stl",
     ]
 
