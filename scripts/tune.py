@@ -1,4 +1,4 @@
-"""Tune the open parameters of README.md with the simulation (issue #20).
+"""Tune the open parameters of README.md with the simulation (issues #20 and #103).
 
 Usage (from the repo root):
 
@@ -44,11 +44,24 @@ folder (e.g. ``rm -r output/tune-checkpoints``) when a report is done or
 after code changes. ``--smoke`` saves and loads nothing.
 
 A *configuration* is a mode, a player count (2 to 5), and a seating:
-``greedy`` (every seat greedy) or ``mixed`` (seats alternate saboteur and
-greedy, seat 1 saboteur). Sweeps vary one or two parameters around
-``SWEEP_BASE`` with ``SWEEP_GAMES`` games from ``SWEEP_SEED``; the final
-validation runs ``PROPOSED`` at ``final_games(players)`` games from
-``FINAL_SEED``, a seed no sweep uses. A candidate the preset or the board
+``greedy``, ``score_aware`` or ``lookahead`` (that bot in every seat;
+``lookahead`` with its ``POLICIES`` defaults), or ``mixed`` (seats
+alternate saboteur and greedy, seat 1 saboteur). Sweeps vary one or two
+parameters around their base with ``SWEEP_GAMES`` games: #20's sweeps
+around ``SWEEP_BASE`` from ``SWEEP_SEED``; #103's Rules v2 sweeps ``b0``
+to ``b4`` (score_aware seating) around ``V2_BASE`` (``b0``: the shipped
+presets) from ``V2_SWEEP_SEED``. ``b3`` and ``b4`` run at B2's best
+``--scale`` and ``--rare-bonus``. The final validation runs ``PROPOSED``
+at ``final_games(players)`` games from ``FINAL_SEED``, a seed no sweep
+uses; ``--candidate SWEEP LABEL`` validates one sweep candidate instead
+(#103 phase D: seed ``V2_FINAL_SEED`` for a Rules v2 sweep):
+
+    uv run python scripts/tune.py --sweep b0 b1 b2
+    uv run python scripts/tune.py --sweep b3 b4 --scale 2 --rare-bonus 1
+    uv run python scripts/tune.py --candidate b1 "Rules v2 provisional"
+
+Turns and minutes count turns (rounds x P), not log records: under action
+die rules a die turn is 2 records, so ``turns_per_game`` would overcount. A candidate the preset or the board
 generator rejects is printed as infeasible with its error, and the run goes
 on. Any other error is reported with its configuration as failed, and the
 run goes on too. A chunk whose worker process dies (killed, out of memory)
@@ -63,6 +76,7 @@ from __future__ import annotations
 
 import argparse
 import copyreg
+import dataclasses
 import hashlib
 import math
 import multiprocessing
@@ -77,11 +91,22 @@ from collections.abc import Mapping
 from concurrent.futures import FIRST_COMPLETED, ProcessPoolExecutor, wait
 from concurrent.futures.process import BrokenProcessPool
 from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
 from types import MappingProxyType
 
 import acequias
-from acequias.model import Mode, PieceKind
+from acequias.config import (
+    ROULETTE_POINTS,
+    BribeRules,
+    Preset,
+    action_die_rules,
+    roulette_rules,
+    scaled,
+    with_overrides,
+)
+from acequias.config import preset as shipped_preset
+from acequias.model import DieFace, Mode, PieceKind, Varietal
 from acequias.sim import GameRecord, SimRules, game_seed, play_one, summarize
 
 # --- Constants ---------------------------------------------------------------
@@ -96,8 +121,17 @@ SWEEP_GAMES = 500
 """Games per configuration in a sweep."""
 SMOKE_GAMES = 10
 """Games per configuration with ``--smoke``, a quick check that the runner works."""
+V2_SWEEP_SEED = 103_001
+"""The run seed of every Rules v2 sweep (#103); no earlier run used it."""
+V2_FINAL_SEED = 103_002
+"""The run seed of the Rules v2 final validation (#103, ``--candidate``); no earlier run used it."""
 PLAYER_COUNTS = (2, 3, 4, 5)
-SEATINGS = ("greedy", "mixed")
+SEATINGS = ("greedy", "mixed", "score_aware", "lookahead")
+"""Every seating ``--seating`` accepts; see ``policies``."""
+V1_FINAL_SEATINGS = ("greedy", "mixed")
+"""The seatings of the final validation of ``PROPOSED`` (#20)."""
+V2_FINAL_SEATINGS = ("score_aware", "lookahead", "greedy")
+"""The seatings of a ``--candidate`` validation (#103 phase D); greedy only for comparison with #20."""
 ADVANTAGE_TARGET = 0.10
 """README.md, Quality criteria: turn-order advantage at most 10%."""
 TARGET_TURNS = {Mode.NORMAL: (45, 60), Mode.FLASH: (10, 20)}
@@ -115,9 +149,11 @@ def margin(players: int, n: int) -> float:
 
 
 def policies(seating: str, players: int) -> tuple[str, ...]:
-    """The bot of each seat: all greedy, or saboteur/greedy alternating from seat 1."""
-    if seating == "greedy":
-        return ("greedy",) * players
+    """The bot of each seat: ``mixed`` alternates saboteur/greedy from seat 1;
+    ``greedy``, ``score_aware`` and ``lookahead`` (its ``POLICIES`` defaults)
+    put that bot in every seat."""
+    if seating in ("greedy", "score_aware", "lookahead"):
+        return (seating,) * players
     if seating == "mixed":
         return tuple("saboteur" if k % 2 == 0 else "greedy" for k in range(players))
     raise ValueError(f"unknown seating {seating!r}")
@@ -201,17 +237,67 @@ command validates (see ``_docs/tuning-results.md`` for the reasons and the
 owner's decisions)."""
 
 
+# --- Rules v2 (#103) ---------------------------------------------------------
+
+
+def _diff(p: Preset) -> dict[str, object]:
+    """The fields of ``p`` that differ from its mode's shipped preset, as overrides."""
+    shipped = shipped_preset(p.mode)
+    return {
+        f.name: getattr(p, f.name)
+        for f in dataclasses.fields(Preset)
+        if f.name != "mode" and getattr(p, f.name) != getattr(shipped, f.name)
+    }
+
+
+V2_PRESET: Mapping[Mode, Preset] = {mode: action_die_rules(roulette_rules(shipped_preset(mode))) for mode in Mode}
+"""The shipped preset with ``roulette_rules`` and then ``action_die_rules`` (bag without floodgates)."""
+V2_BASE: Mapping[Mode, Mapping[str, object]] = {mode: _diff(V2_PRESET[mode]) for mode in Mode}
+"""The overrides every Rules v2 sweep starts from: ``V2_PRESET`` as overrides of the shipped preset."""
+RARE_VARIETALS = (Varietal.BONARDA, Varietal.CABERNET_FRANC)
+"""The varietals worth a bit more under roulette rules (owner goal 5 of #103)."""
+COMMON_POINTS = min(ROULETTE_POINTS.values())
+"""The points of a common varietal at scale 1 (``ROULETTE_POINTS``)."""
+NO_DIE = {"bribe_rules": BribeRules.D6}
+"""Rules v2 with no action die and no bribe: d6 bribe rules, so the die is never
+offered, and a bag without floodgates, so there is nothing to bribe."""
+
+
+def v2(mode: Mode, scale: int = 1, rare_bonus: int | None = None, **changes: object) -> dict[str, object]:
+    """Rules v2 overrides: ``V2_PRESET`` with ``scaled(scale)``; if
+    ``rare_bonus`` is given, ``RARE_VARIETALS`` score the common value + it
+    (``None`` keeps the scaled points, i.e. + ``scale``); then ``changes``
+    (``Preset`` fields, e.g. ``action_die_cost``, ``action_die``,
+    ``vineyards_per_player``, ``grape_clusters_per_player``,
+    ``hexes_per_player``), unchecked, so a rejected candidate is reported
+    as infeasible by the run."""
+    p = scaled(V2_PRESET[mode], scale)
+    if rare_bonus is not None:
+        common = COMMON_POINTS * scale
+        p = with_overrides(p, varietal_points={
+            v: common + rare_bonus if v in RARE_VARIETALS else common for v in p.varietal_points
+        })
+    return {**_diff(p), **changes}
+
+
+def die_faces(floodgate: int, release: int, resow: int) -> tuple[DieFace, ...]:
+    """An action die with that many faces of each kind, in ``DieFace`` order."""
+    return (DieFace.FLOODGATE,) * floodgate + (DieFace.RELEASE,) * release + (DieFace.RESOW,) * resow
+
+
 # --- Sweeps ------------------------------------------------------------------
 
 
 @dataclass(frozen=True)
 class Sweep:
-    """Candidates per mode, each a label and the overrides it changes from ``SWEEP_BASE``."""
+    """Candidates per mode, each a label and the overrides it changes from ``base``."""
 
     name: str
     title: str
     candidates: Mapping[Mode, tuple[tuple[str, Mapping[str, object]], ...]]
     seatings: tuple[str, ...] = ("greedy",)
+    base: Mapping[Mode, Mapping[str, object]] = dataclasses.field(default_factory=lambda: SWEEP_BASE)
+    seed: int = SWEEP_SEED
 
 
 def _grid(distances, hexes) -> tuple[tuple[str, dict], ...]:
@@ -337,6 +423,62 @@ SWEEPS: tuple[Sweep, ...] = (
         },
     ),
 )
+
+
+def v2_sweeps(scale: int = 1, rare_bonus: int = 1) -> tuple[Sweep, ...]:
+    """#103 phase B: score_aware seating, seed ``V2_SWEEP_SEED``. B3 and B4
+    run at B2's best ``scale`` and ``rare_bonus`` (``--scale``,
+    ``--rare-bonus``; the defaults are the provisional 2/3 points). B5
+    combines the best of B2-B4, so it is added once they are known."""
+    best = f"scale {scale}, rare +{rare_bonus}"
+    seats = ("score_aware",)
+    shipped = {mode: {} for mode in Mode}
+
+    def v2_sweep(name: str, title: str, candidates) -> Sweep:
+        return Sweep(name, title, candidates, seats, V2_BASE, V2_SWEEP_SEED)
+
+    def die_label(cost: int, faces: tuple[int, int, int]) -> str:
+        return f"cost {cost}, faces {'/'.join(map(str, faces))}"
+
+    return (
+        Sweep("b0", "Rules v1 baseline: the shipped presets", {mode: (("shipped (Rules v1)", {}),) for mode in Mode},
+              seats, shipped, V2_SWEEP_SEED),
+        v2_sweep("b1", "Rules v2 provisional: cost 2, faces 2/2/2, points 2 / rare 3, scale 1, 2 plots, no cap",
+                 {mode: (("Rules v2 provisional", {}),) for mode in Mode}),
+        v2_sweep("b2", "Score scale x rare bonus (Bonarda and Cabernet Franc: common + 1 or common + scale)",
+                 {mode: tuple(
+                     (f"scale {k}, points {COMMON_POINTS * k} / rare {COMMON_POINTS * k + bonus}",
+                      v2(mode, k, bonus))
+                     for k, bonus in ((1, 1), (2, 1), (2, 2), (3, 1), (3, 3))
+                 ) for mode in Mode}),
+        v2_sweep("b3", f"Action die cost x faces (floodgate/release/resow), and no die; {best}",
+                 {mode: tuple(
+                     (die_label(cost, faces), v2(mode, scale, rare_bonus, action_die_cost=cost,
+                                                 action_die=die_faces(*faces)))
+                     for cost in (0, 1, 2)
+                     for faces in ((2, 2, 2), (3, 2, 1))
+                 ) + (("no die (no bribe either)", v2(mode, scale, rare_bonus, **NO_DIE)),) for mode in Mode}),
+        v2_sweep("b4", f"Vineyard plots and board (distance 4); {best}",
+                 {
+                     Mode.NORMAL: tuple(
+                         (f"{plots} plots, {hexes} hexes/player, cap {cap or 'none'}",
+                          v2(Mode.NORMAL, scale, rare_bonus, vineyards_per_player=plots, hexes_per_player=hexes,
+                             grape_clusters_per_player=cap, vineyard_distance=(4, 4)))
+                         for plots in (2, 3)
+                         for hexes in (15, 18)
+                         for cap in (None, 2)
+                     ),
+                     Mode.FLASH: tuple(
+                         (f"{plots} plots", v2(Mode.FLASH, scale, rare_bonus, vineyards_per_player=plots))
+                         for plots in (2, 3)
+                     ),
+                 }),
+    )
+
+
+V1_SWEEPS = SWEEPS
+"""The sweeps of #20 (Rules v1, greedy and mixed seatings)."""
+SWEEPS = V1_SWEEPS + v2_sweeps()
 SWEEP_NAMES = tuple(s.name for s in SWEEPS)
 
 
@@ -639,10 +781,14 @@ class Progress:
               file=sys.stderr, flush=True)
 
 
+SEATING_COST = {"greedy": 1, "mixed": 4, "score_aware": 10, "lookahead": 50}
+"""Rough time per game of each seating relative to greedy (scheduling only)."""
+
+
 def _cost(job: Job) -> float:
     """A rough cost estimate, so the slowest jobs start first."""
     hexes = job.overrides.get("hexes_per_player", 12)
-    return job.n * job.players**2 * hexes * (4 if job.seating == "mixed" else 1)
+    return job.n * job.players**2 * hexes * SEATING_COST[job.seating]
 
 
 def describe_job(job: Job) -> str:
@@ -778,16 +924,42 @@ def _list(xs) -> str:
     return " / ".join(f"{x:.2f}" for x in xs)
 
 
+TURNS_NOTE = (
+    f"Turns are rounds x P, one per player turn; minutes assume {MINUTES_PER_TURN} minute per turn. "
+    "A die turn is 2 log records (the roll, then its use), so `turns_per_game` is not used. "
+    "Die columns: games with a roll, rolls per game, rolls per face (floodgate/release/resow), "
+    "and the share of rolls used, not declined; \"-\" under d6 rules."
+)
 SWEEP_HEADER = (
     "| Candidate | P | Seating | Advantage ± 95% | Win rate by position | Shared wins "
     "| Turns (min) | Pass share | Canal / gate / bribe / pass | Winning score | Score | Bodega rate | Bodega points "
-    "| Winner has Malbec / Bonarda / Torrontés | Bribe games | Win rate bribers / non-bribers | Mean debt |"
+    "| Winner varietal rates | Bribe games | Win rate bribers / non-bribers | Mean debt "
+    "| Die games | Rolls | Rolls per face | Die use rate |"
 )
-SWEEP_COLUMNS = 17
+SWEEP_COLUMNS = 21
 
 
 def _varietals(data: Mapping[str, object]) -> str:
-    return " / ".join(f"{data['winner_varietal_rate'][v]:.2f}" for v in ("malbec", "bonarda", "torrontes"))
+    """One rate per varietal in play (the keys of ``winner_varietal_rate``)."""
+    return ", ".join(f"{v} {rate:.2f}" for v, rate in data["winner_varietal_rate"].items())
+
+
+def _turns(job: Job, data: Mapping[str, object]) -> int:
+    """Turns per game: rounds x P (every game plays every round)."""
+    return data["preset"]["rounds"][str(job.players)] * job.players
+
+
+def _die(data: Mapping[str, object]) -> list[str]:
+    """Games with a roll, rolls per game, rolls per face, and the use rate; "-" under d6 rules."""
+    if data["preset"]["bribe_rules"] == BribeRules.D6.value:
+        return ["-"] * 4
+    faces = data["die_faces_per_game"]
+    return [
+        f"{data['games_with_die']:.3f}",
+        f"{data['actions_per_game']['die']:.2f}",
+        " / ".join(f"{faces[f.value]:.2f}" for f in DieFace),
+        _f(data["die_use_rate"], 3),
+    ]
 
 
 def _not_run(outcome: Outcome) -> str:
@@ -800,28 +972,28 @@ def sweep_row(job: Job, outcome: Outcome) -> str:
     if data is None:
         return f"{head} {_not_run(outcome)} |" + " |" * (SWEEP_COLUMNS - 4)
     a = data["actions_per_game"]
-    turns = data["turns_per_game"]
+    turns = _turns(job, data)
     return (
         f"{head} {data['turn_order_advantage']:.3f} ± {margin(job.players, job.n):.3f} "
         f"| {_list(data['win_rate_by_position'])} | {_f(data['shared_win_rate'])} "
-        f"| {turns:.0f} ({turns * MINUTES_PER_TURN:.0f}) | {a['pass'] / turns:.2f} "
+        f"| {turns} ({turns * MINUTES_PER_TURN}) | {a['pass'] / turns:.2f} "
         f"| {a['canal']:.1f} / {a['floodgate']:.2f} / {a['bribe']:.2f} / {a['pass']:.1f} "
         f"| {_spread(data['winning_score'])} | {_spread(data['score_terms']['total'])} "
         f"| {_f(data['bodega_rate'], 3)} | {data['score_terms']['bodega']['mean']:.3f} | {_varietals(data)} "
         f"| {_f(data['games_with_bribe'])} "
         f"| {_f(data['win_rate_bribers'], 3)} / {_f(data['win_rate_non_bribers'], 3)} "
-        f"| {_f(data['score_terms']['debt']['mean'])} |"
+        f"| {_f(data['score_terms']['debt']['mean'])} | {' | '.join(_die(data))} |"
     )
 
 
 def detail_rows(job: Job, outcome: Outcome) -> list[str]:
-    """The rows of the three final tables: balance and length, actions and bribes, scores."""
+    """The rows of the three final tables: balance and length, actions and the die, scores."""
     name = f"{job.mode.value} | {job.players} | {job.seating}"
     data = outcome.data
     if data is None:
         return [f"| {name} | {_not_run(outcome)} |"] * 3
     a = data["actions_per_game"]
-    turns = data["turns_per_game"]
+    turns = _turns(job, data)
     adv = data["turn_order_advantage"]
     m = margin(job.players, job.n)
     low, high = TARGET_TURNS[job.mode]
@@ -832,11 +1004,11 @@ def detail_rows(job: Job, outcome: Outcome) -> list[str]:
     return [
         f"| {name} | {job.n} | {adv:.3f} ± {m:.3f} | {'yes' if adv <= ADVANTAGE_TARGET else 'no'} "
         f"| {_list(data['win_rate_by_position'])} | {by_policy} | {data['shared_win_rate']:.3f} "
-        f"| {turns:.0f} | {minutes:.0f} | {'yes' if low <= minutes <= high else 'no'} | {a['pass'] / turns:.2f} |",
+        f"| {turns} | {minutes} | {'yes' if low <= minutes <= high else 'no'} | {a['pass'] / turns:.2f} |",
         f"| {name} | {a['canal']:.2f} | {a['floodgate']:.2f} | {a['bribe']:.2f} | {a['pass']:.2f} "
         f"| {data['games_with_floodgate']:.3f} | {data['games_with_bribe']:.3f} "
         f"| {_f(data['win_rate_bribers'], 3)} | {_f(data['win_rate_non_bribers'], 3)} "
-        f"| {terms['debt']['mean']:.2f} |",
+        f"| {terms['debt']['mean']:.2f} | {' | '.join(_die(data))} |",
         f"| {name} | {_spread(terms['total'])} | {_spread(data['winning_score'])} "
         f"| {terms['vineyards']['mean']:.2f} | {terms['bodega']['mean']:.3f} | {data['bodega_rate']:.3f} "
         f"| {terms['rights_paid']['mean']:.2f} | {varietals} |",
@@ -848,13 +1020,13 @@ DETAIL_HEADERS = (
     "| Shared wins | Turns | Minutes | In length target | Pass share |\n"
     "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     "| Mode | P | Seating | Canal | Floodgate | Bribe | Pass | Games with floodgate | Games with bribe "
-    "| Win rate bribers | Win rate non-bribers | Mean debt |\n"
-    "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+    "| Win rate bribers | Win rate non-bribers | Mean debt | Die games | Rolls | Rolls per face | Die use rate |\n"
+    "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     "| Mode | P | Seating | Total (mean ± sd) | Winning score (mean ± sd) | Vineyard points "
-    "| Bodega points | Bodega rate | Rights paid | Winner has Malbec / Bonarda / Torrontés |\n"
+    "| Bodega points | Bodega rate | Rights paid | Winner varietal rates |\n"
     "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
 )
-DETAIL_TITLES = ("Balance and length", "Actions, floodgates, and bribes", "Scores")
+DETAIL_TITLES = ("Balance and length", "Actions, floodgates, bribes, and the action die", "Scores")
 
 
 def describe(overrides: Mapping[str, object]) -> str:
@@ -866,6 +1038,12 @@ def describe(overrides: Mapping[str, object]) -> str:
             value = _bag_label(value)
         elif key == "vineyard_distance":
             value = f"{value[0]}-{value[1]}"
+        elif key == "varietal_points":
+            value = "/".join(f"{v.name.lower()} {points}" for v, points in value.items())
+        elif key == "action_die":
+            value = "/".join(str(value.count(f)) for f in DieFace)
+        elif isinstance(value, Enum):
+            value = value.value
         parts.append(f"{key}={value}")
     return ", ".join(parts) or "(shipped preset)"
 
@@ -873,34 +1051,36 @@ def describe(overrides: Mapping[str, object]) -> str:
 # --- Commands ----------------------------------------------------------------
 
 
-def sweep_jobs(sweep: Sweep, modes, games: int) -> list[Job]:
+def sweep_jobs(sweep: Sweep, modes, games: int, players_list=PLAYER_COUNTS, seatings=None) -> list[Job]:
+    """The jobs of ``sweep``: its seatings unless ``seatings`` is given."""
     return [
-        Job(label, mode, players, seating, {**SWEEP_BASE[mode], **changes}, games, SWEEP_SEED)
+        Job(label, mode, players, seating, {**sweep.base[mode], **changes}, games, sweep.seed)
         for mode in modes
         for label, changes in sweep.candidates.get(mode, ())
-        for players in PLAYER_COUNTS
-        for seating in sweep.seatings
+        for players in players_list
+        for seating in seatings or sweep.seatings
     ]
 
 
-def do_sweeps(sweeps: list[Sweep], run, modes, games: int) -> list[Outcome]:
+def do_sweeps(sweeps: list[Sweep], run, modes, games: int, players_list=PLAYER_COUNTS, seatings=None,
+              flags: str = "") -> list[Outcome]:
     """Run every job of ``sweeps`` with ``run`` (``run_all`` with the run's
     options) in one pool, so no core idles between sweeps, then print each
     sweep's table."""
-    per_sweep = [sweep_jobs(sweep, modes, games) for sweep in sweeps]
+    per_sweep = [sweep_jobs(sweep, modes, games, players_list, seatings) for sweep in sweeps]
     outcomes = run([job for jobs in per_sweep for job in jobs])
     at = 0
     for sweep, jobs in zip(sweeps, per_sweep):
         mine, at = outcomes[at:at + len(jobs)], at + len(jobs)
         print(f"## Sweep `{sweep.name}`: {sweep.title}\n")
-        print(f"Command: `uv run python scripts/tune.py --sweep {sweep.name}`. "
-              f"{games} games per row, seed {SWEEP_SEED}.\n")
+        print(f"Command: `uv run python scripts/tune.py --sweep {sweep.name}{flags}`. "
+              f"{games} games per row, seed {sweep.seed}. {TURNS_NOTE}\n")
         for mode in modes:
             rows = [(j, o) for j, o in zip(jobs, mine) if j.mode is mode]
             if not rows:
                 continue
             print(f"### {mode.value.capitalize()}\n")
-            print(f"Base: {describe(SWEEP_BASE[mode])}.\n")
+            print(f"Base: {describe(sweep.base[mode])}.\n")
             print(SWEEP_HEADER)
             print("|" + " --- |" * SWEEP_COLUMNS)
             for job, outcome in rows:
@@ -909,20 +1089,22 @@ def do_sweeps(sweeps: list[Sweep], run, modes, games: int) -> list[Outcome]:
     return outcomes
 
 
-def do_final(run, modes, players_list, seatings, n: int | None, seed: int) -> list[Outcome]:
+def do_final(run, values: Mapping[Mode, Mapping[str, object]], players_list, seatings, n: int | None, seed: int,
+             label: str = "proposed") -> list[Outcome]:
+    """The final validation of ``values`` (overrides per mode; its modes are the ones run)."""
     jobs = [
-        Job("proposed", mode, players, seating, PROPOSED[mode], n or final_games(players), seed)
-        for mode in modes
+        Job(label, mode, players, seating, values[mode], n or final_games(players), seed)
+        for mode in values
         for players in players_list
         for seating in seatings
     ]
     outcomes = run(jobs)
-    print("## Final validation of the proposed values\n")
+    print(f"## Final validation of {'the proposed values' if label == 'proposed' else f'`{label}`'}\n")
     print(f"Seed {seed}; games per configuration: "
           + ", ".join(f"{p}p {n or final_games(p)}" for p in players_list)
-          + f". Minutes assume {MINUTES_PER_TURN} minute per turn.\n")
-    for mode in modes:
-        print(f"- {mode.value.capitalize()}: {describe(PROPOSED[mode])}")
+          + f". {TURNS_NOTE}\n")
+    for mode in values:
+        print(f"- {mode.value.capitalize()}: {describe(values[mode])}")
     print()
     for k, (title, header) in enumerate(zip(DETAIL_TITLES, DETAIL_HEADERS)):
         print(f"### {title}\n")
@@ -931,6 +1113,23 @@ def do_final(run, modes, players_list, seatings, n: int | None, seed: int) -> li
             print(detail_rows(job, outcome)[k])
         print()
     return outcomes
+
+
+def find_candidate(sweeps, name: str, label: str, modes) -> tuple[Sweep, dict[Mode, Mapping[str, object]]]:
+    """Sweep ``name``'s candidate ``label`` as full overrides per mode (those of ``modes`` that have it)."""
+    sweep = next((s for s in sweeps if s.name == name), None)
+    if sweep is None:
+        raise ValueError(f"unknown sweep {name!r}")
+    values = {
+        mode: {**sweep.base[mode], **changes}
+        for mode in modes
+        for lab, changes in sweep.candidates.get(mode, ())
+        if lab == label
+    }
+    if not values:
+        labels = sorted({lab for mode in modes for lab, _ in sweep.candidates.get(mode, ())})
+        raise ValueError(f"sweep {name!r} has no candidate {label!r}; its candidates are {labels}")
+    return sweep, values
 
 
 def _workers(text: str) -> int:
@@ -945,16 +1144,25 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--sweep", nargs="+", choices=(*SWEEP_NAMES, "all"),
                         help="run these candidate sweeps, or all of them")
     parser.add_argument("--mode", choices=[m.value for m in Mode], help="only this mode")
-    parser.add_argument("--players", type=int, choices=PLAYER_COUNTS,
-                        help="only this player count (final validation)")
-    parser.add_argument("--seating", choices=SEATINGS, help="only this seating (final validation)")
+    parser.add_argument("--players", type=int, choices=PLAYER_COUNTS, help="only this player count")
+    parser.add_argument("--seating", choices=SEATINGS,
+                        help="only this seating (in a sweep: instead of the sweep's own seatings)")
+    parser.add_argument("--candidate", nargs=2, metavar=("SWEEP", "LABEL"),
+                        help="final validation of one sweep candidate (#103 phase D): seatings "
+                             f"{', '.join(V2_FINAL_SEATINGS)}; seed {V2_FINAL_SEED} for a Rules v2 sweep")
+    parser.add_argument("--scale", type=_workers, default=1,
+                        help="the score scale of sweeps b3 and b4: B2's best (default 1)")
+    parser.add_argument("--rare-bonus", type=_workers, default=1,
+                        help="Bonarda and Cabernet Franc score the common value + this in sweeps b3 and b4: "
+                             "B2's best (default 1)")
     parser.add_argument("--games", type=int,
                         help=f"games per configuration (default: {SWEEP_GAMES} in a sweep, the final count otherwise)")
     parser.add_argument("--smoke", action="store_true",
                         help=f"a quick check of the runner: {SMOKE_GAMES} games per configuration; "
                              "its numbers are not the report's; saves and loads no checkpoints")
-    parser.add_argument("--seed", type=int, default=FINAL_SEED,
-                        help=f"run seed of the final validation (default {FINAL_SEED})")
+    parser.add_argument("--seed", type=int,
+                        help=f"run seed of the final validation (default {FINAL_SEED}; "
+                             f"{V2_FINAL_SEED} for a Rules v2 --candidate)")
     parser.add_argument("--workers", type=_workers, default=min(DEFAULT_WORKERS, os.cpu_count() or 1),
                         help=f"worker processes, at below-normal priority (default {DEFAULT_WORKERS}, "
                              "capped at the CPU count); changes only the wall time, never a number")
@@ -974,9 +1182,20 @@ def main(argv: list[str] | None = None) -> int:
     if games is not None and games < 1:
         parser.error("--games must be at least 1")
     modes = [Mode(args.mode)] if args.mode else list(Mode)
+    sweeps = V1_SWEEPS + v2_sweeps(args.scale, args.rare_bonus)
+    flags = "" if (args.scale, args.rare_bonus) == (1, 1) else f" --scale {args.scale} --rare-bonus {args.rare_bonus}"
+    players_list = [args.players] if args.players else list(PLAYER_COUNTS)
+    candidate = None
+    if args.candidate:
+        if args.sweep:
+            parser.error("--candidate and --sweep cannot be combined")
+        try:
+            candidate = find_candidate(sweeps, *args.candidate, modes)
+        except ValueError as error:
+            parser.error(str(error))
 
     if args.list:
-        for sweep in SWEEPS:
+        for sweep in sweeps:
             print(f"{sweep.name}: {sweep.title} [{', '.join(sweep.seatings)}]")
             for mode in Mode:
                 for label, _ in sweep.candidates.get(mode, ()):
@@ -993,16 +1212,24 @@ def main(argv: list[str] | None = None) -> int:
         print(f"SMOKE RUN ({SMOKE_GAMES} games per configuration): not the report's numbers\n")
     try:
         if args.sweep:
-            chosen = [s for s in SWEEPS if "all" in args.sweep or s.name in args.sweep]
-            outcomes = do_sweeps(chosen, run, modes, games or SWEEP_GAMES)
+            chosen = [s for s in sweeps if "all" in args.sweep or s.name in args.sweep]
+            outcomes = do_sweeps(chosen, run, modes, games or SWEEP_GAMES, players_list,
+                                 [args.seating] if args.seating else None, flags)
+        elif candidate:
+            sweep, values = candidate
+            seed = args.seed if args.seed is not None else (
+                V2_FINAL_SEED if sweep.seed == V2_SWEEP_SEED else FINAL_SEED)
+            outcomes = do_final(run, values, players_list,
+                                [args.seating] if args.seating else list(V2_FINAL_SEATINGS),
+                                games, seed, f"{sweep.name}: {args.candidate[1]}")
         else:
             outcomes = do_final(
                 run,
-                modes,
-                [args.players] if args.players else list(PLAYER_COUNTS),
-                [args.seating] if args.seating else list(SEATINGS),
+                {mode: PROPOSED[mode] for mode in modes},
+                players_list,
+                [args.seating] if args.seating else list(V1_FINAL_SEATINGS),
                 games,
-                args.seed,
+                FINAL_SEED if args.seed is None else args.seed,
             )
     except KeyboardInterrupt:
         if checkpoints:
