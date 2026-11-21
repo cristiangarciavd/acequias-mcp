@@ -6,6 +6,7 @@ import pytest
 from acequias.bots import (
     POLICIES,
     greedy_bot,
+    lookahead_bot,
     policy,
     random_bot,
     saboteur_bot,
@@ -95,10 +96,13 @@ def seating(state, name):
 
 
 def test_policies_maps_names_to_bots_and_is_read_only():
-    assert dict(POLICIES) == {
+    policies = dict(POLICIES)
+    lookahead = policies.pop("lookahead")
+    assert policies == {
         "random": random_bot, "greedy": greedy_bot, "saboteur": saboteur_bot,
         "score_aware": score_aware_bot,
     }
+    assert lookahead.func is lookahead_bot
     with pytest.raises(TypeError):
         POLICIES["other"] = random_bot
     with pytest.raises(TypeError):
