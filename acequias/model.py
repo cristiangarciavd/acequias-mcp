@@ -484,7 +484,9 @@ class GameState:
     piece drawn. ``preset`` is the preset the game was built with (its mode
     must be ``mode``); ``None`` means the shipped preset for ``mode``. It
     takes part in equality but not in the hash, since a ``Preset`` holds
-    read-only mappings and is not hashable.
+    read-only mappings and is not hashable. With a
+    ``grape_clusters_per_player`` cap in the preset, no player holds more
+    claims than the cap.
     """
 
     board: Board
@@ -542,6 +544,24 @@ class GameState:
             if player_id not in known:
                 raise ValueError(f"claim on {hex} by unknown player {player_id!r}")
         self._check_varietals()
+        self._check_clusters()
+
+    def _check_clusters(self) -> None:
+        """With a grape-cluster cap, no player holds more claims than the cap."""
+        from acequias.config import preset as shipped_preset  # local: config imports this module
+
+        preset = self.preset if self.preset is not None else shipped_preset(self.mode)
+        cap = preset.grape_clusters_per_player
+        if cap is None:
+            return
+        held: dict[str, int] = {}
+        for _, player_id in self.board.claims:
+            held[player_id] = held.get(player_id, 0) + 1
+        over = sorted(p for p, n in held.items() if n > cap)
+        if over:
+            raise ValueError(
+                f"players {over} hold more claims than grape_clusters_per_player ({cap})"
+            )
 
     def _check_varietals(self) -> None:
         """The board's varietals must fit the preset's varietal rules.

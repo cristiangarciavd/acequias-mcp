@@ -96,6 +96,10 @@ class Preset:
     varietals the board generator deals. ``roulette`` lists the roulette's
     sectors in order, one varietal each; it is used only under roulette
     rules.
+
+    ``vineyards_per_player`` is the number of vineyard plots per player on
+    the board. ``grape_clusters_per_player`` caps the claims each player can
+    hold; ``None`` means no cap (the shipped game).
     """
 
     mode: Mode
@@ -112,6 +116,7 @@ class Preset:
     varietal_rules: VarietalRules
     varietal_points: Mapping[Varietal, int]
     roulette: tuple[Varietal, ...]
+    grape_clusters_per_player: int | None
 
     def __post_init__(self) -> None:
         _check_type("mode", self.mode, Mode)
@@ -134,6 +139,8 @@ class Preset:
         _check_type("varietal_rules", self.varietal_rules, VarietalRules)
         _set(self, "varietal_points", _varietal_points(self.varietal_points))
         _set(self, "roulette", _roulette(self.roulette))
+        if self.grape_clusters_per_player is not None:
+            _check_count("grape_clusters_per_player", self.grape_clusters_per_player)
         if self.varietal_rules is VarietalRules.FIXED:
             in_play = len(self.varietal_points)
             where = "varietal_points"
@@ -303,6 +310,7 @@ NORMAL = Preset(
     varietal_rules=VarietalRules.FIXED,
     varietal_points={Varietal.MALBEC: 3, Varietal.BONARDA: 2, Varietal.TORRONTES: 1},
     roulette=ROULETTE_SECTORS,
+    grape_clusters_per_player=None,
 )
 
 FLASH = Preset(
@@ -320,6 +328,7 @@ FLASH = Preset(
     varietal_rules=VarietalRules.FIXED,
     varietal_points=NORMAL.varietal_points,
     roulette=ROULETTE_SECTORS,
+    grape_clusters_per_player=None,
 )
 
 _PRESETS: Mapping[Mode, Preset] = MappingProxyType({Mode.NORMAL: NORMAL, Mode.FLASH: FLASH})

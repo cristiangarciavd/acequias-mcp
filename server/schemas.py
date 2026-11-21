@@ -42,7 +42,8 @@ The preset shape, written by `simulate_game` (the `preset` of
 by the lowercase `PieceKind` name (`"straight"` ... `"floodgate"`, the
 floodgate included), `vineyard_distance` as `[low, high]`, `varietal_rules`
 by value, `varietal_points` keyed by varietal name, `roulette` as a list of
-varietal names, the rest as ints. `overrides_from_json` turns those keys
+varietal names, `grape_clusters_per_player` as an int or null (no cap), the
+rest as ints. `overrides_from_json` turns those keys
 back into `int`, `PieceKind`, and `Varietal`, the names into `VarietalRules`
 and `Varietal`, and the lists into tuples; every value check is left to
 `Preset`.
@@ -325,6 +326,10 @@ _POINTS_DESCRIPTION = (
     "the varietals dealt on the board."
 )
 _ROULETTE_DESCRIPTION = "The roulette's sectors in order, one varietal name each."
+_CLUSTERS_DESCRIPTION = (
+    "Grape clusters (claims) each player can hold; null means no cap. A player at "
+    "the cap claims nothing more, and the vineyards they water stay unclaimed."
+)
 
 
 class PresetJSON(BaseModel):
@@ -335,7 +340,7 @@ class PresetJSON(BaseModel):
     mode: ModeName = Field(description="The mode the preset belongs to.")
     rounds: dict[PlayerCountName, int] = Field(description=_ROUNDS_DESCRIPTION)
     hexes_per_player: int = Field(description="Board hexes per player.")
-    vineyards_per_player: int = Field(description="Vineyards per player.")
+    vineyards_per_player: int = Field(description="Vineyard plots per player.")
     stone_share: int = Field(description="Percentage of non-river hexes that are stone.")
     vineyard_distance: list[int] = Field(
         min_length=2, max_length=2, description=_DISTANCE_DESCRIPTION
@@ -348,6 +353,7 @@ class PresetJSON(BaseModel):
     varietal_rules: VarietalRulesName = Field(description=_RULES_DESCRIPTION)
     varietal_points: dict[VarietalName, int] = Field(description=_POINTS_DESCRIPTION)
     roulette: list[VarietalName] = Field(description=_ROULETTE_DESCRIPTION)
+    grape_clusters_per_player: int | None = Field(description=_CLUSTERS_DESCRIPTION)
 
 
 @with_config(ConfigDict(extra="forbid"))
@@ -364,7 +370,7 @@ class PresetOverridesJSON(TypedDict, total=False):
         Field(description=_ROUNDS_DESCRIPTION + " Give every key, e.g. {\"2\": 10, ...}."),
     ]
     hexes_per_player: Annotated[StrictInt, Field(description="Board hexes per player.")]
-    vineyards_per_player: Annotated[StrictInt, Field(description="Vineyards per player.")]
+    vineyards_per_player: Annotated[StrictInt, Field(description="Vineyard plots per player.")]
     stone_share: Annotated[
         StrictInt, Field(description="Percentage, 0 to 100, of non-river hexes that are stone.")
     ]
@@ -400,6 +406,10 @@ class PresetOverridesJSON(TypedDict, total=False):
             description=_ROULETTE_DESCRIPTION
             + " Not empty; under roulette rules every sector needs a varietal_points entry."
         ),
+    ]
+    grape_clusters_per_player: Annotated[
+        StrictInt | None,
+        Field(description=_CLUSTERS_DESCRIPTION + " An int is 1 or more."),
     ]
 
 
