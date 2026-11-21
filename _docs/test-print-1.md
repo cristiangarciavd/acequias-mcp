@@ -190,9 +190,9 @@ No, write what is different, and attach a screenshot to a comment on #34.
 
 | Plate | Every piece on the bed, in the right place? (Yes / No) | Note if No | Screenshot link |
 | --- | --- | --- | --- |
-| 1 (`plate-1-neutral.3mf`) | not recorded | | |
-| 2 (`plate-2-neutral.3mf`) | not recorded | | |
-| 3 (`plate-3-red.3mf`) | not recorded | | |
+| 1 (`plate-1-neutral.3mf`) | not recorded | not recorded | not recorded |
+| 2 (`plate-2-neutral.3mf`) | not recorded | not recorded | not recorded |
+| 3 (`plate-3-red.3mf`) | not recorded | not recorded | not recorded |
 
 ## Owner: setup
 
