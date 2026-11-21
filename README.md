@@ -152,16 +152,16 @@ The board's vineyards have no varietal. When a player claims a vineyard, they sp
 
 The rarer Bonarda and Cabernet Franc are worth a bit more; a spin is worth 30/14, about 2.14 points, on average. The bodega bonus needs watered vineyards of 3 **different** varietals. The point values are provisional until the re-tuning in #103 (with the scale from #111).
 
-The varietals, for the printed roulette and the rules sheet:
+The varietals, for the printed roulette and the rules sheet (research notes, figures and sources in [`_docs/varietals.md`](_docs/varietals.md)):
 
-- **Malbec:** Mendoza's flagship red, from Cahors in France. Deep color, plum and violet.
-- **Cabernet Sauvignon:** a Bordeaux red. Structured, blackcurrant, built to age.
-- **Cabernet Franc:** a Bordeaux red and the rising star of the Uco Valley. Red fruit with an herbal edge.
-- **Syrah:** a Rhône red, strong in Mendoza and San Juan. Spicy, dark fruit.
-- **Merlot:** a Bordeaux red. Soft and round, plum.
-- **Bonarda:** Argentina's second most planted red. Fruity and easy drinking.
-- **Torrontés:** Argentina's own white. Floral and aromatic.
-- **Chardonnay:** a Burgundy white, grown high in the Uco Valley. Fresh, from citrus to buttery.
+- **Malbec:** Argentina's flagship red, brought from France in 1853; one vine in four in the country is Malbec.
+- **Cabernet Sauvignon:** Bordeaux's noble red; before Malbec's rise it was Argentina's prestige grape. Firm, cassis-scented, long-lived.
+- **Cabernet Franc:** The rising star: Argentina's plantings more than doubled in a decade, led by high Uco vineyards.
+- **Syrah:** Spicy Rhône red that loves the hot eastern plains; Mendoza grows three-quarters of Argentina's Syrah.
+- **Merlot:** Bordeaux's soft, plummy red; a quiet blending partner that shines in cool Uco and Patagonia.
+- **Bonarda:** A juicy East-side red with a mistaken identity: not Italian at all, but France's Douce Noir.
+- **Torrontés:** Argentina's own white, born from Muscat and a mission grape; smells sweet, tastes dry.
+- **Chardonnay:** Burgundy's white goes high: crisp Chardonnay from Tupungato, and the base of Mendoza's sparkling wine.
 
 ## Physical pieces
 
