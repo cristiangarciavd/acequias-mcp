@@ -6,7 +6,7 @@ of ``acequias.game``) that returns one element of
 calls, never change the state they are given, and draw random numbers only
 from ``rng``.
 
-Three policies for the MVP:
+Three policies for the MVP, and a fourth after it:
 
 - ``random_bot``: ``rng.choice`` over every legal action, bribes and
   floodgates included.
@@ -51,6 +51,28 @@ Boards and claims come from
 ``acequias.turn`` (the private ``_board_after`` that ``apply`` uses too),
 so no rule is reimplemented here.
 
+``score_aware_bot`` (#67) values every action by its effect on the full
+score of ``acequias.scoring.calculate_score`` (vineyards, bodega, water
+rights, debt), as if the game ended on the board the action gives
+(``_board_after``, no draw): the change in its own total minus the change
+in the best rival's total (the highest rival total after, against the
+highest before). Values are exact ``Fraction``s. Chance counts by
+expectation, never by sampling: a claimed vineyard with no varietal yet
+counts at the roulette's mean points (the bodega handling is in
+``_Evaluator._totals``), a d6 bribe adds ``(die_faces + 1) / 2`` debt, a
+``Resow`` counts the vineyard at the roulette's mean, and
+``RollActionDie`` is worth ``-action_die_cost`` plus the mean, over the
+faces of ``Preset.action_die``, of ``max(0, best use of that face)`` (a
+face can be declined; one with no use counts 0). It plays the highest
+value even when none is above 0, and never falls back to greedy; ``Pass``
+is legal only with nothing to place, and is then weighed at 0 against the
+bribes or the roll. Handed a pending face, it plays the use with the
+highest value, or ``DeclineFace()`` when none is above 0. Ties go to one
+``rng.choice`` over the tied actions in ``legal_actions`` order, with no
+draw when one is left; that is its only use of ``rng``. Claims come from
+``_board_after``, so the cluster cap applies: a vineyard it waters but
+cannot claim is worth nothing to it.
+
 ``POLICIES`` maps policy names to bots, and ``policy(name)`` looks one up.
 Standard library only; no global randomness.
 """
@@ -58,17 +80,19 @@ Standard library only; no global randomness.
 from __future__ import annotations
 
 import random
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
+from dataclasses import replace
 from fractions import Fraction
 from types import MappingProxyType
 from typing import TypeVar
 
-from acequias.config import VarietalRules
+from acequias.config import Preset, VarietalRules
 from acequias.config import preset as shipped_preset
 from acequias.flow import _watered
 from acequias.game import Bot
 from acequias.hex import Hex
 from acequias.model import Board, GameState, Terrain
+from acequias.scoring import Score, calculate_score
 from acequias.turn import (
     Action,
     Bribe,
@@ -82,7 +106,7 @@ from acequias.turn import (
     legal_actions,
 )
 
-__all__ = ["random_bot", "greedy_bot", "saboteur_bot", "POLICIES", "policy"]
+__all__ = ["random_bot", "greedy_bot", "saboteur_bot", "score_aware_bot", "POLICIES", "policy"]
 
 T = TypeVar("T")
 
@@ -150,8 +174,43 @@ def saboteur_bot(state: GameState, player: str, rng: random.Random) -> Action:
     return _pick([a for a, v in zip(candidates, values) if v == best], rng)
 
 
+def score_aware_bot(state: GameState, player: str, rng: random.Random) -> Action:
+    """The action that most raises its total over the best rival's; see the module docstring.
+
+    Raises ``ValueError`` for a ``player`` that is not in the game, or one
+    with no action (a pending face that is someone else's). Evaluation
+    never draws from ``rng``; only a tie does, once.
+    """
+    actions = legal_actions(state, player)
+    if not actions:
+        raise ValueError(f"{player!r} has no die face to resolve; it is {state.current_player}'s")
+    if len(actions) == 1 and state.pending_face is None:
+        return actions[0]  # Pass alone
+    evaluator = _Evaluator(state, player)
+    if state.pending_face is not None:
+        uses = [a for a in actions if not isinstance(a, DeclineFace)]
+        values = [evaluator.value(state, a) for a in uses]
+        best = max(values, default=Fraction(0))
+        if best <= 0:
+            return DeclineFace()
+        return _pick([a for a, v in zip(uses, values) if v == best], rng)
+    values = [
+        evaluator.roll_value() if isinstance(a, RollActionDie)
+        else Fraction(0) if isinstance(a, Pass)
+        else evaluator.value(state, a)
+        for a in actions
+    ]
+    best = max(values)
+    return _pick([a for a, v in zip(actions, values) if v == best], rng)
+
+
 POLICIES = MappingProxyType(
-    {"random": random_bot, "greedy": greedy_bot, "saboteur": saboteur_bot}
+    {
+        "random": random_bot,
+        "greedy": greedy_bot,
+        "saboteur": saboteur_bot,
+        "score_aware": score_aware_bot,
+    }
 )
 """Every bot policy by name, read-only."""
 
@@ -298,6 +357,103 @@ def _resolve_face(state: GameState, player: str, rng: random.Random) -> Action:
         return DeclineFace()
     best = max(values)
     return _pick([a for a, v in zip(candidates, values) if v == best], rng)
+
+
+# --- Score-aware -------------------------------------------------------------
+
+
+class _Evaluator:
+    """The score-aware values of actions for one player on one state.
+
+    ``value`` is (own expected total after - own total now) - (best rival's
+    expected total after - best rival's total now), on the board
+    ``_board_after`` gives, scored by ``calculate_score`` as if the game
+    ended there. Values are cached by action, so a use weighed for the die
+    is scored once.
+    """
+
+    def __init__(self, state: GameState, player: str) -> None:
+        preset = state.preset or shipped_preset(state.mode)
+        self.state = state
+        self.player = player
+        self.preset: Preset = preset
+        self.rivals = [p.id for p in state.players if p.id != player]
+        if preset.varietal_rules is VarietalRules.ROULETTE:
+            points = preset.varietal_points
+            self.mean = Fraction(sum(points[v] for v in preset.roulette), len(preset.roulette))
+        else:
+            self.mean = Fraction(0)  # under fixed rules no vineyard is blank
+        self.bribe_debt = Fraction(preset.die_faces + 1, 2)
+        totals = self._totals(state.board, _watered(state.board))
+        self.own_now = totals[player]
+        self.rival_now = max(totals[r] for r in self.rivals)
+        self._cache: dict[Action, Fraction] = {}
+
+    def value(self, state: GameState, action: Action) -> Fraction:
+        """The value of a placement, bribe, or face use; ``state`` carries any pending face."""
+        cached = self._cache.get(action)
+        if cached is not None:
+            return cached
+        after, watered = _board_after(state, self.player, action)  # no draw
+        if isinstance(action, Resow):  # weighed blank: the respin's mean points
+            after = after._derive(plantings=tuple(p for p in after.plantings if p[0] != action.hex))
+        totals = self._totals(after, watered)
+        value = (totals[self.player] - self.own_now) - (
+            max(totals[r] for r in self.rivals) - self.rival_now
+        )
+        if isinstance(action, Bribe):
+            value -= self.bribe_debt
+        self._cache[action] = value
+        return value
+
+    def roll_value(self) -> Fraction:
+        """``-action_die_cost`` plus the mean, over the die's faces, of max(0, the face's best use)."""
+        faces = self.preset.action_die
+        best = {}
+        for face in set(faces):
+            rolled = replace(self.state, pending_face=face)
+            uses = legal_actions(rolled, self.player)
+            best[face] = max(
+                (self.value(rolled, a) for a in uses if not isinstance(a, DeclineFace)),
+                default=Fraction(0),
+            )
+        mean = Fraction(sum(max(Fraction(0), best[f]) for f in faces), len(faces))
+        return mean - self.preset.action_die_cost
+
+    def _totals(self, board: Board, watered: Iterable[Hex]) -> dict[str, Fraction]:
+        """Every player's expected total on ``board``; ``watered`` is its watered vineyards.
+
+        A watered claimed vineyard with no varietal yet (a claim before its
+        spin, or a vineyard weighed for a resow) counts at the roulette's
+        mean points, and never towards the bodega: the bodega bonus is the
+        one the varietals already planted earn. This approximation
+        undervalues a claim whose spin could complete the bodega (and
+        cannot lose one, which only the varietals already counted earn).
+        Rights and debt do not depend on varietals, so they come from a
+        scoring with every blank planted with a placeholder; vineyards and
+        bodega come from a scoring with the blank claims dropped.
+        """
+        blanks = [
+            h for h in watered if board.claimant(h) is not None and board.varietal_at(h) is None
+        ]
+        if not blanks:
+            return {pid: Fraction(s.total) for pid, s in self._score(board).items()}
+        placeholder = self.preset.roulette[0]
+        blank_set = set(blanks)
+        planted = board._derive(plantings=board.plantings + tuple((h, placeholder) for h in blanks))
+        dropped = board._derive(claims=tuple(c for c in board.claims if c[0] not in blank_set))
+        full, known = self._score(planted), self._score(dropped)
+        totals = {}
+        for pid, s in full.items():
+            count = sum(1 for h in blanks if board.claimant(h) == pid)
+            totals[pid] = (
+                s.total - s.vineyards - s.bodega
+                + known[pid].vineyards + known[pid].bodega + self.mean * count
+            )
+        return totals
+
+    def _score(self, board: Board) -> Mapping[str, Score]:
+        return calculate_score(replace(self.state, board=board, pending_face=None), self.preset)
 
 
 def _pick(candidates: Sequence[T], rng: random.Random) -> T:
