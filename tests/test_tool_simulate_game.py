@@ -26,6 +26,7 @@ RESULT_KEYS = {
     "score_terms", "mean_total_by_position", "winning_score", "turns_per_game",
     "actions_per_game", "games_with_bribe", "games_with_floodgate", "win_rate_bribers",
     "win_rate_non_bribers", "bodega_rate", "winner_varietal_rate",
+    "games_with_die", "die_faces_per_game", "die_use_rate",
 }  # fmt: skip
 
 

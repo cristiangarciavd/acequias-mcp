@@ -38,7 +38,10 @@ DEFAULT_POLICY = "greedy"
 # Built from `POLICIES` at import time, so a policy added there is listed here.
 PolicyName = Literal[tuple(POLICIES)]  # type: ignore[valid-type]
 
-ActionName = Literal["canal", "floodgate", "bribe", "pass"]
+ActionName = Literal[
+    "canal", "floodgate", "bribe", "pass", "die", "release", "resow", "decline"
+]
+DieFaceName = Literal["floodgate", "release", "resow"]
 ScoreTermName = Literal["vineyards", "bodega", "rights_paid", "rights_collected", "debt", "total"]
 
 
@@ -85,9 +88,18 @@ class SimResultJSON(BaseModel):
         description="Entry j-1: mean total score of position-j players."
     )
     winning_score: SpreadJSON = Field(description="Mean and stdev of each game's highest total.")
-    turns_per_game: float = Field(description="Mean number of turns per game (rounds * P).")
+    turns_per_game: float = Field(
+        description=(
+            "Mean number of log records per game: rounds * P, plus one per action die roll "
+            "(a die turn is the roll and its resolution)."
+        )
+    )
     actions_per_game: dict[ActionName, float] = Field(
-        description="Mean number of each action per game; they add up to turns_per_game."
+        description=(
+            "Mean number of each action per game; they add up to turns_per_game. Under "
+            'action_die rules "die" counts rolls, "release", "resow" and "decline" the '
+            'resolutions, and a die floodgate counts as "floodgate".'
+        )
     )
     games_with_bribe: float = Field(description="Share of games with at least one bribe.")
     games_with_floodgate: float = Field(description="Share of games with at least one floodgate.")
@@ -100,6 +112,15 @@ class SimResultJSON(BaseModel):
     bodega_rate: float = Field(description="Share of player-games with a bodega bonus.")
     winner_varietal_rate: dict[VarietalName, float] = Field(
         description="Varietal: share of games where a winner watered a vineyard of it."
+    )
+    games_with_die: float = Field(
+        description="Share of games with at least one action die roll (action_die rules)."
+    )
+    die_faces_per_game: dict[DieFaceName, float] = Field(
+        description="Die face: mean number of rolls per game that showed it."
+    )
+    die_use_rate: float | None = Field(
+        description="Share of action die rolls resolved with a use, not declined; null with no rolls."
     )
 
 

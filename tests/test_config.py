@@ -6,17 +6,20 @@ import pytest
 
 from acequias import config
 from acequias.config import (
+    ACTION_DIE_FACES,
     FLASH,
     NORMAL,
     ROULETTE_POINTS,
     ROULETTE_SECTORS,
+    BribeRules,
     Preset,
     VarietalRules,
+    action_die_rules,
     preset,
     roulette_rules,
     with_overrides,
 )
-from acequias.model import MAX_PLAYERS, MIN_PLAYERS, Mode, PieceKind, Varietal
+from acequias.model import MAX_PLAYERS, MIN_PLAYERS, DieFace, Mode, PieceKind, Varietal
 
 PRESETS = [NORMAL, FLASH]
 PLAYER_COUNTS = range(MIN_PLAYERS, MAX_PLAYERS + 1)
@@ -83,6 +86,9 @@ README_VALUES = {
         varietal_points=README_VARIETAL_POINTS,
         roulette=ROULETTE_SECTORS,
         grape_clusters_per_player=None,
+        bribe_rules=BribeRules.D6,
+        action_die_cost=2,
+        action_die=ACTION_DIE_FACES,
     ),
     Mode.FLASH: dict(
         rounds={2: 6, 3: 6, 4: 4, 5: 4},
@@ -99,6 +105,9 @@ README_VALUES = {
         varietal_points=README_VARIETAL_POINTS,
         roulette=ROULETTE_SECTORS,
         grape_clusters_per_player=None,
+        bribe_rules=BribeRules.D6,
+        action_die_cost=2,
+        action_die=ACTION_DIE_FACES,
     ),
 }
 
@@ -518,3 +527,68 @@ def test_config_imports_only_the_model():
             for alias in node.names:
                 assert not alias.name.startswith("acequias"), alias.name
     assert acequias_imports == {"acequias.model"}
+
+
+# --- Action die (#112) -------------------------------------------------------
+
+
+def test_action_die_faces_and_cost():
+    assert ACTION_DIE_FACES == (
+        DieFace.FLOODGATE, DieFace.FLOODGATE,
+        DieFace.RELEASE, DieFace.RELEASE,
+        DieFace.RESOW, DieFace.RESOW,
+    )
+    assert config.ACTION_DIE_COST == 2
+
+
+@pytest.mark.parametrize("mode", list(Mode), ids=lambda m: m.name)
+def test_action_die_rules_bag_mix(mode):
+    p = action_die_rules(roulette_rules(preset(mode)))
+    assert p.bribe_rules is BribeRules.ACTION_DIE
+    assert dict(p.bag_mix) == {
+        PieceKind.STRAIGHT: 44,
+        PieceKind.GENTLE_CURVE: 22,
+        PieceKind.SHARP_CURVE: 17,
+        PieceKind.SYMMETRIC_Y: 6,
+        PieceKind.T_BRANCH: 6,
+        PieceKind.CLAW: 5,
+        PieceKind.FLOODGATE: 0,
+    }
+    # Everything else is the roulette preset's.
+    base = fields_of(roulette_rules(preset(mode)))
+    for name, value in fields_of(p).items():
+        if name not in ("bribe_rules", "bag_mix"):
+            assert value == base[name], name
+
+
+def test_action_die_rules_needs_roulette():
+    with pytest.raises(ValueError, match="RESOW"):
+        action_die_rules(NORMAL)
+
+
+def test_action_die_rules_on_a_die_without_resow_works_under_fixed_rules():
+    p = action_die_rules(
+        with_overrides(NORMAL, action_die=(DieFace.FLOODGATE, DieFace.RELEASE))
+    )
+    assert p.bribe_rules is BribeRules.ACTION_DIE
+    assert p.varietal_rules is VarietalRules.FIXED
+
+
+def test_action_die_rejections():
+    die = action_die_rules(roulette_rules(NORMAL))
+    assert_raises(die, ValueError, "FLOODGATE", bag_mix=README_BAG_MIX)
+    assert_raises(die, ValueError, "RESOW", varietal_rules=VarietalRules.FIXED,
+                  varietal_points=README_VARIETAL_POINTS)
+    assert_raises(die, ValueError, "at least one face", action_die=())
+    assert_raises(die, ValueError, "action_die_cost", action_die_cost=0)
+    assert_raises(die, TypeError, "action_die_cost", action_die_cost=True)
+    assert_raises(die, TypeError, "action_die face", action_die=("floodgate",))
+    assert_raises(die, TypeError, "bribe_rules", bribe_rules="action_die")
+
+
+def test_d6_rules_ignore_the_action_die_checks():
+    # Under d6 rules a floodgate share and a RESOW face under fixed rules are fine.
+    assert NORMAL.bag_mix[PieceKind.FLOODGATE] == 10
+    assert DieFace.RESOW in NORMAL.action_die
+    with pytest.raises(ValueError, match="action_die_cost"):
+        with_overrides(NORMAL, action_die_cost=0)

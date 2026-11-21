@@ -24,7 +24,7 @@ from dataclasses import dataclass
 from enum import Enum
 from types import MappingProxyType
 
-from acequias.model import MAX_PLAYERS, MIN_PLAYERS, Mode, PieceKind, Varietal
+from acequias.model import MAX_PLAYERS, MIN_PLAYERS, DieFace, Mode, PieceKind, Varietal
 
 PLAYER_COUNTS = tuple(range(MIN_PLAYERS, MAX_PLAYERS + 1))
 MIN_VINEYARD_DISTANCE = 2
@@ -41,6 +41,34 @@ class VarietalRules(Enum):
 
     FIXED = "fixed"
     ROULETTE = "roulette"
+
+
+class BribeRules(Enum):
+    """What the bribe action is.
+
+    ``D6``: roll the bribe die, add the roll to your debt, and remove or
+    move a floodgate (the shipped game). ``ACTION_DIE``: pay a fixed cost
+    in debt, roll the action die, and use its face (floodgate, release, or
+    resow); floodgates come only from the die.
+    """
+
+    D6 = "d6"
+    ACTION_DIE = "action_die"
+
+
+ACTION_DIE_FACES: tuple[DieFace, ...] = (
+    DieFace.FLOODGATE,
+    DieFace.FLOODGATE,
+    DieFace.RELEASE,
+    DieFace.RELEASE,
+    DieFace.RESOW,
+    DieFace.RESOW,
+)
+"""The action die's 6 faces, in order: two of each."""
+
+# Provisional: the debt a roll of the action die costs. The owner's range is
+# 2 or 3; the final value is tuned in #103.
+ACTION_DIE_COST = 2
 
 
 ROULETTE_SECTORS: tuple[Varietal, ...] = (
@@ -100,6 +128,13 @@ class Preset:
     ``vineyards_per_player`` is the number of vineyard plots per player on
     the board. ``grape_clusters_per_player`` caps the claims each player can
     hold; ``None`` means no cap (the shipped game).
+
+    ``bribe_rules`` says what the bribe action is: the d6 bribe (shipped)
+    or the action die. ``action_die_cost`` is the debt one roll of the
+    action die costs, and ``action_die`` its faces in order; both are used
+    only under ``action_die`` rules, where the bag has no floodgates
+    (``bag_mix`` gives them 0) and a ``RESOW`` face needs roulette rules.
+    ``die_faces`` is the bribe d6, used only under ``d6`` rules.
     """
 
     mode: Mode
@@ -117,6 +152,9 @@ class Preset:
     varietal_points: Mapping[Varietal, int]
     roulette: tuple[Varietal, ...]
     grape_clusters_per_player: int | None
+    bribe_rules: BribeRules
+    action_die_cost: int
+    action_die: tuple[DieFace, ...]
 
     def __post_init__(self) -> None:
         _check_type("mode", self.mode, Mode)
@@ -141,6 +179,20 @@ class Preset:
         _set(self, "roulette", _roulette(self.roulette))
         if self.grape_clusters_per_player is not None:
             _check_count("grape_clusters_per_player", self.grape_clusters_per_player)
+        _check_type("bribe_rules", self.bribe_rules, BribeRules)
+        _check_count("action_die_cost", self.action_die_cost)
+        _set(self, "action_die", _action_die(self.action_die))
+        if self.bribe_rules is BribeRules.ACTION_DIE:
+            if self.bag_mix[PieceKind.FLOODGATE] != 0:
+                raise ValueError(
+                    "under action_die rules floodgates come only from the die, so "
+                    f"bag_mix[FLOODGATE] must be 0, got {self.bag_mix[PieceKind.FLOODGATE]}"
+                )
+            if (
+                DieFace.RESOW in self.action_die
+                and self.varietal_rules is not VarietalRules.ROULETTE
+            ):
+                raise ValueError("the action die's RESOW face needs roulette varietal rules")
         if self.varietal_rules is VarietalRules.FIXED:
             in_play = len(self.varietal_points)
             where = "varietal_points"
@@ -284,6 +336,17 @@ def _roulette(value: object) -> tuple[Varietal, ...]:
     return sectors
 
 
+def _action_die(value: object) -> tuple[DieFace, ...]:
+    if isinstance(value, (str, bytes, Mapping)) or not hasattr(value, "__iter__"):
+        raise TypeError(f"action_die must be a sequence of die faces, got {value!r}")
+    faces = tuple(value)
+    if not faces:
+        raise ValueError("action_die must have at least one face")
+    for face in faces:
+        _check_type("action_die face", face, DieFace)
+    return faces
+
+
 # --- Presets and access ----------------------------------------------------
 
 
@@ -311,6 +374,9 @@ NORMAL = Preset(
     varietal_points={Varietal.MALBEC: 3, Varietal.BONARDA: 2, Varietal.TORRONTES: 1},
     roulette=ROULETTE_SECTORS,
     grape_clusters_per_player=None,
+    bribe_rules=BribeRules.D6,
+    action_die_cost=ACTION_DIE_COST,
+    action_die=ACTION_DIE_FACES,
 )
 
 FLASH = Preset(
@@ -329,6 +395,9 @@ FLASH = Preset(
     varietal_points=NORMAL.varietal_points,
     roulette=ROULETTE_SECTORS,
     grape_clusters_per_player=None,
+    bribe_rules=BribeRules.D6,
+    action_die_cost=ACTION_DIE_COST,
+    action_die=ACTION_DIE_FACES,
 )
 
 _PRESETS: Mapping[Mode, Preset] = MappingProxyType({Mode.NORMAL: NORMAL, Mode.FLASH: FLASH})
@@ -361,3 +430,26 @@ def roulette_rules(p: Preset) -> Preset:
     return with_overrides(
         p, varietal_rules=VarietalRules.ROULETTE, varietal_points=ROULETTE_POINTS
     )
+
+
+def action_die_rules(p: Preset) -> Preset:
+    """``p`` under action die rules: no floodgates in the bag.
+
+    The floodgate share goes to 0 and the other shares are rescaled to add
+    up to 100 by the largest remainder method (ties in ``PieceKind``
+    order). ``p`` must be under roulette rules for the die's ``RESOW``
+    face: ``action_die_rules(roulette_rules(preset(mode)))``; otherwise the
+    ``Preset`` check raises ``ValueError``.
+    """
+    _check_type("p", p, Preset)
+    kinds = [k for k in PieceKind if k is not PieceKind.FLOODGATE]
+    total = sum(p.bag_mix[k] for k in kinds)
+    if total == 0:
+        raise ValueError("bag_mix has only floodgates; nothing is left once they leave the bag")
+    mix = {k: p.bag_mix[k] * 100 // total for k in kinds}
+    short = 100 - sum(mix.values())
+    by_remainder = sorted(kinds, key=lambda k: (-(p.bag_mix[k] * 100 % total), kinds.index(k)))
+    for k in by_remainder[:short]:
+        mix[k] += 1
+    mix[PieceKind.FLOODGATE] = 0
+    return with_overrides(p, bribe_rules=BribeRules.ACTION_DIE, bag_mix=mix)

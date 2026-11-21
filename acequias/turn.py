@@ -1,8 +1,10 @@
 """The turn engine: check and apply one player's action, and list the legal ones.
 
 Rules come from ``README.md`` (Turn, Claims and watering, Floodgate, Bribe).
-An action is one of four frozen, hashable dataclasses: ``PlaceCanal``,
-``PlaceFloodgate``, ``Bribe``, or ``Pass``.
+An action is one of eight frozen, hashable dataclasses: ``PlaceCanal``,
+``PlaceFloodgate``, ``Bribe``, ``Pass``, and, under ``action_die`` bribe
+rules (``Preset.bribe_rules``), ``RollActionDie``, ``Release``, ``Resow``,
+and ``DeclineFace``.
 
 ``apply(state, player, action, rng)`` returns a new ``GameState`` and never
 changes its input. It does not check or change whose turn it is (that is
@@ -14,14 +16,36 @@ varietal rules only, each vineyard the action newly claims is planted with
 one ``rng.choice(preset.roulette)`` spin, in ascending hex order, and
 recorded in ``Board.plantings``. Under fixed rules nothing else is drawn.
 
-After a placement or a bribe (not a ``Pass``) the acting player claims the
+Action die rules replace the bribe (``Bribe`` is illegal there, and
+``RollActionDie`` is illegal under ``d6`` rules). ``RollActionDie`` adds
+``Preset.action_die_cost`` to the roller's debt and sets
+``GameState.pending_face`` to the face rolled; it is legal whenever the
+player could take a turn, and it is not a placement (``Pass`` keeps its
+rule). While a face is pending only ``current_player`` may act, and only
+with that face's uses or ``DeclineFace()``; either clears the face. The
+floodgate face is a ``PlaceFloodgate`` that takes nothing from the market
+(the market and bag are unchanged); ``Release`` removes a floodgate from
+the board; ``Resow`` replants a claimed vineyard (the claim stays). A
+declined or unusable face keeps the cost paid. The rng order of the die:
+
+- ``RollActionDie``: one ``rng.choice(preset.action_die)``, nothing else.
+- ``Resow``: one ``rng.choice(preset.roulette)``, the vineyard's new
+  planting, then the claim spins below.
+- ``Release`` and the die's ``PlaceFloodgate``: no draw of their own, then
+  the claim spins below.
+- ``DeclineFace``: nothing.
+
+After a placement, a bribe, or a used die face (not a ``Pass``, a roll,
+or a declined face) the acting player claims the
 unclaimed watered vineyards in ascending hex order. With a
 ``Preset.grape_clusters_per_player`` cap they stop once they hold that many
 claims; the rest stay unclaimed for the next player who places or bribes.
 A vineyard left unclaimed gets no roulette spin.
 
 ``legal_actions(state, player)`` lists every legal action once, in a fixed
-order: canal placements, floodgate placements, bribes, then pass. Actions
+order: canal placements, floodgate placements, bribes (``d6`` rules),
+``RollActionDie()`` (``action_die`` rules), then pass; with a pending face,
+that face's uses then ``DeclineFace()``. Actions
 that mean the same move are listed once in a canonical spelling (the
 smallest rotation that opens the same edges; a floodgate edge named from
 the canal side with the smaller hex), and ``apply`` accepts any spelling
@@ -36,13 +60,14 @@ from __future__ import annotations
 import random
 from dataclasses import dataclass, replace
 
-from acequias.config import VarietalRules
+from acequias.config import BribeRules, Preset, VarietalRules
 from acequias.config import preset as shipped_preset
 from acequias.flow import _watered
 from acequias.hex import Direction, Hex
 from acequias.model import (
     ROTATIONS,
     Board,
+    DieFace,
     Floodgate,
     GameState,
     PieceKind,
@@ -55,6 +80,10 @@ __all__ = [
     "PlaceFloodgate",
     "Bribe",
     "Pass",
+    "RollActionDie",
+    "Release",
+    "Resow",
+    "DeclineFace",
     "Action",
     "IllegalAction",
     "apply",
@@ -81,7 +110,11 @@ class PlaceCanal:
 
 @dataclass(frozen=True)
 class PlaceFloodgate:
-    """Take a floodgate from the market and place it on the edge of ``hex`` facing ``direction``."""
+    """Place a floodgate on the edge of ``hex`` facing ``direction``.
+
+    It comes from the market or, while the action die's floodgate face is
+    pending, from the die (the market and bag are left alone).
+    """
 
     hex: Hex
     direction: Direction
@@ -122,7 +155,49 @@ class Pass:
     """Do nothing; legal only when the player has nothing they can place."""
 
 
-Action = PlaceCanal | PlaceFloodgate | Bribe | Pass
+@dataclass(frozen=True)
+class RollActionDie:
+    """Pay the action die's cost in debt and roll it (``action_die`` rules only)."""
+
+
+@dataclass(frozen=True)
+class Release:
+    """Die face Release: remove the floodgate on the edge of ``hex`` facing ``direction``."""
+
+    hex: Hex
+    direction: Direction
+
+    def __post_init__(self) -> None:
+        _check_type("Release.hex", self.hex, Hex)
+        _check_type("Release.direction", self.direction, Direction)
+
+
+@dataclass(frozen=True)
+class Resow:
+    """Die face Resow: spin the roulette again for the claimed vineyard on ``hex``."""
+
+    hex: Hex
+
+    def __post_init__(self) -> None:
+        _check_type("Resow.hex", self.hex, Hex)
+
+
+@dataclass(frozen=True)
+class DeclineFace:
+    """Leave the rolled die face unused; its cost stays paid."""
+
+
+Action = (
+    PlaceCanal | PlaceFloodgate | Bribe | Pass | RollActionDie | Release | Resow | DeclineFace
+)
+_ACTION_TYPES = (
+    PlaceCanal, PlaceFloodgate, Bribe, Pass, RollActionDie, Release, Resow, DeclineFace
+)
+_FACE_ACTIONS = {
+    DieFace.FLOODGATE: PlaceFloodgate,
+    DieFace.RELEASE: Release,
+    DieFace.RESOW: Resow,
+}
 
 
 class IllegalAction(ValueError):
@@ -138,13 +213,33 @@ def apply(state: GameState, player: str, action: Action, rng: random.Random) -> 
     Raises ``TypeError`` for an object that is not an action, ``ValueError``
     for a player id that is not in the game, and ``IllegalAction`` (a
     ``ValueError``) naming the broken rule for an illegal action. Every
-    check runs before the bribe die is rolled, so a rejected action leaves
+    check runs before any die or roulette draw, so a rejected action leaves
     ``rng`` untouched.
     """
     _check_type("state", state, GameState)
-    if not isinstance(action, (PlaceCanal, PlaceFloodgate, Bribe, Pass)):
-        raise TypeError(f"action must be PlaceCanal, PlaceFloodgate, Bribe, or Pass, got {action!r}")
+    if not isinstance(action, _ACTION_TYPES):
+        raise TypeError(
+            "action must be PlaceCanal, PlaceFloodgate, Bribe, Pass, RollActionDie, "
+            f"Release, Resow, or DeclineFace, got {action!r}"
+        )
     _check_player(state, player)
+    preset = _preset(state)
+
+    if state.pending_face is not None:
+        return _resolve_face(state, player, action, rng)
+    if isinstance(action, (Release, Resow, DeclineFace)):
+        raise IllegalAction(f"{type(action).__name__} needs a rolled action die face")
+    if isinstance(action, RollActionDie):
+        if preset.bribe_rules is not BribeRules.ACTION_DIE:
+            raise IllegalAction("the action die is only rolled under action_die bribe rules")
+        face = rng.choice(preset.action_die)
+        players = tuple(
+            replace(p, debt=p.debt + preset.action_die_cost) if p.id == player else p
+            for p in state.players
+        )
+        return replace(state, players=players, pending_face=face)
+    if isinstance(action, Bribe) and preset.bribe_rules is not BribeRules.D6:
+        raise IllegalAction("there is no bribe under action_die rules; roll the action die")
 
     if isinstance(action, PlaceCanal):
         board, _ = _board_after(state, player, action)
@@ -154,8 +249,7 @@ def apply(state: GameState, player: str, action: Action, rng: random.Random) -> 
         return _take_from_market(state, _plant(state, board, rng), PieceKind.FLOODGATE)
     if isinstance(action, Bribe):
         board, _ = _board_after(state, player, action)
-        die_faces = (state.preset or shipped_preset(state.mode)).die_faces
-        roll = rng.randint(1, die_faces)
+        roll = rng.randint(1, preset.die_faces)
         players = tuple(
             replace(p, debt=p.debt + roll) if p.id == player else p for p in state.players
         )
@@ -172,25 +266,39 @@ def legal_actions(state: GameState, player: str) -> tuple[Action, ...]:
     then rotation), then floodgate placements (by hex, then direction in
     ``Direction`` order), then bribes (by the floodgate's hex and
     direction; removal before moves, moves by target hex and direction),
-    and last ``Pass()``, listed only when there is no placement.
+    then ``RollActionDie()`` under action die rules (bribes are listed only
+    under d6 rules), and last ``Pass()``, listed only when there is no
+    placement. With a pending die face the list is that face's uses, then
+    ``DeclineFace()``: floodgate edges or releases in the bribe edge order,
+    or resows by hex. It is empty for any player but ``current_player``.
     """
     _check_type("state", state, GameState)
     _check_player(state, player)
+    face = state.pending_face
+    if face is not None:
+        if player != state.current_player:
+            return ()
+        return (*_face_uses(state.board, face), DeclineFace())
+    action_die = _preset(state).bribe_rules is BribeRules.ACTION_DIE
     canals = _canal_placements(state)
     gates = _floodgate_placements(state)
-    bribes = _bribes(state.board)
+    bribes: list[Bribe] = [] if action_die else _bribes(state.board)
+    rolls: tuple[Action, ...] = (RollActionDie(),) if action_die else ()
     passes: tuple[Action, ...] = () if canals or gates else (Pass(),)
-    return (*canals, *gates, *bribes, *passes)
+    return (*canals, *gates, *bribes, *rolls, *passes)
 
 
 def _board_after(
-    state: GameState, player: str, action: PlaceCanal | PlaceFloodgate | Bribe
+    state: GameState,
+    player: str,
+    action: PlaceCanal | PlaceFloodgate | Bribe | Release | Resow,
 ) -> tuple[Board, list[Hex]]:
-    """The board after ``player`` places a piece or bribes, and its watered vineyards.
+    """The board after ``player`` places a piece, bribes, or uses a die face, and its watered vineyards.
 
     The board is the one ``apply`` puts in its new state, claims included;
     the market, debt, die roll, and roulette spins are left out, so nothing
-    is drawn (under roulette rules the new claims have no planting). Raises
+    is drawn (under roulette rules the new claims have no planting, and a
+    ``Resow`` keeps the old planting). Raises
     ``IllegalAction`` exactly as ``apply`` does. ``state`` and ``player``
     must already be checked. The bots use this to weigh a move without
     building a whole state.
@@ -199,9 +307,13 @@ def _board_after(
         board = _canal_board(state, player, action)
     elif isinstance(action, PlaceFloodgate):
         board = _floodgate_board(state, action)
+    elif isinstance(action, Release):
+        board = _release_board(state, action)
+    elif isinstance(action, Resow):
+        board = _resow_check(state, action)
     else:
         board = _bribe_board(state, action)
-    cap = (state.preset or shipped_preset(state.mode)).grape_clusters_per_player
+    cap = _preset(state).grape_clusters_per_player
     return _claim(board, player, cap)
 
 
@@ -290,7 +402,8 @@ _CANONICAL_ROTATIONS: dict[PieceKind, tuple[int, ...]] = {
 
 
 def _floodgate_board(state: GameState, action: PlaceFloodgate) -> Board:
-    if PieceKind.FLOODGATE not in state.market:
+    """The board with the floodgate; from the die while its floodgate face is pending."""
+    if state.pending_face is not DieFace.FLOODGATE and PieceKind.FLOODGATE not in state.market:
         raise IllegalAction("the market has no floodgate")
     board = state.board
     side = _gate_side_or_raise(board, action.hex, action.direction)
@@ -342,7 +455,75 @@ def _bribe_board(state: GameState, action: Bribe) -> Board:
     return board._derive(floodgates=floodgates)
 
 
+# --- Action die --------------------------------------------------------------
+
+
+def _resolve_face(
+    state: GameState, player: str, action: Action, rng: random.Random
+) -> GameState:
+    """The state after ``player`` uses or declines the pending die face."""
+    face = state.pending_face
+    if player != state.current_player:
+        raise IllegalAction(
+            f"{state.current_player} has a {face.value} face to resolve; {player} cannot act"
+        )
+    if isinstance(action, DeclineFace):
+        return replace(state, pending_face=None)
+    use = _FACE_ACTIONS[face]
+    if not isinstance(action, use):
+        raise IllegalAction(
+            f"the pending {face.value} face allows only {use.__name__} or DeclineFace, "
+            f"not {type(action).__name__}"
+        )
+    board, _ = _board_after(state, player, action)
+    if isinstance(action, Resow):
+        board = _resow(state, board, action.hex, rng)
+    return replace(state, board=_plant(state, board, rng), pending_face=None)
+
+
+def _release_board(state: GameState, action: Release) -> Board:
+    """The board with the floodgate on the action's edge removed."""
+    board = state.board
+    gate = board.floodgate_at(action.hex, action.direction)
+    if gate is None:
+        raise IllegalAction(
+            f"the edge of {action.hex} facing {action.direction.name} has no floodgate to release"
+        )
+    return board._derive(floodgates=tuple(g for g in board.floodgates if g != gate))
+
+
+def _resow_check(state: GameState, action: Resow) -> Board:
+    """Check the resow target is a claimed vineyard; the board itself is unchanged."""
+    if state.board.claimant(action.hex) is None:
+        raise IllegalAction(f"{action.hex} is not a claimed vineyard; only those can be resown")
+    return state.board
+
+
+def _resow(state: GameState, board: Board, hex: Hex, rng: random.Random) -> Board:
+    """``board`` with one roulette spin replacing the planting on ``hex``."""
+    varietal = rng.choice(_preset(state).roulette)
+    plantings = tuple(p for p in board.plantings if p[0] != hex) + ((hex, varietal),)
+    return board._derive(plantings=plantings)  # hex is a claimed blank vineyard
+
+
+def _face_uses(board: Board, face: DieFace) -> list[Action]:
+    """Every use of ``face`` on ``board``, in ``legal_actions`` order."""
+    if face is DieFace.FLOODGATE:
+        return [PlaceFloodgate(h, d) for h, d in _open_gate_edges(board)]
+    if face is DieFace.RELEASE:
+        gates = sorted(
+            (_gate_side(board, g.hex, g.direction) for g in board.floodgates), key=_side_key
+        )
+        return [Release(h, d) for h, d in gates]
+    return [Resow(hex) for hex, _ in board.claims]  # claims are stored by hex
+
+
 # --- Shared ------------------------------------------------------------------
+
+
+def _preset(state: GameState) -> Preset:
+    return state.preset or shipped_preset(state.mode)
+
 
 
 def _claim(board: Board, player: str, cap: int | None) -> tuple[Board, list[Hex]]:
@@ -369,7 +550,7 @@ def _plant(state: GameState, board: Board, rng: random.Random) -> Board:
     Only under roulette rules; the spins go in ascending hex order. Under
     fixed rules ``board`` is returned as is and nothing is drawn.
     """
-    preset = state.preset or shipped_preset(state.mode)
+    preset = _preset(state)
     if preset.varietal_rules is not VarietalRules.ROULETTE:
         return board
     before = state.board._claim_index

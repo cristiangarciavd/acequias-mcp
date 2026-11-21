@@ -352,8 +352,12 @@ def test_statistics_of_hand_built_records():
     assert result.winning_score == pytest.approx({"mean": 8.5, "stdev": math.sqrt(1.25)})
     assert result.turns_per_game == 2.0
     assert result.actions_per_game == pytest.approx(
-        {"canal": 0.75, "floodgate": 0.25, "bribe": 0.25, "pass": 0.75}
+        {"canal": 0.75, "floodgate": 0.25, "bribe": 0.25, "pass": 0.75,
+         "die": 0, "release": 0, "resow": 0, "decline": 0}
     )
+    assert result.games_with_die == 0
+    assert result.die_faces_per_game == {"floodgate": 0, "release": 0, "resow": 0}
+    assert result.die_use_rate is None
     assert result.games_with_bribe == 0.25
     assert result.games_with_floodgate == 0.25
     assert result.win_rate_bribers == 0.0
@@ -439,7 +443,15 @@ def test_to_json_names():
     assert set(data["preset"]["bag_mix"]) == {k.name.lower() for k in PieceKind}
     assert data["preset"]["bag_mix"]["gentle_curve"] == 20
     assert set(data["winner_varietal_rate"]) == {"malbec", "bonarda", "torrontes"}
-    assert set(data["actions_per_game"]) == {"canal", "floodgate", "bribe", "pass"}
+    assert set(data["actions_per_game"]) == {
+        "canal", "floodgate", "bribe", "pass", "die", "release", "resow", "decline"
+    }
+    assert data["preset"]["bribe_rules"] == "d6"
+    assert data["preset"]["action_die"] == [
+        "floodgate", "floodgate", "release", "release", "resow", "resow"
+    ]
+    assert data["preset"]["action_die_cost"] == 2
+    assert set(data["die_faces_per_game"]) == {"floodgate", "release", "resow"}
     assert set(data["score_terms"]) == {
         "vineyards", "bodega", "rights_paid", "rights_collected", "debt", "total"
     }

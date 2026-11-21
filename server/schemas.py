@@ -11,6 +11,8 @@ String mappings (`acequias` enum -> JSON string):
   `"bonarda"`, `"torrontes"`, `"chardonnay"` (not the display names
   `"Torrontés"` or `"Cabernet Sauvignon"`)
 - `VarietalRules`: its value, `"fixed"` or `"roulette"`
+- `BribeRules`: its value, `"d6"` or `"action_die"`
+- `DieFace`: its value, `"floodgate"`, `"release"`, or `"resow"`
 - `Mode`: its value, `"normal"` or `"flash"`
 - `PieceKind` (canal shapes only): its lowercase enum name, ASCII only:
   `"straight"`, `"gentle_curve"`, `"sharp_curve"`, `"symmetric_y"`,
@@ -42,10 +44,11 @@ The preset shape, written by `simulate_game` (the `preset` of
 by the lowercase `PieceKind` name (`"straight"` ... `"floodgate"`, the
 floodgate included), `vineyard_distance` as `[low, high]`, `varietal_rules`
 by value, `varietal_points` keyed by varietal name, `roulette` as a list of
-varietal names, `grape_clusters_per_player` as an int or null (no cap), the
+varietal names, `grape_clusters_per_player` as an int or null (no cap),
+`bribe_rules` by value, `action_die` as a list of face values, the
 rest as ints. `overrides_from_json` turns those keys
-back into `int`, `PieceKind`, and `Varietal`, the names into `VarietalRules`
-and `Varietal`, and the lists into tuples; every value check is left to
+back into `int`, `PieceKind`, and `Varietal`, the names into `VarietalRules`,
+`BribeRules`, `DieFace`, and `Varietal`, and the lists into tuples; every value check is left to
 `Preset`.
 
 The piece shape, read by `generate_piece_stl` (and `build_plate`): `PieceJSON`,
@@ -71,11 +74,12 @@ from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, StrictInt, w
 from typing_extensions import TypedDict
 
 from acequias.assembly import AssemblyStep
-from acequias.config import PLAYER_COUNTS, VarietalRules
+from acequias.config import PLAYER_COUNTS, BribeRules, VarietalRules
 from acequias.hex import Direction, Hex
 from acequias.model import (
     ROTATIONS,
     Board,
+    DieFace,
     Floodgate,
     Mode,
     PieceKind,
@@ -99,6 +103,8 @@ VarietalName = Literal[
     "chardonnay",
 ]
 VarietalRulesName = Literal["fixed", "roulette"]
+BribeRulesName = Literal["d6", "action_die"]
+DieFaceName = Literal["floodgate", "release", "resow"]
 ModeName = Literal["normal", "flash"]
 KindName = Literal["straight", "gentle_curve", "sharp_curve", "symmetric_y", "t_branch", "claw"]
 DirectionName = Literal["E", "NE", "NW", "W", "SW", "SE"]
@@ -112,6 +118,8 @@ _TERRAIN_BY_NAME = {terrain.value: terrain for terrain in Terrain}
 _VARIETAL_BY_NAME = {varietal.name.lower(): varietal for varietal in Varietal}
 _MODE_BY_NAME = {mode.value: mode for mode in Mode}
 _RULES_BY_NAME = {rules.value: rules for rules in VarietalRules}
+_BRIBE_RULES_BY_NAME = {rules.value: rules for rules in BribeRules}
+_FACE_BY_NAME = {face.value: face for face in DieFace}
 _KIND_BY_NAME = {kind.name.lower(): kind for kind in PieceKind if kind.is_canal}
 _DIRECTION_BY_NAME = {direction.name: direction for direction in Direction}
 _PIECE_BY_NAME = {kind.name.lower(): kind for kind in PieceKind}
@@ -330,6 +338,16 @@ _CLUSTERS_DESCRIPTION = (
     "Grape clusters (claims) each player can hold; null means no cap. A player at "
     "the cap claims nothing more, and the vineyards they water stay unclaimed."
 )
+_BRIBE_RULES_DESCRIPTION = (
+    'What the bribe is: "d6" (roll the bribe die, add the roll to your debt, remove or '
+    'move a floodgate) or "action_die" (pay action_die_cost in debt, roll the action die, '
+    "use its face; floodgates come only from the die, so bag_mix gives them 0)."
+)
+_DIE_COST_DESCRIPTION = "Debt one roll of the action die costs (action_die rules)."
+_ACTION_DIE_DESCRIPTION = (
+    'The faces of the action die in order, each "floodgate", "release", or "resow" '
+    "(action_die rules)."
+)
 
 
 class PresetJSON(BaseModel):
@@ -347,13 +365,16 @@ class PresetJSON(BaseModel):
     )
     market_size: int = Field(description="Pieces face up in the market.")
     bag_mix: dict[PieceName, int] = Field(description=_BAG_MIX_DESCRIPTION)
-    die_faces: int = Field(description="Faces of the bribe die.")
+    die_faces: int = Field(description="Faces of the bribe d6 (d6 rules).")
     bodega_points: int = Field(description="Points of the bodega bonus.")
     bodega_varietals: int = Field(description="Distinct watered varietals the bodega bonus needs.")
     varietal_rules: VarietalRulesName = Field(description=_RULES_DESCRIPTION)
     varietal_points: dict[VarietalName, int] = Field(description=_POINTS_DESCRIPTION)
     roulette: list[VarietalName] = Field(description=_ROULETTE_DESCRIPTION)
     grape_clusters_per_player: int | None = Field(description=_CLUSTERS_DESCRIPTION)
+    bribe_rules: BribeRulesName = Field(description=_BRIBE_RULES_DESCRIPTION)
+    action_die_cost: int = Field(description=_DIE_COST_DESCRIPTION)
+    action_die: list[DieFaceName] = Field(description=_ACTION_DIE_DESCRIPTION)
 
 
 @with_config(ConfigDict(extra="forbid"))
@@ -383,7 +404,9 @@ class PresetOverridesJSON(TypedDict, total=False):
         dict[PieceName, StrictInt],
         Field(description=_BAG_MIX_DESCRIPTION + " Give every key; the shares add up to 100."),
     ]
-    die_faces: Annotated[StrictInt, Field(description="Faces of the bribe die, 2 or more.")]
+    die_faces: Annotated[
+        StrictInt, Field(description="Faces of the bribe d6 (d6 rules), 2 or more.")
+    ]
     bodega_points: Annotated[StrictInt, Field(description="Points of the bodega bonus.")]
     bodega_varietals: Annotated[
         StrictInt,
@@ -411,6 +434,19 @@ class PresetOverridesJSON(TypedDict, total=False):
         StrictInt | None,
         Field(description=_CLUSTERS_DESCRIPTION + " An int is 1 or more."),
     ]
+    bribe_rules: Annotated[
+        BribeRulesName,
+        Field(
+            description=_BRIBE_RULES_DESCRIPTION
+            + ' "action_die" with a resow face needs varietal_rules "roulette".'
+        ),
+    ]
+    action_die_cost: Annotated[
+        StrictInt, Field(description=_DIE_COST_DESCRIPTION + " 1 or more.")
+    ]
+    action_die: Annotated[
+        list[DieFaceName], Field(description=_ACTION_DIE_DESCRIPTION + " Not empty.")
+    ]
 
 
 def overrides_from_json(overrides: Mapping[str, Any]) -> dict[str, Any]:
@@ -418,7 +454,8 @@ def overrides_from_json(overrides: Mapping[str, Any]) -> dict[str, Any]:
 
     `rounds` keys become `int`, `bag_mix` keys `PieceKind`, `varietal_points`
     keys `Varietal`, `varietal_rules` a `VarietalRules`, `roulette` a tuple
-    of `Varietal`, and `vineyard_distance` a tuple; every other value is
+    of `Varietal`, `bribe_rules` a `BribeRules`, `action_die` a tuple of
+    `DieFace`, and `vineyard_distance` a tuple; every other value is
     passed on as is, for `Preset` to check. Raises `ValueError` on a key or
     name that is not one.
     """
@@ -449,6 +486,14 @@ def overrides_from_json(overrides: Mapping[str, Any]) -> dict[str, Any]:
     if isinstance(changes.get("roulette"), (list, tuple)):
         changes["roulette"] = tuple(
             _lookup("roulette sector", name, _VARIETAL_BY_NAME) for name in changes["roulette"]
+        )
+    if "bribe_rules" in changes:
+        changes["bribe_rules"] = _lookup(
+            "bribe_rules", changes["bribe_rules"], _BRIBE_RULES_BY_NAME
+        )
+    if isinstance(changes.get("action_die"), (list, tuple)):
+        changes["action_die"] = tuple(
+            _lookup("action_die face", name, _FACE_BY_NAME) for name in changes["action_die"]
         )
     return changes
 
