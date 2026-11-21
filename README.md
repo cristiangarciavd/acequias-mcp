@@ -4,7 +4,7 @@
 
 Acequias is a competitive board game for 2 to 5 players with 3D-printed hex pieces. Players build canals to carry water from the mountains to the vineyards of Mendoza. This repo holds an MCP server that generates balanced boards, scores games, simulates them with bots to tune the rules, and outputs printable STL pieces for a Bambu Lab A1.
 
-> **Status:** early development. Milestones 1 (game logic) and 2 (MCP server) are done. Milestone 3 (simulation) is nearly done: the turn engine, the round loop, the random, greedy, and saboteur bots, and the faster simulation are in, and the server exposes `generate_board`, `calculate_score`, and `simulate_game`; the open parameters are tuned with it (#20, [results](#tuning-results)). Milestone 4 (pieces) is done: every MVP piece is modeled and `generate_piece_stl` writes its STL. Milestone 5 has the plate layout (#18), the 3MF export (#33), and `build_plate` (#19); only the first test print (#34) is left. Progress is tracked in the [GitHub issues](../../issues) and [milestones](../../milestones).
+> **Status:** the MVP (milestones 1 to 5) is done: the game logic, the MCP server with all 5 tools, the simulation that tuned the rules (#20, [results](#tuning-results)), every MVP piece as STL, and A1 plates as 3MF, confirmed by the first test print (#34, [report](_docs/test-print-1.md)). The remaining work is milestone 6, After the MVP. Progress is tracked in the [GitHub issues](../../issues) and [milestones](../../milestones).
 
 This README is the project's specification: game rules, design decisions, architecture, and roadmap. Task details live in the GitHub issues.
 
@@ -293,12 +293,12 @@ The MVP is a **playable, printable Acequias set** for 2 to 5 players, in Normal 
 
 It is done when:
 
-- [ ] All 5 MCP tools work from Claude: `generate_board`, `calculate_score`, `simulate_game`, `generate_piece_stl`, `build_plate`
-- [ ] The full rules above play end to end in the engine, in both modes, with bots
-- [ ] Turn-order advantage is at most 10% in both modes, and the tuned values are recorded here
-- [ ] Every piece needed to play (terrain hexes, six canal shapes, floodgates, owner tokens, grape clusters, debt tokens) is generated as a closed STL and laid out on A1 plates as 3MF
-- [ ] The first test print passes its fit check (#34)
-- [ ] CI runs the whole suite on every pull request (#44)
+- [x] All 5 MCP tools work from Claude: `generate_board`, `calculate_score`, `simulate_game`, `generate_piece_stl`, `build_plate`
+- [x] The full rules above play end to end in the engine, in both modes, with bots
+- [ ] Turn-order advantage is at most 10% in both modes, and the tuned values are recorded here: values recorded; the 10% bound is met in 10 of 16 configurations (see Quality criteria, follow-ups #103, #104)
+- [x] Every piece needed to play (terrain hexes, six canal shapes, floodgates, owner tokens, grape clusters, debt tokens) is generated as a closed STL and laid out on A1 plates as 3MF
+- [x] The first test print passes its fit check (#34)
+- [x] CI runs the whole suite on every pull request (#44)
 
 **In the MVP** (milestones 1–5): #3–#15, #17–#22, #28–#31, #33, #34, #44, #45.
 
@@ -315,11 +315,11 @@ MVP pieces are plain and functional; the decorative layer below comes after the 
 
 ### Quality criteria
 
-- [ ] Each tool has unit tests with pytest
-- [ ] Every generated board has at least one reachable vineyard per player
+- [x] Each tool has unit tests with pytest
+- [x] Every generated board has at least one reachable vineyard per player
 - [ ] Turn-order advantage is at most 10%, in Normal and in Flash separately: met in 10 of 16 simulated configurations; missed by all-greedy tables at Normal 4–5p and Flash 3–5p, and by Flash 5p with saboteurs (follow-ups #103, #104)
 - [ ] A Normal game takes about 45–60 min and a Flash game 10–20 min, estimated at 1 minute per turn: met at every player count except 2-player Normal, which takes about 20 min by the owner's choice (more rounds would only add passes)
-- [ ] Each STL is a closed solid and fits with the other pieces
+- [x] Each STL is a closed solid and fits with the other pieces
 
 ### Tuning results
 
