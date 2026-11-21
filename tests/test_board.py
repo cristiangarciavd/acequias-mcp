@@ -116,12 +116,13 @@ def check_board(board, players, p):
 
     # Content: varietals.
     counts = Counter(t.varietal for t in vineyards)
-    assert all(isinstance(v, Varietal) for v in counts)
-    if len(vineyards) >= len(Varietal):
-        assert set(counts) == set(Varietal)
+    in_play = list(p.varietal_points)
+    assert set(counts) <= set(in_play)
+    if len(vineyards) >= len(in_play):
+        assert set(counts) == set(in_play)
     else:
         assert all(n == 1 for n in counts.values())
-    full = [counts.get(v, 0) for v in Varietal] if len(vineyards) >= len(Varietal) else list(
+    full = [counts.get(v, 0) for v in in_play] if len(vineyards) >= len(in_play) else list(
         counts.values()
     )
     assert max(full) - min(full) <= 1

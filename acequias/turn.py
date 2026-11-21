@@ -7,8 +7,12 @@ An action is one of four frozen, hashable dataclasses: ``PlaceCanal``,
 ``apply(state, player, action, rng)`` returns a new ``GameState`` and never
 changes its input. It does not check or change whose turn it is (that is
 the round loop's job), so ``current_player``, ``start_player``, and
-``round`` are copied unchanged. Only a bribe draws from ``rng``, with one
-``rng.randint(1, die_faces)`` call made after every check has passed.
+``round`` are copied unchanged. ``rng`` is drawn from only after every
+check has passed, so a rejected action leaves it untouched. A bribe first
+rolls the die, one ``rng.randint(1, die_faces)`` call. Then, under roulette
+varietal rules only, each vineyard the action newly claims is planted with
+one ``rng.choice(preset.roulette)`` spin, in ascending hex order, and
+recorded in ``Board.plantings``. Under fixed rules nothing else is drawn.
 
 ``legal_actions(state, player)`` lists every legal action once, in a fixed
 order: canal placements, floodgate placements, bribes, then pass. Actions
@@ -26,6 +30,7 @@ from __future__ import annotations
 import random
 from dataclasses import dataclass, replace
 
+from acequias.config import VarietalRules
 from acequias.config import preset as shipped_preset
 from acequias.flow import _watered
 from acequias.hex import Direction, Hex
@@ -137,10 +142,10 @@ def apply(state: GameState, player: str, action: Action, rng: random.Random) -> 
 
     if isinstance(action, PlaceCanal):
         board, _ = _board_after(state, player, action)
-        return _take_from_market(state, board, action.kind)
+        return _take_from_market(state, _plant(state, board, rng), action.kind)
     if isinstance(action, PlaceFloodgate):
         board, _ = _board_after(state, player, action)
-        return _take_from_market(state, board, PieceKind.FLOODGATE)
+        return _take_from_market(state, _plant(state, board, rng), PieceKind.FLOODGATE)
     if isinstance(action, Bribe):
         board, _ = _board_after(state, player, action)
         die_faces = (state.preset or shipped_preset(state.mode)).die_faces
@@ -148,7 +153,7 @@ def apply(state: GameState, player: str, action: Action, rng: random.Random) -> 
         players = tuple(
             replace(p, debt=p.debt + roll) if p.id == player else p for p in state.players
         )
-        return replace(state, players=players, board=board)
+        return replace(state, players=players, board=_plant(state, board, rng))
     if _has_placement(state):
         raise IllegalAction("pass is only legal when the player has nothing they can place")
     return replace(state)
@@ -178,7 +183,8 @@ def _board_after(
     """The board after ``player`` places a piece or bribes, and its watered vineyards.
 
     The board is the one ``apply`` puts in its new state, claims included;
-    the market, debt, and die roll are left out, so nothing is drawn. Raises
+    the market, debt, die roll, and roulette spins are left out, so nothing
+    is drawn (under roulette rules the new claims have no planting). Raises
     ``IllegalAction`` exactly as ``apply`` does. ``state`` and ``player``
     must already be checked. The bots use this to weigh a move without
     building a whole state.
@@ -340,6 +346,23 @@ def _claim(board: Board, player: str) -> tuple[Board, list[Hex]]:
         if board.claimant(vineyard) is None:
             claims.append((vineyard, player))
     return board._derive(claims=tuple(claims)), watered
+
+
+def _plant(state: GameState, board: Board, rng: random.Random) -> Board:
+    """``board`` with one roulette spin planted on each vineyard newly claimed since ``state``.
+
+    Only under roulette rules; the spins go in ascending hex order. Under
+    fixed rules ``board`` is returned as is and nothing is drawn.
+    """
+    preset = state.preset or shipped_preset(state.mode)
+    if preset.varietal_rules is not VarietalRules.ROULETTE:
+        return board
+    before = state.board._claim_index
+    new = sorted(hex for hex, _ in board.claims if hex not in before)
+    if not new:
+        return board
+    plantings = board.plantings + tuple((hex, rng.choice(preset.roulette)) for hex in new)
+    return board._derive(plantings=plantings)  # each hex is a newly claimed blank vineyard
 
 
 def _take_from_market(state: GameState, board: Board, market_take: PieceKind) -> GameState:

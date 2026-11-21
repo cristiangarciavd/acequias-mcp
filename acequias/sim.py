@@ -14,7 +14,8 @@ rule value from the preset, and reimplements no rules. Standard library
 only.
 
 ``SimResult.to_json`` uses the JSON names of ``server/schemas.py``: modes by
-value, varietals and piece kinds by lowercase ASCII enum name. ``acequias``
+value, varietal rules by value, varietals and piece kinds by lowercase
+ASCII enum name. ``acequias``
 never imports ``server``, so the few names are written out here.
 """
 
@@ -28,7 +29,7 @@ from dataclasses import dataclass, field
 from types import MappingProxyType
 
 from acequias.bots import policy
-from acequias.config import Preset, preset as shipped_preset, with_overrides
+from acequias.config import Preset, VarietalRules, preset as shipped_preset, with_overrides
 from acequias.game import Bot, TurnRecord, game_rngs, play_game, turn_order
 from acequias.model import MAX_PLAYERS, MIN_PLAYERS, GameState, Mode, Varietal
 from acequias.scoring import Score, calculate_score, winners
@@ -219,7 +220,9 @@ class SimResult:
     """Share of player-games with a bodega bonus (``bodega > 0``)."""
     winner_varietal_rate: Mapping[str, float] = field(hash=False)
     """Varietal JSON name: share of games in which at least one winner has a
-    watered vineyard of that varietal."""
+    watered vineyard of that varietal. Only the varietals in play are keys:
+    those of ``varietal_points`` under fixed rules, the roulette's under
+    roulette rules, in ``Varietal`` order."""
 
     def to_json(self) -> dict[str, object]:
         """The result as plain JSON data: dicts with string keys, lists, str, int, float, None."""
@@ -276,7 +279,7 @@ def summarize(rules: SimRules, seed: int, records: Iterable[GameRecord]) -> SimR
     shared = with_bribe = with_floodgate = bodegas = 0
     briber_credit: list[float] = []
     other_credit: list[float] = []
-    varietal_games = {varietal: 0 for varietal in Varietal}
+    varietal_games = {varietal: 0 for varietal in _in_play(preset)}
 
     for record in records:
         order = turn_order(record.start, 1)
@@ -310,7 +313,7 @@ def summarize(rules: SimRules, seed: int, records: Iterable[GameRecord]) -> SimR
             (briber_credit if player.id in bribers else other_credit).append(mine)
         best_totals.append(max(s.total for s in record.scores.values()))
 
-        for varietal in Varietal:
+        for varietal in varietal_games:
             if any(
                 v.varietal is varietal
                 for winner in record.winners
@@ -366,8 +369,25 @@ def _preset_values(preset: Preset) -> Mapping[str, object]:
             value = MappingProxyType({kind.name.lower(): share for kind, share in value.items()})
         elif f.name == "vineyard_distance":
             value = tuple(value)
+        elif f.name == "varietal_rules":
+            value = value.value
+        elif f.name == "varietal_points":
+            value = MappingProxyType({_VARIETAL_NAMES[v]: points for v, points in value.items()})
+        elif f.name == "roulette":
+            value = tuple(_VARIETAL_NAMES[v] for v in value)
         values[f.name] = value
     return MappingProxyType(values)
+
+
+def _in_play(preset: Preset) -> list[Varietal]:
+    """The varietals a game under ``preset`` can have, in ``Varietal`` order:
+    the keys of ``varietal_points`` under fixed rules, the roulette's sectors
+    under roulette rules."""
+    if preset.varietal_rules is VarietalRules.FIXED:
+        used = set(preset.varietal_points)
+    else:
+        used = set(preset.roulette)
+    return [v for v in Varietal if v in used]
 
 
 def _to_json(value: object) -> object:

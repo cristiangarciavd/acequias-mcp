@@ -16,6 +16,9 @@ Layout rules (``README.md``, Setup and Game modes):
   ``k`` from the nearest river hex, so vineyards are placed by row offset.
 
 Every size, count, and distance comes from the preset (``acequias.config``).
+Under fixed varietal rules the vineyards get the varietals of
+``preset.varietal_points``, dealt evenly; under roulette rules they are
+blank (no varietal), and are planted when claimed.
 All randomness comes from one ``random.Random(seed)``, and every choice is
 made over lists in a fixed order, so the result never depends on hash order.
 """
@@ -25,7 +28,7 @@ from __future__ import annotations
 import random
 from collections.abc import Sequence
 
-from acequias.config import Preset, _ceil_share
+from acequias.config import Preset, VarietalRules, _ceil_share
 from acequias.config import preset as shipped_preset
 from acequias.hex import Direction, Hex
 from acequias.model import MAX_PLAYERS, MIN_PLAYERS, Board, Mode, Terrain, Tile, Varietal
@@ -160,10 +163,16 @@ def _layout(
     rest = [h for row in rows for h in row if h not in taken]
     stone_hexes = rng.sample(rest, stones)
 
-    varietals = list(Varietal)
-    rng.shuffle(varietals)
-    grapes = [varietals[i % len(varietals)] for i in range(vineyards)]
-    rng.shuffle(grapes)
+    grapes: list[Varietal | None]
+    if preset.varietal_rules is VarietalRules.FIXED:
+        # Deal the varietals in play as evenly as possible, in random order.
+        varietals = list(preset.varietal_points)
+        rng.shuffle(varietals)
+        grapes = [varietals[i % len(varietals)] for i in range(vineyards)]
+        rng.shuffle(grapes)
+    else:
+        # Roulette rules: blank plots, planted when claimed (acequias.turn).
+        grapes = [None] * vineyards
 
     stone_set = set(stone_hexes)
     tiles = [Tile(river, Terrain.RIVER) for river in _river(rows)]

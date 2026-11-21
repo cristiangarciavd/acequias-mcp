@@ -66,11 +66,19 @@ def test_terrain_has_four_members():
     assert {t.name for t in Terrain} == {"RIVER", "VINEYARD", "STONE", "EMPTY"}
 
 
-def test_varietal_points():
-    assert len(Varietal) == 3
-    assert Varietal.MALBEC.points == 3
-    assert Varietal.BONARDA.points == 2
-    assert Varietal.TORRONTES.points == 1
+def test_varietal_has_the_eight_mendoza_varietals_in_order():
+    assert [v.name for v in Varietal] == [
+        "MALBEC",
+        "CABERNET_SAUVIGNON",
+        "CABERNET_FRANC",
+        "SYRAH",
+        "MERLOT",
+        "BONARDA",
+        "TORRONTES",
+        "CHARDONNAY",
+    ]
+    assert Varietal.CABERNET_SAUVIGNON.display_name == "Cabernet Sauvignon"
+    assert not hasattr(Varietal.MALBEC, "points")  # points come from the preset
 
 
 def test_varietal_identifiers_are_ascii_and_display_name_keeps_accent():
@@ -269,10 +277,11 @@ def test_tile_records_hex_and_terrain():
     assert tile.varietal is None
 
 
-def test_vineyard_tile_needs_a_varietal():
+def test_vineyard_tile_may_be_blank():
     assert vineyard(A, Varietal.BONARDA).varietal is Varietal.BONARDA
+    assert Tile(A, Terrain.VINEYARD).varietal is None
     with pytest.raises(ValueError):
-        Tile(A, Terrain.VINEYARD)
+        Tile(A, Terrain.VINEYARD, "malbec")
 
 
 @pytest.mark.parametrize("terrain", [Terrain.RIVER, Terrain.STONE, Terrain.EMPTY])

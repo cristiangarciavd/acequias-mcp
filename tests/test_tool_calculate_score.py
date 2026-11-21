@@ -161,7 +161,9 @@ async def test_input_schema_describes_every_field_and_its_allowed_values():
     async with Client(app) as client:
         schema = (await tool_info(client)).input_schema
     properties = schema["properties"]
-    assert set(properties) == {"mode", "hexes", "canals", "floodgates", "claims", "players"}
+    assert set(properties) == {
+        "mode", "hexes", "canals", "floodgates", "claims", "players", "overrides"
+    }
     assert all(properties[name].get("description") for name in properties)
     assert sorted(schema["required"]) == ["hexes", "mode", "players"]
 
@@ -178,12 +180,13 @@ async def test_input_schema_describes_every_field_and_its_allowed_values():
         ("hexes", {"q", "r", "terrain", "varietal"}),
         ("canals", {"q", "r", "kind", "rotation", "owner"}),
         ("floodgates", {"q", "r", "direction"}),
-        ("claims", {"q", "r", "player"}),
+        ("claims", {"q", "r", "player", "varietal"}),
         ("players", {"id", "debt"}),
     ]:
         shape = item(name)
+        optional = {"varietal"} if name == "claims" else set()
         assert set(shape["properties"]) == keys
-        assert sorted(shape["required"]) == sorted(keys)
+        assert sorted(shape["required"]) == sorted(keys - optional)
         assert shape["additionalProperties"] is False
         assert all(field.get("description") for field in shape["properties"].values())
 

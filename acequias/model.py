@@ -45,24 +45,22 @@ class Terrain(Enum):
 
 
 class Varietal(Enum):
-    """A vineyard's grape, which sets its value in points."""
+    """A vineyard's grape. Its value in points comes from the preset
+    (``Preset.varietal_points``)."""
 
     MALBEC = "Malbec"
+    CABERNET_SAUVIGNON = "Cabernet Sauvignon"
+    CABERNET_FRANC = "Cabernet Franc"
+    SYRAH = "Syrah"
+    MERLOT = "Merlot"
     BONARDA = "Bonarda"
     TORRONTES = "Torrontés"
+    CHARDONNAY = "Chardonnay"
 
     @property
     def display_name(self) -> str:
         """The name as written in the rules, accents included."""
         return self.value
-
-    @property
-    def points(self) -> int:
-        """Points the vineyard scores when watered at the end of the game."""
-        return _VARIETAL_POINTS[self]
-
-
-_VARIETAL_POINTS = {Varietal.MALBEC: 3, Varietal.BONARDA: 2, Varietal.TORRONTES: 1}
 
 
 class PieceKind(Enum):
@@ -128,7 +126,12 @@ class Mode(Enum):
 
 @dataclass(frozen=True, slots=True)
 class Tile:
-    """A board hex and its terrain; a vineyard tile also has a varietal."""
+    """A board hex and its terrain.
+
+    A vineyard tile has a varietal under fixed rules, and none under
+    roulette rules, where the varietal is planted when the vineyard is
+    claimed (``Board.plantings``). Other terrains never have one.
+    """
 
     hex: Hex
     terrain: Terrain
@@ -138,8 +141,10 @@ class Tile:
         _check_type("Tile.hex", self.hex, Hex)
         _check_type("Tile.terrain", self.terrain, Terrain)
         if self.terrain is Terrain.VINEYARD:
-            if not isinstance(self.varietal, Varietal):
-                raise ValueError(f"a vineyard tile needs a varietal, got {self.varietal!r}")
+            if self.varietal is not None and not isinstance(self.varietal, Varietal):
+                raise ValueError(
+                    f"a vineyard tile's varietal must be a Varietal or None, got {self.varietal!r}"
+                )
         elif self.varietal is not None:
             raise ValueError(f"a {self.terrain.value} tile cannot have a varietal")
 
@@ -207,22 +212,25 @@ def _edge(hex: Hex, direction: Direction) -> frozenset[tuple[Hex, Direction]]:
 
 @dataclass(frozen=True)
 class Board:
-    """Tiles, placed canals, floodgates, and vineyard claims.
+    """Tiles, placed canals, floodgates, vineyard claims, and plantings.
 
     ``claims`` pairs a vineyard hex with the id of the player who claimed
-    it; a vineyard with no claim is unclaimed. The board checks where pieces
-    may sit, not who owns them: ``GameState`` checks owners against its
-    players.
+    it; a vineyard with no claim is unclaimed. ``plantings`` pairs a claimed
+    vineyard whose tile has no varietal with the varietal the roulette
+    planted there. The board checks where pieces may sit, not who owns
+    them: ``GameState`` checks owners against its players.
     """
 
     tiles: tuple[Tile, ...] = ()
     canals: tuple[PlacedCanal, ...] = ()
     floodgates: tuple[Floodgate, ...] = ()
     claims: tuple[tuple[Hex, str], ...] = ()
+    plantings: tuple[tuple[Hex, Varietal], ...] = ()
 
     _tile_index: Mapping[Hex, Tile] = field(init=False, repr=False, compare=False)
     _canal_index: Mapping[Hex, PlacedCanal] = field(init=False, repr=False, compare=False)
     _claim_index: Mapping[Hex, str] = field(init=False, repr=False, compare=False)
+    _planting_index: Mapping[Hex, Varietal] = field(init=False, repr=False, compare=False)
     _floodgate_index: Mapping[frozenset, Floodgate] = field(
         init=False, repr=False, compare=False
     )
@@ -237,6 +245,7 @@ class Board:
         canals = _items("Board.canals", self.canals, PlacedCanal)
         floodgates = _items("Board.floodgates", self.floodgates, Floodgate)
         claims = _claim_items(self.claims)
+        plantings = _planting_items(self.plantings)
 
         tile_index: dict[Hex, Tile] = {}
         for tile in tiles:
@@ -280,13 +289,30 @@ class Board:
                 raise ValueError(f"claim on {hex}, which is not a vineyard")
             claim_index[hex] = player_id
 
+        planting_index: dict[Hex, Varietal] = {}
+        for hex, varietal in plantings:
+            if hex in planting_index:
+                raise ValueError(f"two plantings on {hex}")
+            tile = tile_index.get(hex)
+            if tile is None or tile.terrain is not Terrain.VINEYARD:
+                raise ValueError(f"planting on {hex}, which is not a vineyard")
+            if tile.varietal is not None:
+                raise ValueError(
+                    f"planting on {hex}, whose tile already has {tile.varietal.display_name}"
+                )
+            if hex not in claim_index:
+                raise ValueError(f"planting on {hex}, an unclaimed vineyard")
+            planting_index[hex] = varietal
+
         _set(self, "tiles", tuple(sorted(tiles, key=lambda t: t.hex)))
         _set(self, "canals", tuple(sorted(canals, key=lambda c: c.hex)))
         _set(self, "floodgates", tuple(sorted(floodgates, key=_floodgate_key)))
         _set(self, "claims", tuple(sorted(claims)))
+        _set(self, "plantings", tuple(sorted(plantings, key=_planting_order)))
         _set(self, "_tile_index", MappingProxyType(tile_index))
         _set(self, "_canal_index", MappingProxyType(canal_index))
         _set(self, "_claim_index", MappingProxyType(claim_index))
+        _set(self, "_planting_index", MappingProxyType(planting_index))
         _set(self, "_floodgate_index", MappingProxyType(floodgate_index))
 
     def tile_at(self, hex: Hex) -> Tile | None:
@@ -300,6 +326,13 @@ class Board:
     def claimant(self, hex: Hex) -> str | None:
         """The id of the player who claimed the vineyard at ``hex``, or None."""
         return self._claim_index.get(hex)
+
+    def varietal_at(self, hex: Hex) -> Varietal | None:
+        """The varietal at ``hex``: the tile's, else the one planted there, else None."""
+        tile = self._tile_index.get(hex)
+        if tile is not None and tile.varietal is not None:
+            return tile.varietal
+        return self._planting_index.get(hex)
 
     def floodgate_at(self, hex: Hex, direction: Direction) -> Floodgate | None:
         """The floodgate on the edge of ``hex`` facing ``direction``, from either side, or None."""
@@ -325,6 +358,7 @@ class Board:
         canals: tuple[PlacedCanal, ...] | None = None,
         floodgates: tuple[Floodgate, ...] | None = None,
         claims: tuple[tuple[Hex, str], ...] | None = None,
+        plantings: tuple[tuple[Hex, Varietal], ...] | None = None,
     ) -> Board:
         """This board with some collections replaced, for callers that checked every piece.
 
@@ -357,6 +391,13 @@ class Board:
             claims = tuple(sorted(claims))
             _set(new, "claims", claims)
             _set(new, "_claim_index", MappingProxyType(dict(claims)))
+        if plantings is None:
+            _set(new, "plantings", self.plantings)
+            _set(new, "_planting_index", self._planting_index)
+        else:
+            plantings = tuple(sorted(plantings, key=_planting_order))
+            _set(new, "plantings", plantings)
+            _set(new, "_planting_index", MappingProxyType(dict(plantings)))
         return new
 
 
@@ -366,9 +407,13 @@ class _BoardStatics:
     For each tile hex: its neighbours by direction, the directions that face
     a river tile, and the directions that face a vineyard tile (with the
     vineyard hex). ``empty`` lists the ``EMPTY`` tile hexes in hex order.
+    ``tile_varietals`` is the set of varietals on vineyard tiles, and
+    ``blank_vineyards`` says whether any vineyard tile has none.
     """
 
-    __slots__ = ("neighbors", "river_dirs", "vineyard_dirs", "empty")
+    __slots__ = (
+        "neighbors", "river_dirs", "vineyard_dirs", "empty", "tile_varietals", "blank_vineyards"
+    )
 
     def __init__(self, tiles: tuple[Tile, ...]) -> None:
         terrain = {t.hex: t.terrain for t in tiles}
@@ -387,6 +432,11 @@ class _BoardStatics:
         self.empty: tuple[Hex, ...] = tuple(
             sorted(h for h, t in terrain.items() if t is Terrain.EMPTY)
         )
+        vineyards = [t for t in tiles if t.terrain is Terrain.VINEYARD]
+        self.tile_varietals: frozenset[Varietal] = frozenset(
+            t.varietal for t in vineyards if t.varietal is not None
+        )
+        self.blank_vineyards: bool = any(t.varietal is None for t in vineyards)
 
 
 _DIRECTION_INDEX = {d: i for i, d in enumerate(Direction)}
@@ -394,6 +444,10 @@ _DIRECTION_INDEX = {d: i for i, d in enumerate(Direction)}
 
 def _canal_order(canal: PlacedCanal) -> Hex:
     return canal.hex
+
+
+def _planting_order(planting: tuple[Hex, Varietal]) -> Hex:
+    return planting[0]
 
 
 def _floodgate_key(gate: Floodgate) -> tuple[Hex, Hex, int, int]:
@@ -487,6 +541,31 @@ class GameState:
         for hex, player_id in self.board.claims:
             if player_id not in known:
                 raise ValueError(f"claim on {hex} by unknown player {player_id!r}")
+        self._check_varietals()
+
+    def _check_varietals(self) -> None:
+        """The board's varietals must fit the preset's varietal rules.
+
+        Fixed rules: every vineyard tile has a varietal with points, and
+        nothing is planted. Roulette rules: no vineyard tile has a varietal.
+        """
+        from acequias.config import VarietalRules  # local: config imports this module
+        from acequias.config import preset as shipped_preset
+
+        preset = self.preset if self.preset is not None else shipped_preset(self.mode)
+        statics = self.board._static()
+        if preset.varietal_rules is VarietalRules.FIXED:
+            if statics.blank_vineyards:
+                raise ValueError("under fixed varietal rules every vineyard tile needs a varietal")
+            unscored = sorted(
+                v.name for v in statics.tile_varietals if v not in preset.varietal_points
+            )
+            if unscored:
+                raise ValueError(f"varietals {unscored} have no points under fixed varietal rules")
+            if self.board.plantings:
+                raise ValueError("under fixed varietal rules nothing is planted on claim")
+        elif statics.tile_varietals:
+            raise ValueError("under roulette varietal rules no vineyard tile has a varietal")
 
     def player(self, player_id: str) -> Player | None:
         """The player with ``player_id``, or None."""
@@ -526,6 +605,18 @@ def _items(name: str, values: Iterable[object], cls: type) -> tuple:
     items = tuple(values)
     for item in items:
         _check_type(f"{name} item", item, cls)
+    return items
+
+
+def _planting_items(values: Iterable[object]) -> tuple[tuple[Hex, Varietal], ...]:
+    if isinstance(values, Mapping):
+        values = values.items()
+    items = tuple(tuple(pair) for pair in values)
+    for pair in items:
+        if len(pair) != 2:
+            raise TypeError(f"a planting is a (hex, varietal) pair, got {pair!r}")
+        _check_type("planting hex", pair[0], Hex)
+        _check_type("planting varietal", pair[1], Varietal)
     return items
 
 
