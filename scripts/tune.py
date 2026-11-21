@@ -9,12 +9,39 @@ Usage (from the repo root):
     uv run python scripts/tune.py --list             # the sweeps and their candidates
     uv run python scripts/tune.py --sweep all --smoke   # quick check of the runner (10 games)
 
-Every number comes from ``acequias.sim.simulate_game``: this script builds
-``SimRules`` with ``overrides`` (``Preset`` field names, #22), runs them,
-and formats the ``SimResult`` fields. It reimplements no rule and no
-statistic; the only arithmetic here is presentation (the 95% margin of
-``turn_order_advantage``, the pass share, and minutes at
+A light run, to keep using the PC meanwhile (``DEFAULT_WORKERS`` worker
+processes, below-normal priority), and an overnight run with most threads:
+
+    uv run python scripts/tune.py --sweep all
+    uv run python scripts/tune.py --sweep all --workers 10
+
+Every number comes from ``acequias.sim``: this script builds ``SimRules``
+with ``overrides`` (``Preset`` field names, #22), plays game ``i`` of a
+configuration as ``play_one(rules, game_seed(seed, i))``, and summarizes the
+records in game order with ``summarize``, exactly what ``simulate_game``
+does, so a result equals ``simulate_game(rules, n, seed)``. It reimplements
+no rule and no statistic; the only arithmetic here is presentation (the 95%
+margin of ``turn_order_advantage``, the pass share, and minutes at
 ``MINUTES_PER_TURN``).
+
+Parallel games (#43): each configuration is split into chunks of
+``CHUNK_GAMES`` games by game index, and the chunks of every configuration
+share one pool of ``--workers`` processes (default ``DEFAULT_WORKERS``).
+The main process and the workers run at below-normal OS priority. Every
+game keeps its own seed, so the worker count, the chunk size, and resuming
+change only the wall time, never a number. Progress (games done / total,
+percent, elapsed time, ETA) goes to stderr; stdout carries only the tables.
+
+Checkpoints: each finished chunk is saved in ``--checkpoint-dir`` (default
+``output/tune-checkpoints/``, ignored by git). Stop a run at any time
+(Ctrl+C) and run the same command again to resume: saved chunks are loaded,
+not replayed. A chunk is reused only when its key matches: mode, players,
+policies, overrides, seed, game range, and a SHA-256 of the ``acequias/``
+sources, so after a code change or with other arguments old chunks are
+ignored and replayed. ``--fresh`` ignores and overwrites the saved chunks
+of this run. Old chunks are never cleaned up on their own: delete the
+folder (e.g. ``rm -r output/tune-checkpoints``) when a report is done or
+after code changes. ``--smoke`` saves and loads nothing.
 
 A *configuration* is a mode, a player count (2 to 5), and a seating:
 ``greedy`` (every seat greedy) or ``mixed`` (seats alternate saboteur and
@@ -24,14 +51,10 @@ validation runs ``PROPOSED`` at ``final_games(players)`` games from
 ``FINAL_SEED``, a seed no sweep uses. A candidate the preset or the board
 generator rejects is printed as infeasible with its error, and the run goes
 on. Any other error is reported with its configuration as failed, and the
-run goes on too. Each configuration runs in a process of its own, so a
-process that dies (killed, out of memory) fails only its configuration,
-which is run once more; every table is still printed, and the exit status
-is 1 if anything failed.
-
-``--jobs`` runs that many configurations at a time (one process and one
-``simulate_game`` call each); it changes only the wall time, never a
-number. Wall times go to stderr, so stdout is identical between runs.
+run goes on too. A chunk whose worker process dies (killed, out of memory)
+is run once more (``RETRIES``) in a process of its own, then fails only its
+configuration; every table is still printed, and the exit status is 1 if
+anything failed.
 
 Standard library only. Not a test: it lives outside ``tests/``.
 """
@@ -39,18 +62,27 @@ Standard library only. Not a test: it lives outside ``tests/``.
 from __future__ import annotations
 
 import argparse
+import copyreg
+import hashlib
 import math
+import multiprocessing
 import os
+import pickle
+import signal
 import sys
-import threading
 import time
+import zlib
+from collections import deque
 from collections.abc import Mapping
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+from concurrent.futures import FIRST_COMPLETED, ProcessPoolExecutor, wait
 from concurrent.futures.process import BrokenProcessPool
 from dataclasses import dataclass
+from pathlib import Path
+from types import MappingProxyType
 
+import acequias
 from acequias.model import Mode, PieceKind
-from acequias.sim import SimResult, SimRules, simulate_game
+from acequias.sim import GameRecord, SimRules, game_seed, play_one, summarize
 
 # --- Constants ---------------------------------------------------------------
 
@@ -311,6 +343,25 @@ SWEEP_NAMES = tuple(s.name for s in SWEEPS)
 # --- Running -----------------------------------------------------------------
 
 
+DEFAULT_WORKERS = 3
+"""Worker processes by default (capped at ``os.cpu_count()``): few enough
+that the owner keeps using the PC. Heavy runs pass ``--workers``."""
+CHUNK_GAMES = 25
+"""Games per chunk: the unit of work of a worker, of progress, and of a checkpoint file."""
+PROGRESS_SECONDS = 10
+"""The longest time between two progress lines on stderr."""
+POLL_SECONDS = 0.5
+"""How often the main process wakes up, so Ctrl+C is handled promptly."""
+CHECKPOINT_DIR = Path(__file__).resolve().parent.parent / "output" / "tune-checkpoints"
+"""Where finished chunks are saved by default (``output/`` is ignored by git)."""
+CHECKPOINT_FORMAT = 1
+"""Part of every chunk key: bump it when the chunk file layout changes."""
+BELOW_NORMAL_PRIORITY_CLASS = 0x4000
+"""The Windows priority class of the run (Task Manager: "Below normal")."""
+NICENESS = 10
+"""The POSIX niceness of the run (``os.nice``): below normal."""
+
+
 @dataclass(frozen=True)
 class Job:
     """One configuration to simulate."""
@@ -329,7 +380,8 @@ INFEASIBLE = "infeasible"
 FAILED = "failed"
 """Outcome status: the run broke for another reason (a bug, or a worker process that died)."""
 RETRIES = 1
-"""How many more times a job whose worker process died is run, in a fresh process."""
+"""How many more times a chunk whose worker process died is run, in a process of its own."""
+DIED = "worker process died"
 
 
 @dataclass(frozen=True)
@@ -339,21 +391,252 @@ class Outcome:
     status: str
     data: dict | None = None
     error: str | None = None
-    seconds: float = 0.0
 
 
-def run_job(job: Job) -> Outcome:
-    """Run one job in this process. Never raises: a rejected candidate is
-    ``INFEASIBLE`` and any other exception is ``FAILED``, each with its message."""
-    start = time.perf_counter()
+@dataclass(frozen=True)
+class ChunkResult:
+    """The records of games ``start`` to ``stop - 1`` of a job, or why there are none."""
+
+    status: str
+    records: list[GameRecord] | None = None
+    error: str | None = None
+    priority_warning: str | None = None
+
+
+def _mapping_proxy(data: dict) -> MappingProxyType:
+    return MappingProxyType(data)
+
+
+# Game records hold read-only mappings, which pickle cannot send between
+# processes or save on its own; this rebuilds them from a plain dict.
+copyreg.pickle(MappingProxyType, lambda proxy: (_mapping_proxy, (dict(proxy),)))
+
+
+def rules_of(job: Job) -> SimRules:
+    return SimRules(job.mode, job.players, policies(job.seating, job.players), job.overrides)
+
+
+# --- Priority ------------------------------------------------------------------
+
+
+def lower_priority() -> str | None:
+    """Lower this process to below-normal priority; return a warning if it cannot."""
     try:
-        rules = SimRules(job.mode, job.players, policies(job.seating, job.players), job.overrides)
-        result: SimResult = simulate_game(rules, job.n, job.seed)
+        if sys.platform == "win32":
+            import ctypes
+            from ctypes import wintypes
+
+            kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+            kernel32.GetCurrentProcess.restype = wintypes.HANDLE
+            kernel32.SetPriorityClass.argtypes = (wintypes.HANDLE, wintypes.DWORD)
+            kernel32.SetPriorityClass.restype = wintypes.BOOL
+            if not kernel32.SetPriorityClass(kernel32.GetCurrentProcess(), BELOW_NORMAL_PRIORITY_CLASS):
+                raise ctypes.WinError(ctypes.get_last_error())
+        else:
+            increment = NICENESS - os.nice(0)
+            if increment > 0:
+                os.nice(increment)
+    except Exception as error:  # noqa: BLE001 - a warning, the run goes on
+        return f"warning: could not lower the process priority ({type(error).__name__}: {error})"
+    return None
+
+
+def process_priority() -> int:
+    """This process's priority: the Windows priority class, or the POSIX niceness."""
+    if sys.platform == "win32":
+        import ctypes
+        from ctypes import wintypes
+
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel32.GetCurrentProcess.restype = wintypes.HANDLE
+        kernel32.GetPriorityClass.argtypes = (wintypes.HANDLE,)
+        kernel32.GetPriorityClass.restype = wintypes.DWORD
+        return kernel32.GetPriorityClass(kernel32.GetCurrentProcess())
+    return os.nice(0)
+
+
+_worker_warning: str | None = None
+
+
+def _init_worker() -> None:
+    """Pool initializer: lower the priority (not inherited on purpose) and
+    leave Ctrl+C to the main process, which stops the workers itself."""
+    global _worker_warning
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
+    _worker_warning = lower_priority()
+
+
+_warned = False
+
+
+def warn_priority(warning: str | None) -> None:
+    """Print the first priority warning of the run; the rest are the same news."""
+    global _warned
+    if warning and not _warned:
+        _warned = True
+        print(f"{warning}; running at normal priority", file=sys.stderr, flush=True)
+
+
+def make_pool(workers: int) -> ProcessPoolExecutor:
+    """A pool of ``workers`` spawned processes at below-normal priority."""
+    return ProcessPoolExecutor(
+        max_workers=workers, mp_context=multiprocessing.get_context("spawn"), initializer=_init_worker
+    )
+
+
+def _stop(pool: ProcessPoolExecutor) -> None:
+    """Stop ``pool`` now: kill its workers so none outlives the run."""
+    processes = list((getattr(pool, "_processes", None) or {}).values())
+    for process in processes:
+        process.terminate()
+    pool.shutdown(wait=False, cancel_futures=True)
+    for process in processes:
+        process.join(5)
+
+
+# --- Chunks ------------------------------------------------------------------
+
+
+def run_chunk(job: Job, start: int, stop: int) -> ChunkResult:
+    """Play games ``start`` to ``stop - 1`` of ``job`` in this process. Never
+    raises: a rejected candidate is ``INFEASIBLE`` and any other exception is
+    ``FAILED``, each with its message."""
+    try:
+        rules = rules_of(job)
     except ValueError as error:
-        return Outcome(INFEASIBLE, error=str(error), seconds=time.perf_counter() - start)
+        return ChunkResult(INFEASIBLE, error=str(error), priority_warning=_worker_warning)
     except Exception as error:  # noqa: BLE001 - reported with its job, the run goes on
-        return Outcome(FAILED, error=f"{type(error).__name__}: {error}", seconds=time.perf_counter() - start)
-    return Outcome("ok", data=result.to_json(), seconds=time.perf_counter() - start)
+        return ChunkResult(FAILED, error=f"{type(error).__name__}: {error}", priority_warning=_worker_warning)
+    records = []
+    for i in range(start, stop):
+        seed = game_seed(job.seed, i)
+        try:
+            records.append(play_one(rules, seed))
+        except ValueError as error:
+            return ChunkResult(INFEASIBLE, error=f"game {i} (game seed {seed}): {error}",
+                               priority_warning=_worker_warning)
+        except Exception as error:  # noqa: BLE001 - reported with its job, the run goes on
+            return ChunkResult(FAILED, error=f"game {i} (game seed {seed}): {type(error).__name__}: {error}",
+                               priority_warning=_worker_warning)
+    return ChunkResult("ok", records=records, priority_warning=_worker_warning)
+
+
+def run_isolated(job: Job, start: int, stop: int) -> ChunkResult:
+    """Run one chunk in a process of its own and wait for it, so a process
+    that dies again fails this chunk alone."""
+    pool = make_pool(1)
+    try:
+        return pool.submit(run_chunk, job, start, stop).result()
+    except BrokenProcessPool as error:
+        return ChunkResult(FAILED, error=f"{DIED}: {error}")
+    except Exception as error:  # noqa: BLE001 - e.g. a result that cannot be pickled
+        return ChunkResult(FAILED, error=f"{type(error).__name__}: {error}")
+    finally:
+        _stop(pool)
+
+
+def chunks(n: int, size: int) -> list[tuple[int, int]]:
+    """The game ranges ``(start, stop)`` of a job of ``n`` games."""
+    return [(start, min(start + size, n)) for start in range(0, n, size)]
+
+
+def source_fingerprint() -> str:
+    """A SHA-256 of the ``acequias/`` sources: a code change invalidates every checkpoint."""
+    root = Path(acequias.__file__).resolve().parent
+    digest = hashlib.sha256()
+    for path in sorted(root.rglob("*.py")):
+        digest.update(path.relative_to(root).as_posix().encode() + b"\0")
+        digest.update(path.read_bytes() + b"\0")
+    return digest.hexdigest()
+
+
+def _canonical(value: object) -> str:
+    """A stable text for an override value: mappings sorted by key, sequences as tuples."""
+    if isinstance(value, Mapping):
+        items = sorted((repr(k), _canonical(v)) for k, v in value.items())
+        return "{" + ", ".join(f"{k}: {v}" for k, v in items) + "}"
+    if isinstance(value, (list, tuple)):
+        return "(" + ", ".join(_canonical(v) for v in value) + ")"
+    return repr(value)
+
+
+class Checkpoints:
+    """Finished chunks saved in ``folder``, one file each, named by a hash of their key."""
+
+    def __init__(self, folder: Path, fingerprint: str, fresh: bool = False) -> None:
+        self.folder = Path(folder)
+        self.fingerprint = fingerprint
+        self.fresh = fresh
+
+    def key(self, job: Job, start: int, stop: int) -> str:
+        """Everything a chunk's records depend on."""
+        return _canonical((
+            CHECKPOINT_FORMAT, job.mode.value, job.players, policies(job.seating, job.players),
+            job.overrides, job.seed, start, stop, self.fingerprint,
+        ))
+
+    def path(self, key: str) -> Path:
+        return self.folder / f"{hashlib.sha256(key.encode()).hexdigest()[:40]}.chunk"
+
+    def load(self, job: Job, start: int, stop: int) -> list[GameRecord] | None:
+        """The saved records of a chunk, or None (never saved, ``fresh``, or unreadable)."""
+        if self.fresh:
+            return None
+        key = self.key(job, start, stop)
+        path = self.path(key)
+        if not path.exists():
+            return None
+        try:
+            saved_key, records = pickle.loads(zlib.decompress(path.read_bytes()))
+            if saved_key != key or not isinstance(records, list) or len(records) != stop - start:
+                raise ValueError("its key or game count does not match")
+        except Exception as error:  # noqa: BLE001 - replayed, not fatal
+            print(f"checkpoint {path} is unreadable ({type(error).__name__}: {error}); replaying its games",
+                  file=sys.stderr, flush=True)
+            return None
+        return records
+
+    def save(self, job: Job, start: int, stop: int, records: list[GameRecord]) -> None:
+        """Save a chunk: written to a temporary name, then renamed, so a
+        run killed mid-write never leaves a half-written chunk."""
+        key = self.key(job, start, stop)
+        path = self.path(key)
+        temporary = path.with_name(f"{path.name}.{os.getpid()}.tmp")
+        try:
+            self.folder.mkdir(parents=True, exist_ok=True)
+            temporary.write_bytes(zlib.compress(pickle.dumps((key, records), pickle.HIGHEST_PROTOCOL)))
+            os.replace(temporary, path)
+        except OSError as error:
+            print(f"warning: could not save checkpoint {path} ({error})", file=sys.stderr, flush=True)
+            temporary.unlink(missing_ok=True)
+
+
+def _clock(seconds: float) -> str:
+    seconds = int(seconds)
+    return f"{seconds // 3600}:{seconds // 60 % 60:02d}:{seconds % 60:02d}"
+
+
+class Progress:
+    """Games done / total on stderr, with an ETA from the games played in this
+    session (chunks loaded from checkpoints count as done, not in the rate)."""
+
+    def __init__(self, total: int, loaded: int) -> None:
+        self.total = total
+        self.done = loaded
+        self.played = 0
+        self.started = time.perf_counter()
+        self.shown = self.started
+
+    def report(self, force: bool = False) -> None:
+        now = time.perf_counter()
+        if not force and now - self.shown < PROGRESS_SECONDS:
+            return
+        self.shown = now
+        elapsed = now - self.started
+        percent = 100 * self.done / self.total if self.total else 100.0
+        eta = _clock((self.total - self.done) * elapsed / self.played) if self.played else "?"
+        print(f"progress: {self.done}/{self.total} games ({percent:.1f}%), elapsed {_clock(elapsed)}, ETA {eta}",
+              file=sys.stderr, flush=True)
 
 
 def _cost(job: Job) -> float:
@@ -367,53 +650,113 @@ def describe_job(job: Job) -> str:
     return f"{job.mode.value} {job.players}p {job.seating} {job.label} (n={job.n}, seed={job.seed})"
 
 
-def run_isolated(job: Job) -> Outcome:
-    """Run ``job`` in a process of its own and wait for it. A process that
-    dies (killed, out of memory) breaks only its own one-worker pool, so it
-    fails this job alone instead of every job sharing a pool with it."""
+def run_all(jobs: list[Job], workers: int, checkpoints: Checkpoints | None = None,
+            chunk_games: int = CHUNK_GAMES) -> list[Outcome]:
+    """Run ``jobs`` and return their outcomes in ``jobs`` order.
+
+    The chunks of every job share one pool of ``workers`` processes; each
+    job is summarized from its records in game order. A job never stops the
+    run: an infeasible candidate or a failure is recorded with its error
+    (that of its lowest failed chunk, so the report does not depend on
+    timing) and its remaining chunks are skipped. A process that dies breaks
+    the pool: the chunks it was running are run again (``RETRIES``) one at a
+    time in a process of their own, so only the culprit fails. Finished
+    chunks are saved in ``checkpoints`` (None: nothing is saved or loaded).
+    Ctrl+C stops the workers and raises ``KeyboardInterrupt``."""
+    parts = [chunks(job.n, chunk_games) for job in jobs]
+    records: list[list[list[GameRecord] | None]] = [[None] * len(p) for p in parts]
+    errors: list[dict[int, ChunkResult]] = [{} for _ in jobs]
+    order = sorted(range(len(jobs)), key=lambda j: -_cost(jobs[j]))
+    pending: deque[tuple[int, int]] = deque()
+    loaded = 0
+    for j in order:
+        for c, (start, stop) in enumerate(parts[j]):
+            saved = checkpoints.load(jobs[j], start, stop) if checkpoints else None
+            if saved is None:
+                pending.append((j, c))
+            else:
+                records[j][c] = saved
+                loaded += stop - start
+    progress = Progress(sum(job.n for job in jobs), loaded)
+    if loaded:
+        print(f"resumed {loaded} games from {checkpoints.folder}", file=sys.stderr, flush=True)
+        progress.report(force=True)
+
+    def size(j: int, c: int) -> int:
+        start, stop = parts[j][c]
+        return stop - start
+
+    def finish(j: int, c: int, result: ChunkResult) -> None:
+        warn_priority(result.priority_warning)
+        if result.status == "ok":
+            records[j][c] = result.records
+            if checkpoints:
+                checkpoints.save(jobs[j], *parts[j][c], result.records)
+            progress.done += size(j, c)
+            progress.played += size(j, c)
+        else:
+            if not errors[j]:
+                print(f"{result.status.upper()} {describe_job(jobs[j])}: {result.error}",
+                      file=sys.stderr, flush=True)
+            errors[j][c] = result
+            progress.total -= size(j, c)
+        progress.report(force=True)
+
+    pool = make_pool(workers)
+    running: dict = {}
     try:
-        with ProcessPoolExecutor(max_workers=1) as pool:
-            return pool.submit(run_job, job).result()
-    except BrokenProcessPool as error:
-        return Outcome(FAILED, error=f"worker process died: {error}")
-    except Exception as error:  # noqa: BLE001 - e.g. a result that cannot be pickled
-        return Outcome(FAILED, error=f"{type(error).__name__}: {error}")
+        while pending or running:
+            while pending and len(running) < workers:
+                j, c = pending.popleft()
+                if errors[j]:
+                    progress.total -= size(j, c)
+                    continue
+                running[pool.submit(run_chunk, jobs[j], *parts[j][c])] = (j, c)
+            if not running:
+                continue
+            done, _ = wait(running, timeout=POLL_SECONDS, return_when=FIRST_COMPLETED)
+            died = []
+            for future in done:
+                j, c = running.pop(future)
+                try:
+                    result = future.result()
+                except BrokenProcessPool:
+                    died.append((j, c))
+                    continue
+                except Exception as error:  # noqa: BLE001 - e.g. a result that cannot be pickled
+                    result = ChunkResult(FAILED, error=f"{type(error).__name__}: {error}")
+                finish(j, c, result)
+            if died:
+                # A dead worker breaks the whole pool: rerun every chunk it was
+                # running, each alone, so only the one that dies again fails.
+                died += running.values()
+                running.clear()
+                _stop(pool)
+                for j, c in sorted(died):
+                    if errors[j]:
+                        progress.total -= size(j, c)
+                        continue
+                    print(f"RETRY {describe_job(jobs[j])} games {parts[j][c][0]}-{parts[j][c][1] - 1}: "
+                          f"{DIED}", file=sys.stderr, flush=True)
+                    finish(j, c, run_isolated(jobs[j], *parts[j][c]))
+                pool = make_pool(workers)
+            progress.report()
+    except BaseException:
+        _stop(pool)
+        raise
+    pool.shutdown()
 
-
-def run_all(jobs: list[Job], workers: int) -> list[Outcome]:
-    """Run ``jobs``, ``workers`` at a time, and return their outcomes in ``jobs`` order.
-
-    A job never stops the run: infeasible candidates and failures are
-    recorded with their error and configuration. Each job runs in its own
-    process (``run_isolated``), so a process that dies fails only its job;
-    such a job is run again up to ``RETRIES`` times before it is recorded as
-    ``FAILED``. Failures are listed on stderr at the end."""
-    outcomes: list[Outcome | None] = [None] * len(jobs)
-    started = time.perf_counter()
-    lock = threading.Lock()
-
-    def run(i: int) -> None:
-        for attempt in range(RETRIES + 1):
-            outcome = run_isolated(jobs[i])
-            if not (outcome.status == FAILED and outcome.error.startswith("worker process died")):
-                break
-            if attempt < RETRIES:
-                print(f"RETRY {describe_job(jobs[i])}: {outcome.error}", file=sys.stderr, flush=True)
-        with lock:
-            outcomes[i] = outcome
-            done = sum(o is not None for o in outcomes)
-            note = "" if outcome.status == "ok" else f" {outcome.status.upper()}: {outcome.error}"
-            print(
-                f"[{done}/{len(jobs)}] {describe_job(jobs[i])}: {outcome.seconds:.0f} s "
-                f"(elapsed {time.perf_counter() - started:.0f} s){note}",
-                file=sys.stderr,
-                flush=True,
-            )
-
-    order = sorted(range(len(jobs)), key=lambda i: -_cost(jobs[i]))
-    with ThreadPoolExecutor(max_workers=max(1, workers)) as threads:
-        for future in [threads.submit(run, i) for i in order]:
-            future.result()
+    outcomes = []
+    for j, job in enumerate(jobs):
+        if errors[j]:
+            first = errors[j][min(errors[j])]
+            outcomes.append(Outcome(first.status, error=first.error))
+            continue
+        try:
+            games = [record for part in records[j] for record in part]
+            outcomes.append(Outcome("ok", data=summarize(rules_of(job), job.seed, games).to_json()))
+        except Exception as error:  # noqa: BLE001 - reported with its job, the run goes on
+            outcomes.append(Outcome(FAILED, error=f"{type(error).__name__}: {error}"))
     for job, outcome in zip(jobs, outcomes):
         if outcome.status == FAILED:
             print(f"FAILED {describe_job(job)}: {outcome.error}", file=sys.stderr, flush=True)
@@ -540,11 +883,12 @@ def sweep_jobs(sweep: Sweep, modes, games: int) -> list[Job]:
     ]
 
 
-def do_sweeps(sweeps: list[Sweep], workers: int, modes, games: int) -> list[Outcome]:
-    """Run every job of ``sweeps`` in one pool (so no core idles between
-    sweeps), then print each sweep's table."""
+def do_sweeps(sweeps: list[Sweep], run, modes, games: int) -> list[Outcome]:
+    """Run every job of ``sweeps`` with ``run`` (``run_all`` with the run's
+    options) in one pool, so no core idles between sweeps, then print each
+    sweep's table."""
     per_sweep = [sweep_jobs(sweep, modes, games) for sweep in sweeps]
-    outcomes = run_all([job for jobs in per_sweep for job in jobs], workers)
+    outcomes = run([job for jobs in per_sweep for job in jobs])
     at = 0
     for sweep, jobs in zip(sweeps, per_sweep):
         mine, at = outcomes[at:at + len(jobs)], at + len(jobs)
@@ -565,14 +909,14 @@ def do_sweeps(sweeps: list[Sweep], workers: int, modes, games: int) -> list[Outc
     return outcomes
 
 
-def do_final(workers: int, modes, players_list, seatings, n: int | None, seed: int) -> list[Outcome]:
+def do_final(run, modes, players_list, seatings, n: int | None, seed: int) -> list[Outcome]:
     jobs = [
         Job("proposed", mode, players, seating, PROPOSED[mode], n or final_games(players), seed)
         for mode in modes
         for players in players_list
         for seating in seatings
     ]
-    outcomes = run_all(jobs, workers)
+    outcomes = run(jobs)
     print("## Final validation of the proposed values\n")
     print(f"Seed {seed}; games per configuration: "
           + ", ".join(f"{p}p {n or final_games(p)}" for p in players_list)
@@ -589,7 +933,14 @@ def do_final(workers: int, modes, players_list, seatings, n: int | None, seed: i
     return outcomes
 
 
-def main() -> int:
+def _workers(text: str) -> int:
+    value = int(text)
+    if value < 1:
+        raise argparse.ArgumentTypeError(f"must be at least 1, got {value}")
+    return value
+
+
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--sweep", nargs="+", choices=(*SWEEP_NAMES, "all"),
                         help="run these candidate sweeps, or all of them")
@@ -601,20 +952,29 @@ def main() -> int:
                         help=f"games per configuration (default: {SWEEP_GAMES} in a sweep, the final count otherwise)")
     parser.add_argument("--smoke", action="store_true",
                         help=f"a quick check of the runner: {SMOKE_GAMES} games per configuration; "
-                             "its numbers are not the report's")
+                             "its numbers are not the report's; saves and loads no checkpoints")
     parser.add_argument("--seed", type=int, default=FINAL_SEED,
                         help=f"run seed of the final validation (default {FINAL_SEED})")
-    parser.add_argument("--jobs", type=int, default=os.cpu_count() or 1,
-                        help="parallel processes; changes the wall time only")
+    parser.add_argument("--workers", type=_workers, default=min(DEFAULT_WORKERS, os.cpu_count() or 1),
+                        help=f"worker processes, at below-normal priority (default {DEFAULT_WORKERS}, "
+                             "capped at the CPU count); changes only the wall time, never a number")
+    parser.add_argument("--chunk-games", type=_workers, default=CHUNK_GAMES,
+                        help=f"games per chunk of work and checkpoint file (default {CHUNK_GAMES}); "
+                             "changes only the wall time, never a number")
+    parser.add_argument("--checkpoint-dir", type=Path, default=CHECKPOINT_DIR,
+                        help="where finished chunks are saved (default output/tune-checkpoints/). "
+                             "Run the same command again to resume a stopped run; delete the folder "
+                             "to remove old checkpoints")
+    parser.add_argument("--fresh", action="store_true",
+                        help="ignore and overwrite the saved checkpoints of this run")
     parser.add_argument("--list", action="store_true", help="list the sweeps and their candidates")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     sys.stdout.reconfigure(encoding="utf-8", line_buffering=True)  # tables appear as each sweep ends
     games = SMOKE_GAMES if args.smoke else args.games
     if games is not None and games < 1:
         parser.error("--games must be at least 1")
     modes = [Mode(args.mode)] if args.mode else list(Mode)
 
-    started = time.perf_counter()
     if args.list:
         for sweep in SWEEPS:
             print(f"{sweep.name}: {sweep.title} [{', '.join(sweep.seatings)}]")
@@ -622,20 +982,36 @@ def main() -> int:
                 for label, _ in sweep.candidates.get(mode, ()):
                     print(f"  {mode.value}: {label}")
         return 0
+    warn_priority(lower_priority())
+    started = time.perf_counter()
+    checkpoints = None if args.smoke else Checkpoints(args.checkpoint_dir, source_fingerprint(), args.fresh)
+
+    def run(jobs: list[Job]) -> list[Outcome]:
+        return run_all(jobs, args.workers, checkpoints, args.chunk_games)
+
     if args.smoke:
         print(f"SMOKE RUN ({SMOKE_GAMES} games per configuration): not the report's numbers\n")
-    if args.sweep:
-        chosen = [s for s in SWEEPS if "all" in args.sweep or s.name in args.sweep]
-        outcomes = do_sweeps(chosen, args.jobs, modes, games or SWEEP_GAMES)
-    else:
-        outcomes = do_final(
-            args.jobs,
-            modes,
-            [args.players] if args.players else list(PLAYER_COUNTS),
-            [args.seating] if args.seating else list(SEATINGS),
-            games,
-            args.seed,
-        )
+    try:
+        if args.sweep:
+            chosen = [s for s in SWEEPS if "all" in args.sweep or s.name in args.sweep]
+            outcomes = do_sweeps(chosen, run, modes, games or SWEEP_GAMES)
+        else:
+            outcomes = do_final(
+                run,
+                modes,
+                [args.players] if args.players else list(PLAYER_COUNTS),
+                [args.seating] if args.seating else list(SEATINGS),
+                games,
+                args.seed,
+            )
+    except KeyboardInterrupt:
+        if checkpoints:
+            print(f"\nInterrupted. Finished chunks are saved in {checkpoints.folder}; "
+                  "re-run the same command to resume.", file=sys.stderr, flush=True)
+        else:
+            print("\nInterrupted. --smoke saves nothing; re-run the same command to start again.",
+                  file=sys.stderr, flush=True)
+        return 130
     failed = sum(o.status == FAILED for o in outcomes)
     print(f"total wall time {time.perf_counter() - started:.0f} s; {failed} failed job(s)", file=sys.stderr)
     return 1 if failed else 0
