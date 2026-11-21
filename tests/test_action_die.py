@@ -18,6 +18,7 @@ from acequias.config import (
     action_die_rules,
     preset,
     roulette_rules,
+    with_overrides,
 )
 from acequias.game import act, game_rngs, replay
 from acequias.hex import Direction, Hex
@@ -125,6 +126,18 @@ def test_roll_adds_the_cost_and_sets_the_face_with_one_draw():
         assert after.pending_face is face
         assert after.board == before.board and after.market == before.market
         assert rng.getstate() == ref.getstate()
+
+
+def test_a_roll_at_cost_zero_keeps_the_debt_and_sets_the_face():
+    p = with_overrides(P, action_die_cost=0)
+    for seed in range(5):
+        rng, ref = rng_pair(seed)
+        face = ref.choice(p.action_die)
+        after = apply(state(board(), p=p, debt=3), "a", RollActionDie(), rng)
+        assert after.player("a").debt == 3
+        assert after.pending_face is face
+        assert legal_actions(after, "a")[-1] == DeclineFace()
+        assert apply(after, "a", DeclineFace(), rng).pending_face is None
 
 
 def test_legal_actions_without_a_pending_face():
@@ -348,6 +361,20 @@ def test_greedy_and_saboteur_finish_die_games_without_rolling(policy):
         assert calculate_score(record.final) == record.scores
 
 
+@pytest.mark.parametrize("policy", ["score_aware", "lookahead"])
+def test_smart_bots_finish_a_cost_zero_die_game(policy):
+    rules = SimRules(Mode.FLASH, 3, (policy,) * 3, {
+        "varietal_rules": P.varietal_rules,
+        "varietal_points": P.varietal_points,
+        "bribe_rules": BribeRules.ACTION_DIE,
+        "bag_mix": P.bag_mix,
+        "action_die_cost": 0,
+    })
+    record = play_one(rules, 1)
+    assert calculate_score(record.final) == record.scores
+    assert all(p.debt == 0 for p in record.final.players)
+
+
 # --- Simulation and JSON ------------------------------------------------------------
 
 DIE_JSON = {
@@ -402,6 +429,23 @@ async def test_simulate_game_tool_accepts_and_echoes_the_die_overrides():
     for key in ("bribe_rules", "action_die", "action_die_cost", "bag_mix"):
         assert data["preset"][key] == DIE_JSON[key]
     assert set(data["die_faces_per_game"]) == {"floodgate", "release", "resow"}
+
+
+@pytest.mark.anyio
+async def test_simulate_game_tool_takes_a_cost_of_zero_and_rejects_minus_one():
+    async with Client(app) as client:
+        ok = await client.call_tool("simulate_game", {
+            "mode": "flash", "players": 2, "games": 1, "seed": 4,
+            "overrides": {**DIE_JSON, "action_die_cost": 0},
+        })
+        bad = await client.call_tool("simulate_game", {
+            "mode": "flash", "players": 2, "games": 1, "seed": 4,
+            "overrides": {**DIE_JSON, "action_die_cost": -1},
+        })
+    assert not ok.is_error
+    assert ok.structured_content["preset"]["action_die_cost"] == 0
+    assert bad.is_error
+    assert "action_die_cost" in str(bad.content)
 
 
 @pytest.mark.anyio

@@ -506,6 +506,15 @@ async def test_water_right_points_override_doubles_the_rights_terms():
         ]
 
 
+async def test_action_die_cost_override_takes_zero_and_rejects_minus_one():
+    async with Client(app) as client:
+        ok = await call(client, **small_game(overrides={"action_die_cost": 0}))
+        bad = await call(client, **small_game(overrides={"action_die_cost": -1}))
+    assert not ok.is_error, text_of(ok)
+    assert bad.is_error
+    assert "action_die_cost" in text_of(bad)
+
+
 @pytest.mark.parametrize("bad", [0, "2"])
 async def test_water_right_points_override_rejects(bad):
     async with Client(app) as client:

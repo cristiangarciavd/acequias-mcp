@@ -184,7 +184,7 @@ class Preset:
         if self.grape_clusters_per_player is not None:
             _check_count("grape_clusters_per_player", self.grape_clusters_per_player)
         _check_type("bribe_rules", self.bribe_rules, BribeRules)
-        _check_count("action_die_cost", self.action_die_cost)
+        _check_non_negative("action_die_cost", self.action_die_cost)
         _set(self, "action_die", _action_die(self.action_die))
         if self.bribe_rules is BribeRules.ACTION_DIE:
             if self.bag_mix[PieceKind.FLOODGATE] != 0:
@@ -254,6 +254,12 @@ def _check_count(name: str, value: object) -> None:
     _check_int(name, value)
     if value < 1:
         raise ValueError(f"{name} must be at least 1, got {value}")
+
+
+def _check_non_negative(name: str, value: object) -> None:
+    _check_int(name, value)
+    if value < 0:
+        raise ValueError(f"{name} must be at least 0, got {value}")
 
 
 def _check_share(name: str, value: object) -> None:
