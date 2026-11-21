@@ -79,7 +79,8 @@ Targets at the final validation (all 16 configurations, 2,000-6,400 games each):
   - `uv run python scripts/tune.py --mode flash --players 3 --seating mixed`:
     one configuration of the final validation.
 - Numbers are identical between runs. `--jobs` changes only the wall time,
-  and wall times go to stderr.
+  and wall times go to stderr. (Since #43 the flag is `--workers`, and runs
+  save resumable checkpoints; see `README.md` > Development > Tuning.)
 
 ## Final validation
 
