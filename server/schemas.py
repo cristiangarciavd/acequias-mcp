@@ -451,7 +451,7 @@ class PresetOverridesJSON(TypedDict, total=False):
         ),
     ]
     action_die_cost: Annotated[
-        StrictInt, Field(description=_DIE_COST_DESCRIPTION + " 1 or more.")
+        StrictInt, Field(description=_DIE_COST_DESCRIPTION + " 0 or more.")
     ]
     action_die: Annotated[
         list[DieFaceName], Field(description=_ACTION_DIE_DESCRIPTION + " Not empty.")

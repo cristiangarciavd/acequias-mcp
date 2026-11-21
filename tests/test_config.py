@@ -584,7 +584,7 @@ def test_action_die_rejections():
     assert_raises(die, ValueError, "RESOW", varietal_rules=VarietalRules.FIXED,
                   varietal_points=README_VARIETAL_POINTS)
     assert_raises(die, ValueError, "at least one face", action_die=())
-    assert_raises(die, ValueError, "action_die_cost", action_die_cost=0)
+    assert_raises(die, ValueError, "action_die_cost", action_die_cost=-1)
     assert_raises(die, TypeError, "action_die_cost", action_die_cost=True)
     assert_raises(die, TypeError, "action_die face", action_die=("floodgate",))
     assert_raises(die, TypeError, "bribe_rules", bribe_rules="action_die")
@@ -595,7 +595,16 @@ def test_d6_rules_ignore_the_action_die_checks():
     assert NORMAL.bag_mix[PieceKind.FLOODGATE] == 10
     assert DieFace.RESOW in NORMAL.action_die
     with pytest.raises(ValueError, match="action_die_cost"):
-        with_overrides(NORMAL, action_die_cost=0)
+        with_overrides(NORMAL, action_die_cost=-1)
+
+
+def test_action_die_cost_zero_is_accepted_and_kept_by_scaled():
+    # #128: cost 0 is for testing only; the shipped cost stays at least 1.
+    die = action_die_rules(roulette_rules(NORMAL))
+    assert with_overrides(die, action_die_cost=0).action_die_cost == 0
+    assert with_overrides(NORMAL, action_die_cost=0).action_die_cost == 0
+    assert scaled(with_overrides(die, action_die_cost=0), 3).action_die_cost == 0
+    assert config.ACTION_DIE_COST == 2
 
 
 # --- Score scale (#111) ------------------------------------------------------
