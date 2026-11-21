@@ -107,9 +107,10 @@ def calculate_score(
     """Score an Acequias board state: each player's points by term, and the winners.
 
     Each player scores vineyards + bodega - rights_paid + rights_collected -
-    debt. Every watered claimed vineyard is listed with the canal path its
-    water takes and the rivals its claimant pays, so the water rights can be
-    checked by hand. The state is scored as given, finished or not.
+    debt; every term is in points, and each rival on a vineyard's water path
+    gets water_right_points (1 in the shipped presets). Every watered claimed
+    vineyard is listed with the canal path its water takes and the rivals its
+    claimant pays, so the water rights can be checked by hand. The state is scored as given, finished or not.
     """
     tiles = hexes_to_board(hexes).tiles
     board = Board(

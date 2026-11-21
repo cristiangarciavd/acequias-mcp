@@ -483,3 +483,32 @@ def test_players_get_seats_in_list_order():
         Player("z", 1, 2),
         Player("a", 2, 0),
     )
+
+
+# --- Score scale (#111) ------------------------------------------------------
+
+
+async def test_water_right_points_override_doubles_the_rights_terms():
+    async with Client(app) as client:
+        one = await call(client, **three_player_game())
+        two = await call(client, **three_player_game(), overrides={"water_right_points": 2})
+    assert not two.is_error, text_of(two)
+    for a, b in zip(one.structured_content["scores"], two.structured_content["scores"]):
+        assert b["rights_paid"] == 2 * a["rights_paid"]
+        assert b["rights_collected"] == 2 * a["rights_collected"]
+        for term in ("vineyards", "bodega", "debt"):
+            assert b[term] == a[term]
+        assert b["total"] == (
+            b["vineyards"] + b["bodega"] - b["rights_paid"] + b["rights_collected"] - b["debt"]
+        )
+        assert [v["pays"] for v in b["watered_vineyards"]] == [
+            v["pays"] for v in a["watered_vineyards"]
+        ]
+
+
+@pytest.mark.parametrize("bad", [0, "2"])
+async def test_water_right_points_override_rejects(bad):
+    async with Client(app) as client:
+        result = await call(client, **small_game(overrides={"water_right_points": bad}))
+    assert result.is_error
+    assert "water_right_points" in text_of(result)
