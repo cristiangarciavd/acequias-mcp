@@ -14,8 +14,8 @@ rule value from the preset, and reimplements no rules. Standard library
 only.
 
 ``SimResult.to_json`` uses the JSON names of ``server/schemas.py``: modes by
-value, varietal rules by value, varietals and piece kinds by lowercase
-ASCII enum name. ``acequias``
+value, varietal and bribe rules by value, die faces by value, varietals and
+piece kinds by lowercase ASCII enum name. ``acequias``
 never imports ``server``, so the few names are written out here.
 """
 
@@ -31,10 +31,19 @@ from types import MappingProxyType
 from acequias.bots import policy
 from acequias.config import Preset, VarietalRules, preset as shipped_preset, with_overrides
 from acequias.game import Bot, TurnRecord, game_rngs, play_game, turn_order
-from acequias.model import MAX_PLAYERS, MIN_PLAYERS, GameState, Mode, Varietal
+from acequias.model import MAX_PLAYERS, MIN_PLAYERS, DieFace, GameState, Mode, Varietal
 from acequias.scoring import Score, calculate_score, winners
 from acequias.setup import new_game
-from acequias.turn import Bribe, Pass, PlaceCanal, PlaceFloodgate
+from acequias.turn import (
+    Bribe,
+    DeclineFace,
+    Pass,
+    PlaceCanal,
+    PlaceFloodgate,
+    Release,
+    Resow,
+    RollActionDie,
+)
 
 __all__ = [
     "SimRules",
@@ -54,8 +63,16 @@ ACTION_NAMES = (
     (PlaceFloodgate, "floodgate"),
     (Bribe, "bribe"),
     (Pass, "pass"),
+    (RollActionDie, "die"),
+    (Release, "release"),
+    (Resow, "resow"),
+    (DeclineFace, "decline"),
 )
-"""Each action type and its key in ``SimResult.actions_per_game``."""
+"""Each action type and its key in ``SimResult.actions_per_game``; the die's
+floodgate face counts as ``"floodgate"``."""
+
+DIE_FACE_NAMES = tuple(face.value for face in DieFace)
+"""The keys of ``SimResult.die_faces_per_game``."""
 
 
 # --- Input -------------------------------------------------------------------
@@ -204,10 +221,11 @@ class SimResult:
     """``{"mean", "stdev"}`` of each game's highest ``total`` (population
     standard deviation; one value per game, shared wins included)."""
     turns_per_game: float
-    """The mean log length (rounds * P)."""
+    """The mean log length: rounds * P, plus one record per action die roll."""
     actions_per_game: Mapping[str, float] = field(hash=False)
     """The mean number of each action per game, keyed ``"canal"``,
-    ``"floodgate"``, ``"bribe"``, ``"pass"``; they add up to ``turns_per_game``."""
+    ``"floodgate"``, ``"bribe"``, ``"pass"``, ``"die"``, ``"release"``,
+    ``"resow"``, ``"decline"``; they add up to ``turns_per_game``."""
     games_with_bribe: float
     """Share of games whose log has at least one ``Bribe``."""
     games_with_floodgate: float
@@ -223,6 +241,13 @@ class SimResult:
     watered vineyard of that varietal. Only the varietals in play are keys:
     those of ``varietal_points`` under fixed rules, the roulette's under
     roulette rules, in ``Varietal`` order."""
+    games_with_die: float
+    """Share of games whose log has at least one ``RollActionDie``."""
+    die_faces_per_game: Mapping[str, float] = field(hash=False)
+    """Face value (``"floodgate"``, ``"release"``, ``"resow"``): the mean
+    number of rolls per game that showed that face."""
+    die_use_rate: float | None
+    """Share of rolls resolved with a use, not ``DeclineFace``; None with no rolls."""
 
     def to_json(self) -> dict[str, object]:
         """The result as plain JSON data: dicts with string keys, lists, str, int, float, None."""
@@ -280,6 +305,8 @@ def summarize(rules: SimRules, seed: int, records: Iterable[GameRecord]) -> SimR
     briber_credit: list[float] = []
     other_credit: list[float] = []
     varietal_games = {varietal: 0 for varietal in _in_play(preset)}
+    with_die = rolls = uses = 0
+    faces = {name: 0 for name in DIE_FACE_NAMES}
 
     for record in records:
         order = turn_order(record.start, 1)
@@ -293,6 +320,17 @@ def summarize(rules: SimRules, seed: int, records: Iterable[GameRecord]) -> SimR
         if any(isinstance(r.action, PlaceFloodgate) for r in record.log):
             with_floodgate += 1
         turns.append(len(record.log))
+        game_rolls = 0
+        for r, after in zip(record.log, record.log[1:]):
+            if isinstance(r.action, RollActionDie):
+                game_rolls += 1
+                if r.face is not None:
+                    faces[r.face.value] += 1
+                if not isinstance(after.action, DeclineFace):
+                    uses += 1
+        if game_rolls:
+            with_die += 1
+            rolls += game_rolls
         for r in record.log:
             for kind, name in ACTION_NAMES:
                 if isinstance(r.action, kind):
@@ -348,6 +386,9 @@ def summarize(rules: SimRules, seed: int, records: Iterable[GameRecord]) -> SimR
         winner_varietal_rate=MappingProxyType(
             {_VARIETAL_NAMES[v]: games / n for v, games in varietal_games.items()}
         ),
+        games_with_die=with_die / n,
+        die_faces_per_game=MappingProxyType({k: v / n for k, v in faces.items()}),
+        die_use_rate=uses / rolls if rolls else None,
     )
 
 
@@ -369,8 +410,10 @@ def _preset_values(preset: Preset) -> Mapping[str, object]:
             value = MappingProxyType({kind.name.lower(): share for kind, share in value.items()})
         elif f.name == "vineyard_distance":
             value = tuple(value)
-        elif f.name == "varietal_rules":
+        elif f.name in ("varietal_rules", "bribe_rules"):
             value = value.value
+        elif f.name == "action_die":
+            value = tuple(face.value for face in value)
         elif f.name == "varietal_points":
             value = MappingProxyType({_VARIETAL_NAMES[v]: points for v, points in value.items()})
         elif f.name == "roulette":

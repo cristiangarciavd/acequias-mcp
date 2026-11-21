@@ -121,6 +121,14 @@ class Mode(Enum):
     FLASH = "flash"
 
 
+class DieFace(Enum):
+    """A face of the action die (``action_die`` bribe rules): what the roll lets you do."""
+
+    FLOODGATE = "floodgate"
+    RELEASE = "release"
+    RESOW = "resow"
+
+
 # --- Pieces on the board ---------------------------------------------------
 
 
@@ -487,6 +495,10 @@ class GameState:
     read-only mappings and is not hashable. With a
     ``grape_clusters_per_player`` cap in the preset, no player holds more
     claims than the cap.
+
+    ``pending_face`` is the action die face ``current_player`` rolled and
+    has not resolved yet; it is set only under ``action_die`` bribe rules,
+    and only to a face on the preset's ``action_die``.
     """
 
     board: Board
@@ -498,6 +510,7 @@ class GameState:
     market: tuple[PieceKind, ...] = ()
     bag: tuple[PieceKind, ...] = ()
     preset: Preset | None = field(default=None, hash=False)
+    pending_face: DieFace | None = None
 
     def __post_init__(self) -> None:
         _check_type("GameState.board", self.board, Board)
@@ -545,6 +558,23 @@ class GameState:
                 raise ValueError(f"claim on {hex} by unknown player {player_id!r}")
         self._check_varietals()
         self._check_clusters()
+        self._check_pending_face()
+
+    def _check_pending_face(self) -> None:
+        """A pending face only under action die rules, and only one of the die's faces."""
+        if self.pending_face is None:
+            return
+        _check_type("GameState.pending_face", self.pending_face, DieFace)
+        from acequias.config import BribeRules  # local: config imports this module
+        from acequias.config import preset as shipped_preset
+
+        preset = self.preset if self.preset is not None else shipped_preset(self.mode)
+        if preset.bribe_rules is not BribeRules.ACTION_DIE:
+            raise ValueError("a pending die face needs action_die bribe rules")
+        if self.pending_face not in preset.action_die:
+            raise ValueError(
+                f"pending face {self.pending_face.value} is not on the preset's action die"
+            )
 
     def _check_clusters(self) -> None:
         """With a grape-cluster cap, no player holds more claims than the cap."""

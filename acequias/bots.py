@@ -30,6 +30,14 @@ Three policies for the MVP:
   by one ``rng.choice``) and falls back to ``greedy_bot`` when nothing is
   worth more than 0.
 
+Under action die rules (``Preset.bribe_rules``) greedy and saboteur never
+roll the die (weighing the roll is #67 and #42). Handed a pending face,
+both play its use with the best swing above 0 (ties by one ``rng.choice``),
+else ``DeclineFace()``. A ``Resow`` is weighed on the board with that
+vineyard blank, so its swing is the roulette's mean points minus the
+vineyard's points (for the player, or against a rival). ``random_bot``
+rolls and resolves like any other legal action.
+
 Claims come from ``_board_after``, which follows the cluster cap, so the
 saboteur's swing counts only vineyards the player can claim: one a move
 waters but leaves unclaimed counts for nobody.
@@ -64,9 +72,12 @@ from acequias.model import Board, GameState, Terrain
 from acequias.turn import (
     Action,
     Bribe,
+    DeclineFace,
     Pass,
     PlaceCanal,
     PlaceFloodgate,
+    Resow,
+    RollActionDie,
     _board_after,
     legal_actions,
 )
@@ -86,6 +97,8 @@ def greedy_bot(state: GameState, player: str, rng: random.Random) -> Action:
 
     Raises ``ValueError`` for a ``player`` that is not in the game.
     """
+    if state.pending_face is not None:
+        return _resolve_face(state, player, rng)
     actions = legal_actions(state, player)
     canals = [a for a in actions if isinstance(a, PlaceCanal)]
     gates = [a for a in actions if isinstance(a, PlaceFloodgate)]
@@ -108,8 +121,10 @@ def saboteur_bot(state: GameState, player: str, rng: random.Random) -> Action:
     give, without the die roll (it changes debt, not the board), so
     evaluation never draws from ``rng``.
     """
+    if state.pending_face is not None:
+        return _resolve_face(state, player, rng)
     actions = legal_actions(state, player)
-    if actions == (Pass(),):
+    if all(isinstance(a, (Pass, RollActionDie)) for a in actions):
         return Pass()
     die_faces = (state.preset or shipped_preset(state.mode)).die_faces
     bribe_cost = Fraction(die_faces + 1, 2)
@@ -119,7 +134,7 @@ def saboteur_bot(state: GameState, player: str, rng: random.Random) -> Action:
     candidates: list[Action] = []
     values: list[Fraction] = []
     for action in actions:
-        if isinstance(action, Pass):
+        if isinstance(action, (Pass, RollActionDie)):
             continue
         after, watered = _board_after(state, player, action)  # the board apply would give
         own_after, rivals_after = _balance(after, watered, player, worth)
@@ -254,6 +269,35 @@ def _balance(
         else:
             rivals += points
     return own, rivals
+
+
+# --- Action die --------------------------------------------------------------
+
+
+def _resolve_face(state: GameState, player: str, rng: random.Random) -> Action:
+    """The pending face's use with the best vineyard swing above 0, else ``DeclineFace()``."""
+    actions = legal_actions(state, player)
+    if not actions:
+        raise ValueError(f"{player!r} has no die face to resolve; it is {state.current_player}'s")
+    worth = _worth(state)
+    own_before, rivals_before = _balance(state.board, _watered(state.board), player, worth)
+    candidates: list[Action] = []
+    values: list[Fraction] = []
+    for action in actions:
+        if isinstance(action, DeclineFace):
+            continue
+        after, watered = _board_after(state, player, action)
+        if isinstance(action, Resow):  # weighed blank: the respin's mean points
+            after = after._derive(plantings=tuple(p for p in after.plantings if p[0] != action.hex))
+        own_after, rivals_after = _balance(after, watered, player, worth)
+        value = Fraction((own_after - own_before) - (rivals_after - rivals_before))
+        if value > 0:
+            candidates.append(action)
+            values.append(value)
+    if not candidates:
+        return DeclineFace()
+    best = max(values)
+    return _pick([a for a, v in zip(candidates, values) if v == best], rng)
 
 
 def _pick(candidates: Sequence[T], rng: random.Random) -> T:

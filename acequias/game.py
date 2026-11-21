@@ -4,12 +4,14 @@ Rules come from ``README.md`` (Turn, Turn order). A turn is one action. In
 every round each player acts once, in seat order (players sorted by
 ``Player.seat``, the lowest seat following the highest), starting from that
 round's start player. The start player rotates to the next seat each round,
-like Mendoza's *turnos de riego*. The game ends after the preset's round
+like Mendoza's *turnos de riego*. Under action die rules a die turn is two
+actions by the same player: the roll, then the face's use or
+``DeclineFace``; the turn moves on only once no face is pending. The game ends after the preset's round
 count: the state after the last turn has ``round == rounds + 1``.
 
 ``act`` checks the turn and applies one action through
 ``acequias.turn.apply``; ``play_game`` asks bots for actions until the game
-is over and logs every turn; ``replay`` plays a log again. Dice and bots use
+is over and logs every action (a die turn is two records); ``replay`` plays a log again. Dice and bots use
 separate RNGs (``game_rngs``), so a game is identified by its setup
 arguments, its seed, and its bot policies. This module draws no random
 numbers itself. Standard library only.
@@ -22,8 +24,8 @@ from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, replace
 
 from acequias.config import preset as shipped_preset
-from acequias.model import GameState
-from acequias.turn import Action, apply
+from acequias.model import DieFace, GameState
+from acequias.turn import Action, RollActionDie, apply
 
 __all__ = [
     "Bot",
@@ -42,11 +44,17 @@ Bot = Callable[[GameState, str, random.Random], Action]
 
 @dataclass(frozen=True)
 class TurnRecord:
-    """One turn of a game: the round it was in, who acted, and the action."""
+    """One action of a game: the round it was in, who acted, and the action.
+
+    ``face`` is the face rolled, for a ``RollActionDie`` logged by
+    ``play_game``; ``None`` otherwise. ``replay`` ignores it (the dice rng
+    rolls it again).
+    """
 
     round: int
     player: str
     action: Action
+    face: DieFace | None = None
 
 
 def _round_count(state: GameState) -> int:
@@ -85,13 +93,16 @@ def act(state: GameState, player: str, action: Action, rng: random.Random) -> Ga
     turn (both checked before ``apply``, so ``rng`` is untouched), and the
     ``ValueError`` from ``apply`` for an illegal action. After the last
     player of a round acts, the round goes up by one and the start player
-    moves to the next seat, who acts first.
+    moves to the next seat, who acts first. While ``apply`` leaves a die
+    face pending, the turn does not move: the same player acts again.
     """
     if game_over(state):
         raise ValueError(f"the game is over: all {_round_count(state)} rounds have been played")
     if player != state.current_player:
         raise ValueError(f"it is {state.current_player}'s turn, not {player!r}'s")
     after = apply(state, player, action, rng)
+    if after.pending_face is not None:
+        return after
 
     order = turn_order(state, state.round)
     position = order.index(player)
@@ -120,9 +131,10 @@ def play_game(
     while not game_over(state):
         player = state.current_player
         action = bots[player](state, player, bot_rng)
-        record = TurnRecord(state.round, player, action)
+        round = state.round
         state = act(state, player, action, dice_rng)
-        log.append(record)
+        face = state.pending_face if isinstance(action, RollActionDie) else None
+        log.append(TurnRecord(round, player, action, face))
     return state, tuple(log)
 
 
