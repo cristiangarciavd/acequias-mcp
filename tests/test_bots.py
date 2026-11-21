@@ -3,7 +3,14 @@ from dataclasses import replace
 
 import pytest
 
-from acequias.bots import POLICIES, greedy_bot, policy, random_bot, saboteur_bot
+from acequias.bots import (
+    POLICIES,
+    greedy_bot,
+    policy,
+    random_bot,
+    saboteur_bot,
+    score_aware_bot,
+)
 from acequias.game import game_over, game_rngs, play_game
 from acequias.hex import Direction, Hex
 from acequias.model import (
@@ -90,6 +97,7 @@ def seating(state, name):
 def test_policies_maps_names_to_bots_and_is_read_only():
     assert dict(POLICIES) == {
         "random": random_bot, "greedy": greedy_bot, "saboteur": saboteur_bot,
+        "score_aware": score_aware_bot,
     }
     with pytest.raises(TypeError):
         POLICIES["other"] = random_bot
