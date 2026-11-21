@@ -6,7 +6,7 @@ of ``acequias.game``) that returns one element of
 calls, never change the state they are given, and draw random numbers only
 from ``rng``.
 
-Three policies for the MVP, and a fourth after it:
+Three policies for the MVP, and two more after it:
 
 - ``random_bot``: ``rng.choice`` over every legal action, bribes and
   floodgates included.
@@ -72,6 +72,28 @@ highest value, or ``DeclineFace()`` when none is above 0. Ties go to one
 draw when one is left; that is its only use of ``rng``. Claims come from
 ``_board_after``, so the cluster cap applies: a vineyard it waters but
 cannot claim is worth nothing to it.
+
+``lookahead_bot`` (#42) plans ``depth`` of its own moves (default 2;
+``depth=1`` is ``score_aware_bot``'s choice). At each own move it keeps
+the ``beam`` best actions (default 3) by score_aware's one-move value,
+ties in ``legal_actions`` order; after each, the rivals reply in turn
+order with score_aware's choice made without ``rng`` (ties to the first
+legal action), then it plays its next move. The leaf value is
+score_aware's: its own expected total minus the best rival's, with
+planned debt counted. The end of the game cuts the search. Chance counts
+by expectation, never by sampling: the d6 at its mean, new claims at the
+roulette's mean, and a ``RollActionDie`` (its own or a rival's) as the
+mean, over the die's faces, of the best line for that face, declining
+allowed; a die turn is one own move. It never reads the ``bag``: planned
+moves see only the visible market, less the pieces taken, with no refill.
+Planned boards come from ``_board_after``, and the turn order from
+``act`` on a private fixed-seed ``random.Random`` whose draws are
+discarded; the game's dice rng and ``rng`` are never passed in. Its only
+draw from ``rng`` is one ``rng.choice`` over tied root actions in
+``legal_actions`` order (a pending face no use beats is declined with no
+draw, as score_aware does). ``POLICIES`` registers it as ``"lookahead"``
+with its defaults; ``beam`` is 3, not 5, to stay under 5 s per Normal
+5-player game (``scripts/bench_sim.py`` B4).
 
 ``POLICIES`` maps policy names to bots, and ``policy(name)`` looks one up.
 Standard library only; no global randomness.
@@ -524,7 +546,7 @@ class _Evaluator:
         return totals
 
     def _board_after(self, state: GameState, action: Action) -> tuple[Board, list[Hex]]:
-        """``_board_after`` for a legal action (no draw), cached by board when ``shared`` is given."""
+        """``_board_after`` for a legal action (no draw); cached when ``shared`` is given."""
         if self.shared is None:
             return _board_after(state, self.player, action)
         board = state.board
@@ -537,13 +559,15 @@ class _Evaluator:
 
     def _score(self, board: Board) -> Mapping[str, Score]:
         if self.shared is None:
-            return calculate_score(replace(self.state, board=board, pending_face=None), self.preset)
+            return self._scored(board)
         key = (board.canals, board.floodgates, board.claims, board.plantings)  # tiles are fixed
         score = self.shared.get(key)
         if score is None:
-            score = calculate_score(replace(self.state, board=board, pending_face=None), self.preset)
-            self.shared[key] = score
+            score = self.shared[key] = self._scored(board)
         return score
+
+    def _scored(self, board: Board) -> Mapping[str, Score]:
+        return calculate_score(replace(self.state, board=board, pending_face=None), self.preset)
 
 
 # --- Lookahead ---------------------------------------------------------------
@@ -570,7 +594,8 @@ class _Lookahead:
         self.me = player
         self.beam = beam
         preset = state.preset or shipped_preset(state.mode)
-        self.faces = {face: preset.action_die.count(face) for face in dict.fromkeys(preset.action_die)}
+        faces = preset.action_die
+        self.faces = {face: faces.count(face) for face in dict.fromkeys(faces)}  # die order
         self.die_size = len(preset.action_die)
         self.roll_cost = Fraction(preset.action_die_cost)
         self.bribe_debt = Fraction(preset.die_faces + 1, 2)
@@ -608,10 +633,19 @@ class _Lookahead:
         ]
 
     def _roll(self, state: GameState, extra: Extra, k: int) -> Fraction:
-        """The mean, over the die's faces, of the best planned line for the face (declining allowed)."""
-        return self._chance(state, extra, self.me, lambda s, e: max(v for _, v in self.options(s, e, k)))
+        """The mean, over the die's faces, of the face's best planned line (declining allowed)."""
+        def best(rolled: GameState, planned: Extra) -> Fraction:
+            return max(v for _, v in self.options(rolled, planned, k))
 
-    def _chance(self, state, extra, player, value) -> Fraction:
+        return self._chance(state, extra, self.me, best)
+
+    def _chance(
+        self,
+        state: GameState,
+        extra: Extra,
+        player: str,
+        value: Callable[[GameState, Extra], Fraction],
+    ) -> Fraction:
         """The mean of ``value(rolled state, extra)`` over the faces ``player`` may roll."""
         extra = _add(extra, player, self.roll_cost)
         total = sum(
@@ -653,7 +687,7 @@ class _Lookahead:
     def _step(
         self, state: GameState, extra: Extra, player: str, action: Action
     ) -> tuple[GameState, Extra]:
-        """The planned state after ``player`` takes ``action`` (not a roll), and the planned debt."""
+        """The planned state after ``player`` takes ``action`` (not a roll), and planned debt."""
         after = act(replace(state, bag=()), player, action, self.rng)
         if isinstance(action, (Pass, DeclineFace)):
             return after, extra
