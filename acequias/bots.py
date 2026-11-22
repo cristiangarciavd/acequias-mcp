@@ -46,7 +46,9 @@ amount (a drought less for a player near 0, which scoring clamps), so
 the score-aware bots weigh it at 0 (an approximation: it changes no total
 against the best rival), and a free roll has no cost; lookahead plans a
 season face as the end of the roll (the turn moves on after a voluntary
-roll, and stays with the player after the free one).
+roll, and goes to the round's start player after the free one). The
+season die's holder may not be the start player, so a bot can make the
+season roll outside its own turn; it then plays its turn when it comes.
 
 Claims come from ``_board_after``, which follows the cluster cap, so the
 saboteur's swing counts only vineyards the player can claim: one a move

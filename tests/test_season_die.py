@@ -22,7 +22,16 @@ from acequias.config import (
     scaled,
     with_overrides,
 )
-from acequias.game import act, game_rngs, play_game, replay, turn_order
+from acequias.game import (
+    act,
+    game_over,
+    game_rngs,
+    next_season_roll,
+    play_game,
+    replay,
+    season_holder,
+    turn_order,
+)
 from acequias.hex import Direction, Hex
 from acequias.model import (
     Board,
@@ -263,10 +272,11 @@ def _advance_to(s, round, rng):
 def test_season_roll_comes_at_the_start_of_every_xth_round():
     rng = random.Random(0)
     s = new_game(2, 1, Mode.NORMAL, preset=EVERY2)
+    first = s.start_player
     assert s.season_roll is None
     s = _advance_to(s, 2, rng)
     assert s.season_roll is SeasonRoll.DUE
-    assert s.current_player == s.start_player
+    assert s.current_player == first != s.start_player  # the first roll: the first start player
     s = _advance_to(s, 3, rng)
     assert s.season_roll is None
     s = _advance_to(s, 4, rng)
@@ -320,7 +330,7 @@ def test_a_declined_or_unusable_season_roll_face_keeps_the_turn():
 
 
 @pytest.mark.parametrize("players", [2, 3])
-def test_the_start_player_rotates_who_makes_the_season_roll(players):
+def test_the_season_die_passes_to_the_next_seat_after_each_season_roll(players):
     p = with_overrides(P, season_roll_every=1)
     start = new_game(players, 7, Mode.NORMAL, preset=p)
     dice, bots = game_rngs(7)
@@ -337,6 +347,91 @@ def test_the_start_player_rotates_who_makes_the_season_roll(players):
     k = seats.index(rollers[0])
     assert rollers == [seats[(k + i) % players] for i in range(rounds)]
     assert replay(start, log, game_rngs(7)[0]) == final
+
+
+def _season_rolls(s, rng):
+    """Play first legal actions to the end; return each season roll's (round, roller, start player)."""
+    rolls = []
+    while not game_over(s):
+        player = s.current_player
+        if s.season_roll is SeasonRoll.DUE:
+            assert next_season_roll(s) == (s.round, player)
+            rolls.append((s.round, player, s.start_player))
+        s = act(s, player, legal_actions(s, player)[0], rng)
+    assert next_season_roll(s) is None
+    return rolls
+
+
+@pytest.mark.parametrize("every", [2, 3, 4])
+@pytest.mark.parametrize("players", [2, 3, 4, 5])
+def test_every_seat_makes_the_season_roll_within_one_of_the_others(every, players):
+    p = with_overrides(P, season_roll_every=every)
+    start = new_game(players, 5, Mode.NORMAL, preset=p)
+    rolls = _season_rolls(start, random.Random(5))
+    rounds = p.rounds_for(players)
+    assert [r for r, _, _ in rolls] == list(range(every, rounds + 1, every))
+    seats = [pl.id for pl in start.players]
+    first = seats.index(start.start_player)
+    # the k-th season roll: the seat k-1 places after the first start player
+    assert [roller for _, roller, _ in rolls] == [
+        seats[(first + k) % players] for k in range(len(rolls))
+    ]
+    assert [roller for r, roller, _ in rolls] == [season_holder(start, r) for r, _, _ in rolls]
+    counts = [sum(1 for _, roller, _ in rolls if roller == seat) for seat in seats]
+    assert max(counts) - min(counts) <= 1
+
+
+def test_three_players_every_three_rounds_no_longer_give_one_seat_every_roll():
+    p = with_overrides(P, season_roll_every=3)
+    rolls = _season_rolls(new_game(3, 2, Mode.NORMAL, preset=p), random.Random(2))
+    assert len(rolls) == 5
+    assert len({roller for _, roller, _ in rolls}) == 3
+    assert any(roller != start for _, roller, start in rolls)
+
+
+def test_the_holder_rolls_before_the_start_players_turn_without_spending_their_own():
+    p = with_overrides(P, action_die=(DieFace.RELEASE,), season_roll_every=2)
+    s = new_game(3, 4, Mode.NORMAL, preset=p)
+    s = _advance_to(s, 2, random.Random(4))
+    holder, start = s.current_player, s.start_player
+    assert holder == season_holder(s, 2) != start
+    assert legal_actions(s, start) == ()
+    with pytest.raises(ValueError, match="turn"):
+        act(s, start, RollActionDie(), random.Random(1))
+    rolled = act(s, holder, RollActionDie(), random.Random(1))
+    assert rolled.current_player == holder and rolled.pending_face is DieFace.RELEASE
+    assert legal_actions(rolled, holder) == (DeclineFace(),)  # no floodgate: unusable
+    after = act(rolled, holder, DeclineFace(), random.Random(1))
+    assert after.current_player == start and after.season_roll is None
+    assert after.board == s.board and after.players == s.players  # an unusable face does nothing
+    turns, rng = [], random.Random(4)
+    while after.round == 2:
+        turns.append(after.current_player)
+        after = act(after, after.current_player, legal_actions(after, after.current_player)[0], rng)
+    assert turns == list(turn_order(s, 2))  # the holder still takes their own turn
+
+
+@pytest.mark.parametrize("face", [DieFace.GOOD_SEASON, DieFace.DROUGHT])
+def test_a_season_face_from_the_holder_applies_to_everyone(face):
+    p = with_overrides(P, action_die=(face,), season_roll_every=2)
+    s = _advance_to(new_game(3, 4, Mode.NORMAL, preset=p), 2, random.Random(4))
+    after = act(s, s.current_player, RollActionDie(), random.Random(1))
+    assert after.current_player == s.start_player and after.season_roll is None
+    assert len({(pl.season, pl.drought) for pl in after.players}) == 1
+    assert all((pl.season, pl.drought) != (0, 0) for pl in after.players)
+
+
+def test_next_season_roll_says_when_and_who():
+    p = with_overrides(P, season_roll_every=3)
+    s = new_game(3, 2, Mode.NORMAL, preset=p)
+    seats = [pl.id for pl in s.players]
+    first = seats.index(s.start_player)
+    assert next_season_roll(s) == (3, seats[first])
+    s = _advance_to(s, 4, random.Random(0))
+    assert next_season_roll(s) == (6, seats[(first + 1) % 3])
+    assert next_season_roll(new_game(3, 2, Mode.NORMAL, preset=P)) is None  # no season roll
+    with pytest.raises(ValueError, match="no season roll"):
+        season_holder(s, 4)
 
 
 def test_season_faces_are_logged():
@@ -368,6 +463,10 @@ def test_bots_finish_constructive_die_games_with_season_rolls(policy):
     assert calculate_score(record.final) == record.scores
     rolls = [r for r in record.log if isinstance(r.action, RollActionDie)]
     assert len(rolls) >= preset(Mode.FLASH).rounds_for(3) // 2  # every season roll was made
+    for r in (2, 4):  # these season rolls are made outside the roller's turn
+        roll = next(rec for rec in record.log if rec.round == r)
+        assert isinstance(roll.action, RollActionDie)
+        assert roll.player == season_holder(record.start, r) != turn_order(record.start, r)[0]
 
 
 def test_score_aware_values_a_season_face_at_zero():

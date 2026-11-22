@@ -49,16 +49,17 @@ A *configuration* is a mode, a player count (2 to 5), and a seating:
 alternate saboteur and greedy, seat 1 saboteur). Sweeps vary one or two
 parameters around their base with ``SWEEP_GAMES`` games: #20's sweeps
 around ``SWEEP_BASE`` from ``SWEEP_SEED``; #103's Rules v2 sweeps ``b0``
-to ``b4`` and ``b3b`` (score_aware seating) around ``V2_BASE`` (``b0``: the shipped
+to ``b5`` and ``b3b`` (score_aware seating) around ``V2_BASE`` (``b0``: the shipped
 presets) from ``V2_SWEEP_SEED``. ``b3``, ``b3b`` (#130: the constructive
-die and the season roll) and ``b4`` run at B2's best
+die and the season roll), ``b4`` and ``b5`` (#132: B4's best board with
+the constructive die and the season roll) run at B2's best
 ``--scale`` and ``--rare-bonus``. The final validation runs ``PROPOSED``
 at ``final_games(players)`` games from ``FINAL_SEED``, a seed no sweep
 uses; ``--candidate SWEEP LABEL`` validates one sweep candidate instead
 (#103 phase D: seed ``V2_FINAL_SEED`` for a Rules v2 sweep):
 
     uv run python scripts/tune.py --sweep b0 b1 b2
-    uv run python scripts/tune.py --sweep b3 b4 --scale 2 --rare-bonus 1
+    uv run python scripts/tune.py --sweep b3 b4 b5 --scale 2 --rare-bonus 1
     uv run python scripts/tune.py --candidate b1 "Rules v2 provisional"
 
 Turns and minutes count turns (rounds x P), not log records: under action
@@ -262,6 +263,14 @@ COMMON_POINTS = min(ROULETTE_POINTS.values())
 """The points of a common varietal at scale 1 (``ROULETTE_POINTS``)."""
 B3B_SEASON_EVERY: Mapping[Mode, tuple[int, ...]] = {Mode.NORMAL: (2, 3, 4), Mode.FLASH: (2,)}
 """Sweep b3b's ``season_roll_every`` values (#130): a season roll every X rounds."""
+B5_SEASON_EVERY: Mapping[Mode, tuple[int, ...]] = {Mode.NORMAL: (3, 4), Mode.FLASH: (2, 3)}
+"""Sweep b5's ``season_roll_every`` values (#132)."""
+B5_BOARD: Mapping[Mode, Mapping[str, object]] = {
+    Mode.NORMAL: {"vineyards_per_player": 2, "hexes_per_player": 18, "vineyard_distance": (4, 4)},
+    Mode.FLASH: {},
+}
+"""Sweep b5's board: B4's best for Normal (2 plots, 18 hexes/player, distance 4, no cap);
+Flash keeps its default board."""
 NO_DIE = {"bribe_rules": BribeRules.D6}
 """Rules v2 with no action die and no bribe: d6 bribe rules, so the die is never
 offered, and a bag without floodgates, so there is nothing to bribe."""
@@ -433,7 +442,9 @@ def v2_sweeps(scale: int = 1, rare_bonus: int = 1) -> tuple[Sweep, ...]:
     """#103 phase B: score_aware seating, seed ``V2_SWEEP_SEED``. B3 and B4
     run at B2's best ``scale`` and ``rare_bonus`` (``--scale``,
     ``--rare-bonus``; the defaults are the provisional 2/3 points). B5
-    combines the best of B2-B4, so it is added once they are known."""
+    (#132) combines the best of B2-B4: B4's best board (``B5_BOARD``) with
+    the constructive die x cost x season roll, and no die, at the same
+    scale and rare bonus."""
     best = f"scale {scale}, rare +{rare_bonus}"
     seats = ("score_aware",)
     shipped = {mode: {} for mode in Mode}
@@ -486,6 +497,16 @@ def v2_sweeps(scale: int = 1, rare_bonus: int = 1) -> tuple[Sweep, ...]:
                          for plots in (2, 3)
                      ),
                  }),
+        v2_sweep("b5", "Best board (Normal: 2 plots, 18 hexes/player) x constructive die x cost x "
+                 f"season roll every X rounds, and no die; {best}",
+                 {mode: tuple(
+                     (f"constructive die, cost {cost}, season roll every {every}",
+                      v2(mode, scale, rare_bonus, **B5_BOARD[mode], action_die=CONSTRUCTIVE_DIE_FACES,
+                         action_die_cost=cost, season_roll_every=every))
+                     for cost in (1, 2)
+                     for every in B5_SEASON_EVERY[mode]
+                 ) + (("no die (no bribe either)", v2(mode, scale, rare_bonus, **B5_BOARD[mode], **NO_DIE)),)
+                  for mode in Mode}),
     )
 
 
@@ -1164,9 +1185,9 @@ def main(argv: list[str] | None = None) -> int:
                         help="final validation of one sweep candidate (#103 phase D): seatings "
                              f"{', '.join(V2_FINAL_SEATINGS)}; seed {V2_FINAL_SEED} for a Rules v2 sweep")
     parser.add_argument("--scale", type=_workers, default=1,
-                        help="the score scale of sweeps b3 and b4: B2's best (default 1)")
+                        help="the score scale of sweeps b3, b3b, b4 and b5: B2's best (default 1)")
     parser.add_argument("--rare-bonus", type=_workers, default=1,
-                        help="Bonarda and Cabernet Franc score the common value + this in sweeps b3 and b4: "
+                        help="Bonarda and Cabernet Franc score the common value + this in sweeps b3, b3b, b4 and b5: "
                              "B2's best (default 1)")
     parser.add_argument("--games", type=int,
                         help=f"games per configuration (default: {SWEEP_GAMES} in a sweep, the final count otherwise)")

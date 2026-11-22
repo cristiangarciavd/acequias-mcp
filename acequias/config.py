@@ -157,9 +157,10 @@ class Preset:
     (the default) derives them: ``season_gain`` is one common vineyard
     plot's value (``common_vineyard_points``), and ``drought_loss`` half
     of ``season_gain``, rounded down, at least 1. ``season_roll_every``
-    (``None``: off, the default) gives the start player of every X-th
-    round a free roll of the action die before their turn; it needs
-    action die rules.
+    (``None``: off, the default) starts every X-th round with a free roll
+    of the action die by the season die's holder, which passes to the
+    next seat after each season roll (``acequias.game.season_holder``);
+    it needs action die rules.
     """
 
     mode: Mode
