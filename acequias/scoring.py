@@ -4,7 +4,12 @@ Rules come from ``README.md`` (End and scoring, Water rights, Bodega bonus).
 Each player scores
 
     vineyard values + bodega bonus - water rights paid
-    + water rights collected - bribe debt
+    + water rights collected - bribe debt + season - drought
+
+``season`` is ``Player.season``, the action die's good season gains.
+``drought`` is ``Player.drought``, its drought losses, clamped so a drought
+never takes a total below 0: a player whose total before the drought is
+0 or less loses nothing, one with fewer points than the losses ends at 0.
 
 Only watered claimed vineyards count. Watering and the path the water takes
 come from ``acequias.flow.water``; a vineyard's varietal from
@@ -52,7 +57,9 @@ class WateredVineyard:
 class Score:
     """A player's final score, by term.
 
-    ``total == vineyards + bodega - rights_paid + rights_collected - debt``.
+    ``total == vineyards + bodega - rights_paid + rights_collected - debt
+    + season - drought``, where ``drought`` is the drought loss actually
+    taken (clamped so a drought never takes the total below 0).
     Every term is in points: ``rights_paid`` and ``rights_collected`` are
     the rival-vineyard pairs times the preset's ``water_right_points``.
     ``watered`` is the number of the player's claimed vineyards that are
@@ -70,6 +77,8 @@ class Score:
     total: int
     watered: int
     watered_vineyards: tuple[WateredVineyard, ...]
+    season: int = 0
+    drought: int = 0
 
 
 def calculate_score(state: GameState, preset: Preset | None = None) -> Mapping[str, Score]:
@@ -116,7 +125,9 @@ def calculate_score(state: GameState, preset: Preset | None = None) -> Mapping[s
         varietals = {v.varietal for v in mine}
         bodega = preset.bodega_points if len(varietals) >= preset.bodega_varietals else 0
         paid = sum(len(v.pays) for v in mine) * preset.water_right_points
-        total = vineyards + bodega - paid + collected[p.id] - p.debt
+        before = vineyards + bodega - paid + collected[p.id] - p.debt + p.season
+        drought = min(p.drought, max(0, before))
+        total = before - drought
         scores[p.id] = Score(
             player=p.id,
             seat=p.seat,
@@ -128,6 +139,8 @@ def calculate_score(state: GameState, preset: Preset | None = None) -> Mapping[s
             total=total,
             watered=len(mine),
             watered_vineyards=mine,
+            season=p.season,
+            drought=drought,
         )
     return MappingProxyType(scores)
 

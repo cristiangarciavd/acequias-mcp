@@ -41,8 +41,10 @@ PolicyName = Literal[tuple(POLICIES)]  # type: ignore[valid-type]
 ActionName = Literal[
     "canal", "floodgate", "bribe", "pass", "die", "release", "resow", "decline"
 ]
-DieFaceName = Literal["floodgate", "release", "resow"]
-ScoreTermName = Literal["vineyards", "bodega", "rights_paid", "rights_collected", "debt", "total"]
+DieFaceName = Literal["floodgate", "release", "resow", "good_season", "drought"]
+ScoreTermName = Literal[
+    "vineyards", "bodega", "rights_paid", "rights_collected", "debt", "season", "drought", "total"
+]
 
 
 class SpreadJSON(BaseModel):

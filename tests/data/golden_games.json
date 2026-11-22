@@ -1618,7 +1618,9 @@
    },
    "bodega_rate": 0.0,
    "die_faces_per_game": {
+    "drought": 0.0,
     "floodgate": 0.0,
+    "good_season": 0.0,
     "release": 0.0,
     "resow": 0.0
    },
@@ -1666,6 +1668,7 @@
     "bodega_varietals": 3,
     "bribe_rules": "d6",
     "die_faces": 6,
+    "drought_points": null,
     "grape_clusters_per_player": null,
     "hexes_per_player": 12,
     "market_size": 4,
@@ -1692,6 +1695,8 @@
      "4": 12,
      "5": 12
     },
+    "season_points": null,
+    "season_roll_every": null,
     "stone_share": 10,
     "varietal_points": {
      "bonarda": 2,
@@ -1715,11 +1720,19 @@
      "mean": 0.0,
      "stdev": 0.0
     },
+    "drought": {
+     "mean": 0.0,
+     "stdev": 0.0
+    },
     "rights_collected": {
      "mean": 0.0,
      "stdev": 0.0
     },
     "rights_paid": {
+     "mean": 0.0,
+     "stdev": 0.0
+    },
+    "season": {
      "mean": 0.0,
      "stdev": 0.0
     },
@@ -2779,7 +2792,9 @@
    },
    "bodega_rate": 0.0,
    "die_faces_per_game": {
+    "drought": 0.0,
     "floodgate": 0.0,
+    "good_season": 0.0,
     "release": 0.0,
     "resow": 0.0
    },
@@ -2821,6 +2836,7 @@
     "bodega_varietals": 3,
     "bribe_rules": "d6",
     "die_faces": 6,
+    "drought_points": null,
     "grape_clusters_per_player": null,
     "hexes_per_player": 12,
     "market_size": 4,
@@ -2847,6 +2863,8 @@
      "4": 12,
      "5": 12
     },
+    "season_points": null,
+    "season_roll_every": null,
     "stone_share": 10,
     "varietal_points": {
      "bonarda": 2,
@@ -2870,11 +2888,19 @@
      "mean": 0.0,
      "stdev": 0.0
     },
+    "drought": {
+     "mean": 0.0,
+     "stdev": 0.0
+    },
     "rights_collected": {
      "mean": 0.0,
      "stdev": 0.0
     },
     "rights_paid": {
+     "mean": 0.0,
+     "stdev": 0.0
+    },
+    "season": {
      "mean": 0.0,
      "stdev": 0.0
     },
@@ -5104,7 +5130,9 @@
    },
    "bodega_rate": 0.0,
    "die_faces_per_game": {
+    "drought": 0.0,
     "floodgate": 0.0,
+    "good_season": 0.0,
     "release": 0.0,
     "resow": 0.0
    },
@@ -5148,6 +5176,7 @@
     "bodega_varietals": 3,
     "bribe_rules": "d6",
     "die_faces": 6,
+    "drought_points": null,
     "grape_clusters_per_player": null,
     "hexes_per_player": 12,
     "market_size": 4,
@@ -5174,6 +5203,8 @@
      "4": 12,
      "5": 12
     },
+    "season_points": null,
+    "season_roll_every": null,
     "stone_share": 10,
     "varietal_points": {
      "bonarda": 2,
@@ -5197,6 +5228,10 @@
      "mean": 15.0,
      "stdev": 9.921917377424812
     },
+    "drought": {
+     "mean": 0.0,
+     "stdev": 0.0
+    },
     "rights_collected": {
      "mean": 0.3333333333333333,
      "stdev": 0.4714045207910317
@@ -5204,6 +5239,10 @@
     "rights_paid": {
      "mean": 0.3333333333333333,
      "stdev": 0.6666666666666666
+    },
+    "season": {
+     "mean": 0.0,
+     "stdev": 0.0
     },
     "total": {
      "mean": -14.666666666666666,
@@ -6801,7 +6840,9 @@
    },
    "bodega_rate": 0.0,
    "die_faces_per_game": {
+    "drought": 0.0,
     "floodgate": 0.0,
+    "good_season": 0.0,
     "release": 0.0,
     "resow": 0.0
    },
@@ -6847,6 +6888,7 @@
     "bodega_varietals": 3,
     "bribe_rules": "d6",
     "die_faces": 6,
+    "drought_points": null,
     "grape_clusters_per_player": null,
     "hexes_per_player": 7,
     "market_size": 4,
@@ -6873,6 +6915,8 @@
      "4": 5,
      "5": 5
     },
+    "season_points": null,
+    "season_roll_every": null,
     "stone_share": 10,
     "varietal_points": {
      "bonarda": 2,
@@ -6896,6 +6940,10 @@
      "mean": 0.25,
      "stdev": 0.82915619758885
     },
+    "drought": {
+     "mean": 0.0,
+     "stdev": 0.0
+    },
     "rights_collected": {
      "mean": 0.08333333333333333,
      "stdev": 0.2763853991962833
@@ -6903,6 +6951,10 @@
     "rights_paid": {
      "mean": 0.08333333333333333,
      "stdev": 0.2763853991962833
+    },
+    "season": {
+     "mean": 0.0,
+     "stdev": 0.0
     },
     "total": {
      "mean": 1.5833333333333333,
@@ -9116,7 +9168,9 @@
    },
    "bodega_rate": 0.0,
    "die_faces_per_game": {
+    "drought": 0.0,
     "floodgate": 0.0,
+    "good_season": 0.0,
     "release": 0.0,
     "resow": 0.0
    },
@@ -9164,6 +9218,7 @@
     "bodega_varietals": 3,
     "bribe_rules": "d6",
     "die_faces": 6,
+    "drought_points": null,
     "grape_clusters_per_player": null,
     "hexes_per_player": 7,
     "market_size": 4,
@@ -9190,6 +9245,8 @@
      "4": 5,
      "5": 5
     },
+    "season_points": null,
+    "season_roll_every": null,
     "stone_share": 10,
     "varietal_points": {
      "bonarda": 2,
@@ -9213,6 +9270,10 @@
      "mean": 3.8,
      "stdev": 4.563624290699955
     },
+    "drought": {
+     "mean": 0.0,
+     "stdev": 0.0
+    },
     "rights_collected": {
      "mean": 0.2,
      "stdev": 0.4
@@ -9220,6 +9281,10 @@
     "rights_paid": {
      "mean": 0.2,
      "stdev": 0.5416025603090641
+    },
+    "season": {
+     "mean": 0.0,
+     "stdev": 0.0
     },
     "total": {
      "mean": -1.9333333333333333,
@@ -10155,7 +10220,9 @@
    },
    "bodega_rate": 0.0,
    "die_faces_per_game": {
+    "drought": 0.0,
     "floodgate": 0.0,
+    "good_season": 0.0,
     "release": 0.0,
     "resow": 0.0
    },
@@ -10197,6 +10264,7 @@
     "bodega_varietals": 3,
     "bribe_rules": "d6",
     "die_faces": 4,
+    "drought_points": null,
     "grape_clusters_per_player": null,
     "hexes_per_player": 7,
     "market_size": 4,
@@ -10223,6 +10291,8 @@
      "4": 5,
      "5": 5
     },
+    "season_points": null,
+    "season_roll_every": null,
     "stone_share": 10,
     "varietal_points": {
      "bonarda": 2,
@@ -10246,11 +10316,19 @@
      "mean": 0.25,
      "stdev": 0.6614378277661477
     },
+    "drought": {
+     "mean": 0.0,
+     "stdev": 0.0
+    },
     "rights_collected": {
      "mean": 0.0,
      "stdev": 0.0
     },
     "rights_paid": {
+     "mean": 0.0,
+     "stdev": 0.0
+    },
+    "season": {
      "mean": 0.0,
      "stdev": 0.0
     },

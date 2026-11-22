@@ -26,9 +26,21 @@ with that face's uses or ``DeclineFace()``; either clears the face. The
 floodgate face is a ``PlaceFloodgate`` that takes nothing from the market
 (the market and bag are unchanged); ``Release`` removes a floodgate from
 the board; ``Resow`` replants a claimed vineyard (the claim stays). A
-declined or unusable face keeps the cost paid. The rng order of the die:
+declined or unusable face keeps the cost paid. A season face
+(``GOOD_SEASON``, ``DROUGHT``) is never pending: the roll applies it at
+once, adding ``Preset.season_gain`` to every player's ``Player.season``,
+or ``Preset.drought_loss`` to every ``Player.drought`` (scoring clamps
+the drought so no total goes below 0).
 
-- ``RollActionDie``: one ``rng.choice(preset.action_die)``, nothing else.
+With ``Preset.season_roll_every``, a ``GameState.season_roll`` of ``DUE``
+allows only ``RollActionDie()`` by ``current_player`` (the round's start
+player): a free roll, with no cost. A season face applies and clears it;
+a personal face is pending with ``season_roll`` ``ROLLED`` until it is
+used or declined, which clears both. The round loop then gives the same
+player their own turn. The rng order of the die:
+
+- ``RollActionDie`` (voluntary or season roll): one
+  ``rng.choice(preset.action_die)``, nothing else.
 - ``Resow``: one ``rng.choice(preset.roulette)``, the vineyard's new
   planting, then the claim spins below.
 - ``Release`` and the die's ``PlaceFloodgate``: no draw of their own, then
@@ -72,6 +84,7 @@ from acequias.model import (
     GameState,
     PieceKind,
     PlacedCanal,
+    SeasonRoll,
     Terrain,
 )
 
@@ -88,6 +101,7 @@ __all__ = [
     "IllegalAction",
     "apply",
     "legal_actions",
+    "season_applied",
 ]
 
 
@@ -227,17 +241,23 @@ def apply(state: GameState, player: str, action: Action, rng: random.Random) -> 
 
     if state.pending_face is not None:
         return _resolve_face(state, player, action, rng)
+    if state.season_roll is SeasonRoll.DUE:
+        if player != state.current_player:
+            raise IllegalAction(
+                f"{state.current_player} has the season roll to make; {player} cannot act"
+            )
+        if not isinstance(action, RollActionDie):
+            raise IllegalAction(
+                f"the season roll comes first: {player} must roll the action die, "
+                f"not {type(action).__name__}"
+            )
+        return _roll(state, player, 0, SeasonRoll.ROLLED, rng)
     if isinstance(action, (Release, Resow, DeclineFace)):
         raise IllegalAction(f"{type(action).__name__} needs a rolled action die face")
     if isinstance(action, RollActionDie):
         if preset.bribe_rules is not BribeRules.ACTION_DIE:
             raise IllegalAction("the action die is only rolled under action_die bribe rules")
-        face = rng.choice(preset.action_die)
-        players = tuple(
-            replace(p, debt=p.debt + preset.action_die_cost) if p.id == player else p
-            for p in state.players
-        )
-        return replace(state, players=players, pending_face=face)
+        return _roll(state, player, preset.action_die_cost, None, rng)
     if isinstance(action, Bribe) and preset.bribe_rules is not BribeRules.D6:
         raise IllegalAction("there is no bribe under action_die rules; roll the action die")
 
@@ -271,6 +291,8 @@ def legal_actions(state: GameState, player: str) -> tuple[Action, ...]:
     placement. With a pending die face the list is that face's uses, then
     ``DeclineFace()``: floodgate edges or releases in the bribe edge order,
     or resows by hex. It is empty for any player but ``current_player``.
+    With a season roll ``DUE`` it is ``(RollActionDie(),)`` for
+    ``current_player`` and empty for everyone else.
     """
     _check_type("state", state, GameState)
     _check_player(state, player)
@@ -279,6 +301,8 @@ def legal_actions(state: GameState, player: str) -> tuple[Action, ...]:
         if player != state.current_player:
             return ()
         return (*_face_uses(state.board, face), DeclineFace())
+    if state.season_roll is SeasonRoll.DUE:
+        return (RollActionDie(),) if player == state.current_player else ()
     action_die = _preset(state).bribe_rules is BribeRules.ACTION_DIE
     canals = _canal_placements(state)
     gates = _floodgate_placements(state)
@@ -468,7 +492,7 @@ def _resolve_face(
             f"{state.current_player} has a {face.value} face to resolve; {player} cannot act"
         )
     if isinstance(action, DeclineFace):
-        return replace(state, pending_face=None)
+        return replace(state, pending_face=None, season_roll=None)
     use = _FACE_ACTIONS[face]
     if not isinstance(action, use):
         raise IllegalAction(
@@ -478,7 +502,48 @@ def _resolve_face(
     board, _ = _board_after(state, player, action)
     if isinstance(action, Resow):
         board = _resow(state, board, action.hex, rng)
-    return replace(state, board=_plant(state, board, rng), pending_face=None)
+    return replace(state, board=_plant(state, board, rng), pending_face=None, season_roll=None)
+
+
+def _roll(
+    state: GameState,
+    player: str,
+    cost: int,
+    rolled: SeasonRoll | None,
+    rng: random.Random,
+) -> GameState:
+    """The state after ``player`` pays ``cost`` in debt and rolls the action die.
+
+    A personal face is left pending, with ``season_roll`` set to
+    ``rolled``; a season face applies at once and clears ``season_roll``.
+    """
+    face = rng.choice(_preset(state).action_die)
+    players = tuple(
+        replace(p, debt=p.debt + cost) if p.id == player else p for p in state.players
+    )
+    state = replace(state, players=players)
+    if face.is_season:
+        return season_applied(state, face)
+    return replace(state, pending_face=face, season_roll=rolled)
+
+
+def season_applied(state: GameState, face: DieFace) -> GameState:
+    """``state`` after the season face ``face`` applies to every player; no draw.
+
+    A good season adds ``Preset.season_gain`` to every ``Player.season``,
+    a drought ``Preset.drought_loss`` to every ``Player.drought`` (taken
+    off at scoring, never below a total of 0). ``season_roll`` is cleared.
+    """
+    preset = _preset(state)
+    if face is DieFace.GOOD_SEASON:
+        gain = preset.season_gain
+        players = tuple(replace(p, season=p.season + gain) for p in state.players)
+    elif face is DieFace.DROUGHT:
+        loss = preset.drought_loss
+        players = tuple(replace(p, drought=p.drought + loss) for p in state.players)
+    else:
+        raise ValueError(f"{face.value} is not a season face")
+    return replace(state, players=players, pending_face=None, season_roll=None)
 
 
 def _release_board(state: GameState, action: Release) -> Board:

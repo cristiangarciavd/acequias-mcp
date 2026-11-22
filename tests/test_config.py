@@ -92,6 +92,9 @@ README_VALUES = {
         bribe_rules=BribeRules.D6,
         action_die_cost=2,
         action_die=ACTION_DIE_FACES,
+        season_points=None,
+        drought_points=None,
+        season_roll_every=None,
     ),
     Mode.FLASH: dict(
         rounds={2: 6, 3: 6, 4: 4, 5: 4},
@@ -112,6 +115,9 @@ README_VALUES = {
         bribe_rules=BribeRules.D6,
         action_die_cost=2,
         action_die=ACTION_DIE_FACES,
+        season_points=None,
+        drought_points=None,
+        season_roll_every=None,
     ),
 }
 

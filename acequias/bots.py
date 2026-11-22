@@ -38,6 +38,16 @@ vineyard blank, so its swing is the roulette's mean points minus the
 vineyard's points (for the player, or against a rival). ``random_bot``
 rolls and resolves like any other legal action.
 
+Season faces (``GOOD_SEASON``, ``DROUGHT``) and the season roll
+(``Preset.season_roll_every``): every bot makes the free season roll when
+it is due (the only legal action), and resolves a personal face it
+gives like any other. A season face moves every total by the same
+amount (a drought less for a player near 0, which scoring clamps), so
+the score-aware bots weigh it at 0 (an approximation: it changes no total
+against the best rival), and a free roll has no cost; lookahead plans a
+season face as the end of the roll (the turn moves on after a voluntary
+roll, and stays with the player after the free one).
+
 Claims come from ``_board_after``, which follows the cluster cap, so the
 saboteur's swing counts only vineyards the player can claim: one a move
 waters but leaves unclaimed counts for nobody.
@@ -112,9 +122,9 @@ from typing import TypeVar
 from acequias.config import Preset, VarietalRules
 from acequias.config import preset as shipped_preset
 from acequias.flow import _watered
-from acequias.game import Bot, act, game_over
+from acequias.game import Bot, _next_turn, act, game_over
 from acequias.hex import Hex
-from acequias.model import Board, GameState, Terrain
+from acequias.model import Board, DieFace, GameState, SeasonRoll, Terrain
 from acequias.scoring import Score, calculate_score
 from acequias.turn import (
     Action,
@@ -154,6 +164,8 @@ def greedy_bot(state: GameState, player: str, rng: random.Random) -> Action:
     """
     if state.pending_face is not None:
         return _resolve_face(state, player, rng)
+    if state.season_roll is SeasonRoll.DUE:
+        return RollActionDie()
     actions = legal_actions(state, player)
     canals = [a for a in actions if isinstance(a, PlaceCanal)]
     gates = [a for a in actions if isinstance(a, PlaceFloodgate)]
@@ -178,6 +190,8 @@ def saboteur_bot(state: GameState, player: str, rng: random.Random) -> Action:
     """
     if state.pending_face is not None:
         return _resolve_face(state, player, rng)
+    if state.season_roll is SeasonRoll.DUE:
+        return RollActionDie()
     actions = legal_actions(state, player)
     if all(isinstance(a, (Pass, RollActionDie)) for a in actions):
         return Pass()
@@ -493,18 +507,25 @@ class _Evaluator:
         return value
 
     def roll_value(self) -> Fraction:
-        """``-action_die_cost`` plus the mean, over the die's faces, of max(0, the face's best use)."""
+        """``-action_die_cost`` plus the mean, over the die's faces, of max(0, the face's best use).
+
+        A season face counts 0 (it moves every total alike), and the free
+        season roll has no cost.
+        """
         faces = self.preset.action_die
         best = {}
         for face in set(faces):
-            rolled = replace(self.state, pending_face=face)
+            if face.is_season:
+                best[face] = Fraction(0)
+                continue
+            rolled = _rolled(self.state, face)
             uses = legal_actions(rolled, self.player)
             best[face] = max(
                 (self.value(rolled, a) for a in uses if not isinstance(a, DeclineFace)),
                 default=Fraction(0),
             )
         mean = Fraction(sum(max(Fraction(0), best[f]) for f in faces), len(faces))
-        return mean - self.preset.action_die_cost
+        return mean - _roll_cost(self.state, self.preset)
 
     def _totals(self, board: Board, watered: Iterable[Hex]) -> dict[str, Fraction]:
         """Every player's expected total on ``board``; ``watered`` is its watered vineyards.
@@ -567,7 +588,9 @@ class _Evaluator:
         return score
 
     def _scored(self, board: Board) -> Mapping[str, Score]:
-        return calculate_score(replace(self.state, board=board, pending_face=None), self.preset)
+        return calculate_score(
+            replace(self.state, board=board, pending_face=None, season_roll=None), self.preset
+        )
 
 
 # --- Lookahead ---------------------------------------------------------------
@@ -597,7 +620,7 @@ class _Lookahead:
         faces = preset.action_die
         self.faces = {face: faces.count(face) for face in dict.fromkeys(faces)}  # die order
         self.die_size = len(preset.action_die)
-        self.roll_cost = Fraction(preset.action_die_cost)
+        self.preset = preset
         self.bribe_debt = Fraction(preset.die_faces + 1, 2)
         self.rng = random.Random(0)
         self._lines: dict[tuple, Fraction] = {}
@@ -637,7 +660,10 @@ class _Lookahead:
         def best(rolled: GameState, planned: Extra) -> Fraction:
             return max(v for _, v in self.options(rolled, planned, k))
 
-        return self._chance(state, extra, self.me, best)
+        def settled(after: GameState, planned: Extra) -> Fraction:
+            return self._continue(after, planned, k - 1)
+
+        return self._chance(state, extra, self.me, best, settled)
 
     def _chance(
         self,
@@ -645,14 +671,23 @@ class _Lookahead:
         extra: Extra,
         player: str,
         value: Callable[[GameState, Extra], Fraction],
+        settled: Callable[[GameState, Extra], Fraction],
     ) -> Fraction:
-        """The mean of ``value(rolled state, extra)`` over the faces ``player`` may roll."""
-        extra = _add(extra, player, self.roll_cost)
-        total = sum(
-            count * value(replace(state, pending_face=face), extra)
-            for face, count in self.faces.items()
-        )
-        return Fraction(total, self.die_size)
+        """The mean, over the faces ``player`` may roll, of the planned value.
+
+        A personal face is ``value(rolled state, extra)``; a season face
+        (no effect on the leaf value) is ``settled`` on the state once the
+        roll is done.
+        """
+        extra = _add(extra, player, Fraction(_roll_cost(state, self.preset)))
+        total = Fraction(0)
+        for face, count in self.faces.items():
+            if face.is_season:
+                after = _next_turn(state, replace(state, season_roll=None), player)
+                total += count * settled(after, extra)
+            else:
+                total += count * value(_rolled(state, face), extra)
+        return total / self.die_size
 
     def _continue(self, state: GameState, extra: Extra, k: int) -> Fraction:
         """The planned value once the bot's move is done: rivals reply, then its next move.
@@ -665,7 +700,8 @@ class _Lookahead:
         board = state.board  # tiles are fixed; so are the players, the preset and the bag (empty)
         key = (
             board.canals, board.floodgates, board.claims, board.plantings, state.market,
-            state.round, state.current_player, state.pending_face, frozenset(extra.items()), k,
+            state.round, state.current_player, state.pending_face, state.season_roll,
+            frozenset(extra.items()), k,
         )
         if key not in self._lines:
             self._lines[key] = self._line(state, extra, k)
@@ -681,7 +717,10 @@ class _Lookahead:
             return max(v for _, v in self.options(state, extra, k))
         choice = _score_aware_ties(state, player, extra, self.shared)[0]
         if isinstance(choice, RollActionDie):
-            return self._chance(state, extra, player, lambda s, e: self._continue(s, e, k))
+            def rest(s: GameState, e: Extra) -> Fraction:
+                return self._continue(s, e, k)
+
+            return self._chance(state, extra, player, rest, rest)
         return self._continue(*self._step(state, extra, player, choice), k)
 
     def _step(
@@ -698,6 +737,17 @@ class _Lookahead:
         if isinstance(action, Bribe):
             extra = _add(extra, player, self.bribe_debt)
         return after, extra
+
+
+def _rolled(state: GameState, face: DieFace) -> GameState:
+    """``state`` with the personal ``face`` rolled: pending, from the season roll if one is due."""
+    season_roll = SeasonRoll.ROLLED if state.season_roll is SeasonRoll.DUE else None
+    return replace(state, pending_face=face, season_roll=season_roll)
+
+
+def _roll_cost(state: GameState, preset: Preset) -> int:
+    """The debt a roll costs on ``state``: none for the season roll, else ``action_die_cost``."""
+    return 0 if state.season_roll is SeasonRoll.DUE else preset.action_die_cost
 
 
 def _add(extra: Extra, player: str, debt: Fraction) -> Extra:
