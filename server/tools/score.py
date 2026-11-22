@@ -71,7 +71,7 @@ def calculate_score(
             max_length=MAX_PLAYERS,
             description=(
                 f"{MIN_PLAYERS} to {MAX_PLAYERS} players in seat order (seats 1 to N), "
-                "each with its id and bribe debt."
+                "each with its id, bribe debt, and optional season and drought points (default 0)."
             ),
         ),
     ],
@@ -107,7 +107,8 @@ def calculate_score(
     """Score an Acequias board state: each player's points by term, and the winners.
 
     Each player scores vineyards + bodega - rights_paid + rights_collected -
-    debt; every term is in points, and each rival on a vineyard's water path
+    debt + season - drought (the action die's good season gains and drought
+    losses; drought never takes a total below 0); every term is in points, and each rival on a vineyard's water path
     gets water_right_points (1 in the shipped presets). Every watered claimed
     vineyard is listed with the canal path its water takes and the rivals its
     claimant pays, so the water rights can be checked by hand. The state is scored as given, finished or not.

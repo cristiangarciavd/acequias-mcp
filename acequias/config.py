@@ -66,6 +66,18 @@ ACTION_DIE_FACES: tuple[DieFace, ...] = (
 )
 """The action die's 6 faces, in order: two of each."""
 
+CONSTRUCTIVE_DIE_FACES: tuple[DieFace, ...] = (
+    DieFace.FLOODGATE,
+    DieFace.RELEASE,
+    DieFace.RESOW,
+    DieFace.RESOW,
+    DieFace.GOOD_SEASON,
+    DieFace.DROUGHT,
+)
+"""The constructive action die (#130), in order: floodgate, release, two
+resows, good season, drought. An opt-in ``action_die``; ``ACTION_DIE_FACES``
+stays the default."""
+
 # Provisional: the debt a roll of the action die costs. The owner's range is
 # 2 or 3; the final value is tuned in #103.
 ACTION_DIE_COST = 2
@@ -137,6 +149,17 @@ class Preset:
     only under ``action_die`` rules, where the bag has no floodgates
     (``bag_mix`` gives them 0) and a ``RESOW`` face needs roulette rules.
     ``die_faces`` is the bribe d6, used only under ``d6`` rules.
+
+    Season faces of the action die (``GOOD_SEASON``, ``DROUGHT``) give
+    every player ``season_gain`` or take ``drought_loss`` from them (a
+    drought never takes a score below 0; see ``acequias.scoring``).
+    ``season_points`` and ``drought_points`` set those values; ``None``
+    (the default) derives them: ``season_gain`` is one common vineyard
+    plot's value (``common_vineyard_points``), and ``drought_loss`` half
+    of ``season_gain``, rounded down, at least 1. ``season_roll_every``
+    (``None``: off, the default) gives the start player of every X-th
+    round a free roll of the action die before their turn; it needs
+    action die rules.
     """
 
     mode: Mode
@@ -158,6 +181,9 @@ class Preset:
     bribe_rules: BribeRules
     action_die_cost: int
     action_die: tuple[DieFace, ...]
+    season_points: int | None = None
+    drought_points: int | None = None
+    season_roll_every: int | None = None
 
     def __post_init__(self) -> None:
         _check_type("mode", self.mode, Mode)
@@ -186,6 +212,11 @@ class Preset:
         _check_type("bribe_rules", self.bribe_rules, BribeRules)
         _check_non_negative("action_die_cost", self.action_die_cost)
         _set(self, "action_die", _action_die(self.action_die))
+        for name in ("season_points", "drought_points", "season_roll_every"):
+            if getattr(self, name) is not None:
+                _check_count(name, getattr(self, name))
+        if self.season_roll_every is not None and self.bribe_rules is not BribeRules.ACTION_DIE:
+            raise ValueError("season_roll_every needs action_die bribe rules")
         if self.bribe_rules is BribeRules.ACTION_DIE:
             if self.bag_mix[PieceKind.FLOODGATE] != 0:
                 raise ValueError(
@@ -223,6 +254,24 @@ class Preset:
                     f"leave no empty hex out of {hexes}"
                 )
 
+    @property
+    def season_gain(self) -> int:
+        """What a good season face gives every player: ``season_points``, or one common plot's value."""
+        if self.season_points is not None:
+            return self.season_points
+        return common_vineyard_points(self)
+
+    @property
+    def drought_loss(self) -> int:
+        """What a drought face takes from every player: ``drought_points``, or half the season gain."""
+        if self.drought_points is not None:
+            return self.drought_points
+        return max(1, self.season_gain // 2)
+
+    def is_season_round(self, round: int) -> bool:
+        """Whether ``round`` starts with a free season roll: every ``season_roll_every``-th round."""
+        return self.season_roll_every is not None and round % self.season_roll_every == 0
+
     def rounds_for(self, players: int) -> int:
         """The round count for a game of ``players`` players (2 to 5)."""
         _check_int("players", players)
@@ -231,6 +280,22 @@ class Preset:
                 f"players must be {MIN_PLAYERS} to {MAX_PLAYERS}, got {players}"
             )
         return self.rounds[players]
+
+
+def common_vineyard_points(p: Preset) -> int:
+    """The points of one common vineyard plot under ``p``.
+
+    The most frequent value among the plots a game can deal: the points of
+    each roulette sector under roulette rules, of each varietal in
+    ``varietal_points`` under fixed rules. Ties go to the lower value.
+    Under ``ROULETTE_POINTS`` it is 2 (12 of the 14 sectors), and it
+    scales with ``scaled``.
+    """
+    if p.varietal_rules is VarietalRules.ROULETTE:
+        values = [p.varietal_points[v] for v in p.roulette]
+    else:
+        values = list(p.varietal_points.values())
+    return min(set(values), key=lambda v: (-values.count(v), v))
 
 
 # --- Helpers ---------------------------------------------------------------
@@ -472,7 +537,9 @@ def scaled(p: Preset, factor: int) -> Preset:
 
     ``varietal_points`` (each value), ``bodega_points`` and
     ``water_right_points`` are multiplied; everything else is kept,
-    including ``bodega_varietals``, the roulette and the rounds. Debt is
+    including ``bodega_varietals``, the roulette and the rounds. Explicit
+    ``season_points`` and ``drought_points`` are multiplied too (derived
+    ones follow ``varietal_points``). Debt is
     **not** scaled: the bribe d6 (``die_faces``) and ``action_die_cost``
     stay as they are, and #103 picks them against the scale. ``factor``
     must be an int of at least 1; ``p`` is unchanged.
@@ -484,4 +551,6 @@ def scaled(p: Preset, factor: int) -> Preset:
         varietal_points={v: points * factor for v, points in p.varietal_points.items()},
         bodega_points=p.bodega_points * factor,
         water_right_points=p.water_right_points * factor,
+        season_points=None if p.season_points is None else p.season_points * factor,
+        drought_points=None if p.drought_points is None else p.drought_points * factor,
     )

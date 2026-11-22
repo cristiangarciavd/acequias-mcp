@@ -152,6 +152,17 @@ On your turn, instead of placing a piece, you may **roll the action die**: add i
 
 You may **decline** the face. A face you cannot use (Release with no floodgate on the board) or do not want is lost, and so is its cost: no refund, no re-roll. As after any action, you then claim every newly watered vineyard (a Release can water some). Under these rules **floodgates come only from the die**: they leave the market bag, and the other pieces share the bag (`action_die_rules` rescales the shipped mix to straight 44, gentle curve 22, sharp curve 17, symmetric Y 6, T branch 6, claw 5). There is no bribe action.
 
+#### Constructive die and season roll
+
+Two more opt-in options of the action die (#130), off in the shipped presets; values to be tuned in #126 after #103.
+
+- **Constructive die** (`action_die = CONSTRUCTIVE_DIE_FACES`): 1 x Floodgate, 1 x Release, 2 x Resow, 1 x **Good season**, 1 x **Drought**. The 2/2/2 die (`ACTION_DIE_FACES`) stays the default. Floodgate, Release and Resow are personal, as above: you may decline them, and an unusable one does nothing. Good season and drought always apply, to every player, as soon as they are rolled, and end the roll:
+  - **Good season:** every player gains `season_points` (default: one common vineyard plot's value, the most frequent plot value, 2 under the roulette; it follows `scaled()`).
+  - **Drought:** every player loses `drought_points` (default: half of the good season gain, rounded down, at least 1). A drought never takes a score below 0: a player at 0 or less loses nothing, and one with fewer points than the loss ends at 0 (applied at final scoring, where the losses are tallied).
+- **Season roll** (`season_roll_every = X`, default off): at the start of every X-th round the round's start player rolls the action die for free, without spending their turn, then takes their turn as usual. A season face applies as above; a personal face can be used or declined, and an unusable or declined one does nothing. The start player rotates, so the season roll does too.
+
+A voluntary roll is unchanged: it costs `action_die_cost` and the turn, and a declined or unusable face loses the cost. Gains and losses show in the score as the `season` and `drought` terms (`total = vineyards + bodega - rights_paid + rights_collected - debt + season - drought`), in `Player.season` and `Player.drought` during the game, and in the MCP player and score JSON. `scripts/tune.py --sweep b3b` compares the constructive die at cost 1 and 2 with a season roll every 2, 3 or 4 rounds (Normal) or 2 (Flash), against no die.
+
 #### Varietal roulette
 
 The board's vineyards have no varietal. When a player claims a vineyard, they spin the roulette and that varietal is planted there for the rest of the game. The roulette has 14 equal sectors:

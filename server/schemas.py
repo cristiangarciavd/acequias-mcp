@@ -12,7 +12,8 @@ String mappings (`acequias` enum -> JSON string):
   `"Torrontés"` or `"Cabernet Sauvignon"`)
 - `VarietalRules`: its value, `"fixed"` or `"roulette"`
 - `BribeRules`: its value, `"d6"` or `"action_die"`
-- `DieFace`: its value, `"floodgate"`, `"release"`, or `"resow"`
+- `DieFace`: its value, `"floodgate"`, `"release"`, `"resow"`, `"good_season"`,
+  or `"drought"`
 - `Mode`: its value, `"normal"` or `"flash"`
 - `PieceKind` (canal shapes only): its lowercase enum name, ASCII only:
   `"straight"`, `"gentle_curve"`, `"sharp_curve"`, `"symmetric_y"`,
@@ -34,7 +35,8 @@ The other shapes, read and written by `calculate_score`:
 - claim: `{"q", "r", "player", "varietal"}`, one vineyard claim; `varietal`
   (optional, default null) is what the roulette planted there, a
   `Board.plantings` entry
-- player: `{"id", "debt"}`; the list order is the seat order (seats 1 to N)
+- player: `{"id", "debt", "season", "drought"}` (`season` and `drought` optional,
+  default 0); the list order is the seat order (seats 1 to N)
 - score: one `Score`, its `watered_vineyards` each with the canal path in the
   canal shape
 
@@ -45,8 +47,9 @@ by the lowercase `PieceKind` name (`"straight"` ... `"floodgate"`, the
 floodgate included), `vineyard_distance` as `[low, high]`, `varietal_rules`
 by value, `varietal_points` keyed by varietal name, `roulette` as a list of
 varietal names, `grape_clusters_per_player` as an int or null (no cap),
-`bribe_rules` by value, `action_die` as a list of face values, the
-rest as ints. `overrides_from_json` turns those keys
+`bribe_rules` by value, `action_die` as a list of face values,
+`season_points`, `drought_points` and `season_roll_every` as an int or null,
+the rest as ints. `overrides_from_json` turns those keys
 back into `int`, `PieceKind`, and `Varietal`, the names into `VarietalRules`,
 `BribeRules`, `DieFace`, and `Varietal`, and the lists into tuples; every value check is left to
 `Preset`.
@@ -104,7 +107,7 @@ VarietalName = Literal[
 ]
 VarietalRulesName = Literal["fixed", "roulette"]
 BribeRulesName = Literal["d6", "action_die"]
-DieFaceName = Literal["floodgate", "release", "resow"]
+DieFaceName = Literal["floodgate", "release", "resow", "good_season", "drought"]
 ModeName = Literal["normal", "flash"]
 KindName = Literal["straight", "gentle_curve", "sharp_curve", "symmetric_y", "t_branch", "claw"]
 DirectionName = Literal["E", "NE", "NW", "W", "SW", "SE"]
@@ -282,6 +285,12 @@ class PlayerJSON(BaseModel):
 
     id: str = Field(min_length=1, description="Player id, a non-empty string.")
     debt: int = Field(ge=0, description="Bribe debt, 0 or more.")
+    season: int = Field(default=0, ge=0, description="Good season gains of the action die.")
+    drought: int = Field(
+        default=0,
+        ge=0,
+        description="Drought losses of the action die (scoring never takes a total below 0).",
+    )
 
 
 class WateredVineyardJSON(BaseModel):
@@ -316,7 +325,16 @@ class ScoreJSON(BaseModel):
     )
     rights_collected: int = Field(description="Water rights collected from rivals, in points.")
     debt: int = Field(description="Bribe debt.")
-    total: int = Field(description="vineyards + bodega - rights_paid + rights_collected - debt.")
+    season: int = Field(description="Good season gains of the action die.")
+    drought: int = Field(
+        description=(
+            "Drought losses of the action die actually taken: clamped so the total never goes "
+            "below 0 because of them."
+        )
+    )
+    total: int = Field(
+        description="vineyards + bodega - rights_paid + rights_collected - debt + season - drought."
+    )
     watered: int = Field(description="Number of watered claimed vineyards (the tie-break).")
     watered_vineyards: list[WateredVineyardJSON] = Field(
         description="The player's watered claimed vineyards, by hex."
@@ -350,8 +368,20 @@ _BRIBE_RULES_DESCRIPTION = (
 _WATER_RIGHT_DESCRIPTION = "Points a vineyard pays each distinct rival on its water path."
 _DIE_COST_DESCRIPTION = "Debt one roll of the action die costs (action_die rules)."
 _ACTION_DIE_DESCRIPTION = (
-    'The faces of the action die in order, each "floodgate", "release", or "resow" '
-    "(action_die rules)."
+    'The faces of the action die in order, each "floodgate", "release", "resow", '
+    '"good_season", or "drought" (action_die rules). A season face (good_season, drought) '
+    "applies to every player when rolled."
+)
+_SEASON_POINTS_DESCRIPTION = (
+    "Points every player gains on a good_season face; null: one common vineyard plot's value."
+)
+_DROUGHT_POINTS_DESCRIPTION = (
+    "Points every player loses on a drought face; null: half the good season gain, "
+    "rounded down, at least 1."
+)
+_SEASON_ROLL_DESCRIPTION = (
+    "Every this many rounds the round's start player rolls the action die for free before "
+    "their turn (action_die rules); null: off."
 )
 
 
@@ -381,6 +411,9 @@ class PresetJSON(BaseModel):
     bribe_rules: BribeRulesName = Field(description=_BRIBE_RULES_DESCRIPTION)
     action_die_cost: int = Field(description=_DIE_COST_DESCRIPTION)
     action_die: list[DieFaceName] = Field(description=_ACTION_DIE_DESCRIPTION)
+    season_points: int | None = Field(description=_SEASON_POINTS_DESCRIPTION)
+    drought_points: int | None = Field(description=_DROUGHT_POINTS_DESCRIPTION)
+    season_roll_every: int | None = Field(description=_SEASON_ROLL_DESCRIPTION)
 
 
 @with_config(ConfigDict(extra="forbid"))
@@ -455,6 +488,15 @@ class PresetOverridesJSON(TypedDict, total=False):
     ]
     action_die: Annotated[
         list[DieFaceName], Field(description=_ACTION_DIE_DESCRIPTION + " Not empty.")
+    ]
+    season_points: Annotated[
+        StrictInt | None, Field(description=_SEASON_POINTS_DESCRIPTION + " An int is 1 or more.")
+    ]
+    drought_points: Annotated[
+        StrictInt | None, Field(description=_DROUGHT_POINTS_DESCRIPTION + " An int is 1 or more.")
+    ]
+    season_roll_every: Annotated[
+        StrictInt | None, Field(description=_SEASON_ROLL_DESCRIPTION + " An int is 1 or more.")
     ]
 
 
@@ -866,7 +908,7 @@ def players_from_json(items: Iterable[Mapping[str, Any] | PlayerJSON]) -> tuple[
     if isinstance(items, (str, bytes, Mapping)) or not isinstance(items, Iterable):
         raise TypeError(f"players must be a list of player objects, got {items!r}")
     return tuple(
-        Player(id=item.id, seat=seat, debt=item.debt)
+        Player(id=item.id, seat=seat, debt=item.debt, season=item.season, drought=item.drought)
         for seat, item in enumerate((PlayerJSON.model_validate(i) for i in items), start=1)
     )
 
@@ -892,6 +934,8 @@ def score_to_json(score: Score) -> dict[str, Any]:
         "rights_paid": score.rights_paid,
         "rights_collected": score.rights_collected,
         "debt": score.debt,
+        "season": score.season,
+        "drought": score.drought,
         "total": score.total,
         "watered": score.watered,
         "watered_vineyards": [watered_vineyard_to_json(v) for v in score.watered_vineyards],

@@ -100,13 +100,19 @@ def test_phase_b_sweeps_are_listed_with_new_seeds(capsys):
     assert tune.V2_SWEEP_SEED == 103_001 and tune.V2_FINAL_SEED == 103_002
     assert {tune.V2_SWEEP_SEED, tune.V2_FINAL_SEED}.isdisjoint({tune.SWEEP_SEED, tune.FINAL_SEED})
     v2 = {s.name: s for s in tune.v2_sweeps()}
-    assert list(v2) == ["b0", "b1", "b2", "b3", "b4"]
+    assert list(v2) == ["b0", "b1", "b2", "b3", "b3b", "b4"]
     for sweep in v2.values():
         assert sweep.seed == tune.V2_SWEEP_SEED and sweep.seatings == ("score_aware",)
     assert v2["b0"].base == {mode: {} for mode in Mode}
     assert v2["b1"].base == tune.V2_BASE
     assert [len(v2["b2"].candidates[m]) for m in Mode] == [5, 5]
     assert [len(v2["b3"].candidates[m]) for m in Mode] == [7, 7]
+    assert [len(v2["b3b"].candidates[m]) for m in Mode] == [7, 3]  # 2 costs x 3 / 1 X, + no die
+    for label, changes in v2["b3b"].candidates[Mode.NORMAL][:-1]:
+        assert changes["action_die"] == tune.CONSTRUCTIVE_DIE_FACES
+        assert changes["action_die_cost"] in (1, 2) and changes["season_roll_every"] in (2, 3, 4)
+    assert {c["season_roll_every"] for _, c in v2["b3b"].candidates[Mode.FLASH][:-1]} == {2}
+    assert v2["b3b"].candidates[Mode.FLASH][-1][1]["bribe_rules"] is tune.BribeRules.D6
     assert (len(v2["b4"].candidates[Mode.NORMAL]), len(v2["b4"].candidates[Mode.FLASH])) == (8, 2)
     assert tune.main(["--list"]) == 0
     out = capsys.readouterr().out

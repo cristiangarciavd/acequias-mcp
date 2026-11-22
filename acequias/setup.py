@@ -26,6 +26,7 @@ from acequias.model import (
     Mode,
     PieceKind,
     Player,
+    SeasonRoll,
     Terrain,
 )
 
@@ -37,8 +38,9 @@ def new_game(
 
     ``preset`` replaces the shipped preset for ``mode`` (for the
     simulation); its mode must be ``mode``. The state records the preset
-    actually used in ``GameState.preset``. The same arguments always give
-    an equal state.
+    actually used in ``GameState.preset``. With ``season_roll_every`` 1,
+    round 1 is a season round, so the state starts with ``season_roll``
+    ``DUE``. The same arguments always give an equal state.
     """
     _check_int("players", players)
     _check_int("seed", seed)
@@ -75,6 +77,7 @@ def new_game(
         market=tuple(pieces[: preset.market_size]),
         bag=tuple(pieces[preset.market_size :]),
         preset=preset,
+        season_roll=SeasonRoll.DUE if preset.is_season_round(1) else None,
     )
 
 

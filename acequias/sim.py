@@ -55,7 +55,7 @@ __all__ = [
     "summarize",
 ]
 
-SCORE_TERMS = ("vineyards", "bodega", "rights_paid", "rights_collected", "debt", "total")
+SCORE_TERMS = ("vineyards", "bodega", "rights_paid", "rights_collected", "debt", "season", "drought", "total")
 """The ``Score`` fields summarized in ``SimResult.score_terms``."""
 
 ACTION_NAMES = (
@@ -213,7 +213,7 @@ class SimResult:
     """Share of games with more than one winner."""
     score_terms: Mapping[str, Mapping[str, float]] = field(hash=False)
     """For each ``Score`` term (vineyards, bodega, rights_paid, rights_collected,
-    debt, total): ``{"mean", "stdev"}`` over all player-games (population
+    debt, season, drought, total): ``{"mean", "stdev"}`` over all player-games (population
     standard deviation)."""
     mean_total_by_position: tuple[float, ...]
     """Entry ``j - 1``: the mean ``total`` of position-``j`` players."""
@@ -221,7 +221,8 @@ class SimResult:
     """``{"mean", "stdev"}`` of each game's highest ``total`` (population
     standard deviation; one value per game, shared wins included)."""
     turns_per_game: float
-    """The mean log length: rounds * P, plus one record per action die roll."""
+    """The mean log length: rounds * P, plus one record per action die roll
+    with a personal face, plus one per season-face roll of a season roll."""
     actions_per_game: Mapping[str, float] = field(hash=False)
     """The mean number of each action per game, keyed ``"canal"``,
     ``"floodgate"``, ``"bribe"``, ``"pass"``, ``"die"``, ``"release"``,
@@ -244,10 +245,12 @@ class SimResult:
     games_with_die: float
     """Share of games whose log has at least one ``RollActionDie``."""
     die_faces_per_game: Mapping[str, float] = field(hash=False)
-    """Face value (``"floodgate"``, ``"release"``, ``"resow"``): the mean
-    number of rolls per game that showed that face."""
+    """Face value (``"floodgate"``, ``"release"``, ``"resow"``,
+    ``"good_season"``, ``"drought"``): the mean number of rolls per game
+    that showed that face. Season rolls count as rolls."""
     die_use_rate: float | None
-    """Share of rolls resolved with a use, not ``DeclineFace``; None with no rolls."""
+    """Share of rolls resolved with a use, not ``DeclineFace`` (a season face
+    always counts as used); None with no rolls."""
 
     def to_json(self) -> dict[str, object]:
         """The result as plain JSON data: dicts with string keys, lists, str, int, float, None."""
@@ -321,12 +324,14 @@ def summarize(rules: SimRules, seed: int, records: Iterable[GameRecord]) -> SimR
             with_floodgate += 1
         turns.append(len(record.log))
         game_rolls = 0
-        for r, after in zip(record.log, record.log[1:]):
+        for i, r in enumerate(record.log):
             if isinstance(r.action, RollActionDie):
                 game_rolls += 1
                 if r.face is not None:
                     faces[r.face.value] += 1
-                if not isinstance(after.action, DeclineFace):
+                if r.face is not None and r.face.is_season:
+                    uses += 1  # a season face always applies
+                elif i + 1 < len(record.log) and not isinstance(record.log[i + 1].action, DeclineFace):
                     uses += 1
         if game_rolls:
             with_die += 1

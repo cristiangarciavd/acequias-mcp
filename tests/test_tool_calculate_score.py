@@ -31,6 +31,8 @@ SCORE_KEYS = {
     "rights_paid",
     "rights_collected",
     "debt",
+    "season",
+    "drought",
     "total",
     "watered",
     "watered_vineyards",
@@ -181,10 +183,10 @@ async def test_input_schema_describes_every_field_and_its_allowed_values():
         ("canals", {"q", "r", "kind", "rotation", "owner"}),
         ("floodgates", {"q", "r", "direction"}),
         ("claims", {"q", "r", "player", "varietal"}),
-        ("players", {"id", "debt"}),
+        ("players", {"id", "debt", "season", "drought"}),
     ]:
         shape = item(name)
-        optional = {"varietal"} if name == "claims" else set()
+        optional = {"claims": {"varietal"}, "players": {"season", "drought"}}.get(name, set())
         assert set(shape["properties"]) == keys
         assert sorted(shape["required"]) == sorted(keys - optional)
         assert shape["additionalProperties"] is False

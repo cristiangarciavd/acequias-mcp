@@ -6,7 +6,12 @@ every round each player acts once, in seat order (players sorted by
 round's start player. The start player rotates to the next seat each round,
 like Mendoza's *turnos de riego*. Under action die rules a die turn is two
 actions by the same player: the roll, then the face's use or
-``DeclineFace``; the turn moves on only once no face is pending. The game ends after the preset's round
+``DeclineFace``; the turn moves on only once no face is pending. A
+rolled season face (good season, drought) applies at once and ends the
+turn. With ``Preset.season_roll_every`` X, every X-th round starts with a
+free season roll by its start player (``GameState.season_roll``): the
+roll, and the use or decline of a personal face, do not spend a turn;
+then the same player takes their turn. The game ends after the preset's round
 count: the state after the last turn has ``round == rounds + 1``.
 
 ``act`` checks the turn and applies one action through
@@ -24,7 +29,7 @@ from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, replace
 
 from acequias.config import preset as shipped_preset
-from acequias.model import DieFace, GameState
+from acequias.model import DieFace, GameState, SeasonRoll
 from acequias.turn import Action, RollActionDie, apply
 
 __all__ = [
@@ -47,7 +52,7 @@ class TurnRecord:
     """One action of a game: the round it was in, who acted, and the action.
 
     ``face`` is the face rolled, for a ``RollActionDie`` logged by
-    ``play_game``; ``None`` otherwise. ``replay`` ignores it (the dice rng
+    ``play_game`` (a season face included); ``None`` otherwise. ``replay`` ignores it (the dice rng
     rolls it again).
     """
 
@@ -94,14 +99,24 @@ def act(state: GameState, player: str, action: Action, rng: random.Random) -> Ga
     ``ValueError`` from ``apply`` for an illegal action. After the last
     player of a round acts, the round goes up by one and the start player
     moves to the next seat, who acts first. While ``apply`` leaves a die
-    face pending, the turn does not move: the same player acts again.
+    face pending, the turn does not move: the same player acts again. Nor
+    does it after the season roll (or its face): the start player then
+    takes their turn. A new round that is a season round
+    (``Preset.is_season_round``) starts with ``season_roll`` ``DUE``.
     """
     if game_over(state):
         raise ValueError(f"the game is over: all {_round_count(state)} rounds have been played")
     if player != state.current_player:
         raise ValueError(f"it is {state.current_player}'s turn, not {player!r}'s")
-    after = apply(state, player, action, rng)
-    if after.pending_face is not None:
+    return _next_turn(state, apply(state, player, action, rng), player)
+
+
+def _next_turn(state: GameState, after: GameState, player: str) -> GameState:
+    """``after`` (``player``'s action on ``state``) with the turn moved on, if it ends one.
+
+    The bots use this to plan a season face without rolling.
+    """
+    if after.pending_face is not None or state.season_roll is not None:
         return after
 
     order = turn_order(state, state.round)
@@ -110,7 +125,12 @@ def act(state: GameState, player: str, action: Action, rng: random.Random) -> Ga
         return replace(after, current_player=order[position + 1])
     seats = _seat_order(state)
     start = seats[(seats.index(state.start_player) + 1) % len(seats)]
-    return replace(after, round=state.round + 1, start_player=start, current_player=start)
+    round = state.round + 1
+    p = state.preset or shipped_preset(state.mode)
+    due = SeasonRoll.DUE if round <= _round_count(state) and p.is_season_round(round) else None
+    return replace(
+        after, round=round, start_player=start, current_player=start, season_roll=due
+    )
 
 
 def play_game(
@@ -132,8 +152,8 @@ def play_game(
         player = state.current_player
         action = bots[player](state, player, bot_rng)
         round = state.round
-        state = act(state, player, action, dice_rng)
-        face = state.pending_face if isinstance(action, RollActionDie) else None
+        before, state = state, act(state, player, action, dice_rng)
+        face = _rolled_face(before, state) if isinstance(action, RollActionDie) else None
         log.append(TurnRecord(round, player, action, face))
     return state, tuple(log)
 
@@ -173,6 +193,18 @@ def game_rngs(seed: int) -> tuple[random.Random, random.Random]:
 
 
 # --- Helpers -----------------------------------------------------------------
+
+
+def _rolled_face(before: GameState, after: GameState) -> DieFace:
+    """The face a ``RollActionDie`` from ``before`` gave in ``after``.
+
+    A personal face is pending; a season face raised every player's
+    ``season`` or ``drought`` (gains and losses are at least 1).
+    """
+    if after.pending_face is not None:
+        return after.pending_face
+    gained = after.players[0].season > before.players[0].season
+    return DieFace.GOOD_SEASON if gained else DieFace.DROUGHT
 
 
 def _seat_order(state: GameState) -> tuple[str, ...]:

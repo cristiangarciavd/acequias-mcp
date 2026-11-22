@@ -122,11 +122,35 @@ class Mode(Enum):
 
 
 class DieFace(Enum):
-    """A face of the action die (``action_die`` bribe rules): what the roll lets you do."""
+    """A face of the action die (``action_die`` bribe rules): what the roll lets you do.
+
+    ``FLOODGATE``, ``RELEASE`` and ``RESOW`` are personal: the roller uses
+    or declines them. ``GOOD_SEASON`` and ``DROUGHT`` are season faces:
+    they always apply, to every player, as soon as they are rolled.
+    """
 
     FLOODGATE = "floodgate"
     RELEASE = "release"
     RESOW = "resow"
+    GOOD_SEASON = "good_season"
+    DROUGHT = "drought"
+
+    @property
+    def is_season(self) -> bool:
+        """Whether the face applies to every player (good season, drought), not only the roller."""
+        return self in (DieFace.GOOD_SEASON, DieFace.DROUGHT)
+
+
+class SeasonRoll(Enum):
+    """Where the round's free season roll is (``Preset.season_roll_every``).
+
+    ``DUE``: the start player must roll the action die for free before
+    their turn. ``ROLLED``: they rolled a personal face and must use or
+    decline it; then they take their turn.
+    """
+
+    DUE = "due"
+    ROLLED = "rolled"
 
 
 # --- Pieces on the board ---------------------------------------------------
@@ -469,18 +493,28 @@ def _floodgate_key(gate: Floodgate) -> tuple[Hex, Hex, int, int]:
 
 @dataclass(frozen=True, slots=True)
 class Player:
-    """A player: an id, a seat number, and the bribe debt accumulated so far."""
+    """A player: an id, a seat number, the bribe debt accumulated so far, and season points.
+
+    ``season`` is the sum of the good season gains of the action die so
+    far, and ``drought`` the sum of its drought losses; both are 0 or
+    more. Scoring takes the drought off, but never below a total of 0.
+    """
 
     id: str
     seat: int
     debt: int = 0
+    season: int = 0
+    drought: int = 0
 
     def __post_init__(self) -> None:
         _check_type("Player.id", self.id, str)
         _check_int("Player.seat", self.seat)
         _check_int("Player.debt", self.debt)
-        if self.debt < 0:
-            raise ValueError(f"debt cannot be negative, got {self.debt}")
+        _check_int("Player.season", self.season)
+        _check_int("Player.drought", self.drought)
+        for name in ("debt", "season", "drought"):
+            if getattr(self, name) < 0:
+                raise ValueError(f"{name} cannot be negative, got {getattr(self, name)}")
 
 
 @dataclass(frozen=True, slots=True)
@@ -498,7 +532,13 @@ class GameState:
 
     ``pending_face`` is the action die face ``current_player`` rolled and
     has not resolved yet; it is set only under ``action_die`` bribe rules,
-    and only to a face on the preset's ``action_die``.
+    and only to a personal face on the preset's ``action_die`` (a season
+    face applies at once and is never pending).
+
+    ``season_roll`` is the round's free season roll: ``DUE`` before the
+    start player rolls it (no face pending), ``ROLLED`` while its personal
+    face is pending, ``None`` otherwise. It is set only when the preset
+    has a ``season_roll_every``.
     """
 
     board: Board
@@ -511,6 +551,7 @@ class GameState:
     bag: tuple[PieceKind, ...] = ()
     preset: Preset | None = field(default=None, hash=False)
     pending_face: DieFace | None = None
+    season_roll: SeasonRoll | None = None
 
     def __post_init__(self) -> None:
         _check_type("GameState.board", self.board, Board)
@@ -559,9 +600,10 @@ class GameState:
         self._check_varietals()
         self._check_clusters()
         self._check_pending_face()
+        self._check_season_roll()
 
     def _check_pending_face(self) -> None:
-        """A pending face only under action die rules, and only one of the die's faces."""
+        """A pending face only under action die rules, and only a personal face of the die."""
         if self.pending_face is None:
             return
         _check_type("GameState.pending_face", self.pending_face, DieFace)
@@ -574,6 +616,25 @@ class GameState:
         if self.pending_face not in preset.action_die:
             raise ValueError(
                 f"pending face {self.pending_face.value} is not on the preset's action die"
+            )
+        if self.pending_face.is_season:
+            raise ValueError(
+                f"a {self.pending_face.value} face applies when rolled; it is never pending"
+            )
+
+    def _check_season_roll(self) -> None:
+        """A season roll only with ``season_roll_every``; ``ROLLED`` exactly while a face is pending."""
+        if self.season_roll is None:
+            return
+        _check_type("GameState.season_roll", self.season_roll, SeasonRoll)
+        from acequias.config import preset as shipped_preset  # local: config imports this module
+
+        preset = self.preset if self.preset is not None else shipped_preset(self.mode)
+        if preset.season_roll_every is None:
+            raise ValueError("a season roll needs a preset with season_roll_every")
+        if (self.season_roll is SeasonRoll.ROLLED) != (self.pending_face is not None):
+            raise ValueError(
+                "season_roll is ROLLED exactly while the season roll's face is pending"
             )
 
     def _check_clusters(self) -> None:

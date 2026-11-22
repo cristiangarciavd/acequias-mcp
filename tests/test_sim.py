@@ -356,7 +356,9 @@ def test_statistics_of_hand_built_records():
          "die": 0, "release": 0, "resow": 0, "decline": 0}
     )
     assert result.games_with_die == 0
-    assert result.die_faces_per_game == {"floodgate": 0, "release": 0, "resow": 0}
+    assert result.die_faces_per_game == {
+        "floodgate": 0, "release": 0, "resow": 0, "good_season": 0, "drought": 0
+    }
     assert result.die_use_rate is None
     assert result.games_with_bribe == 0.25
     assert result.games_with_floodgate == 0.25
@@ -451,9 +453,12 @@ def test_to_json_names():
         "floodgate", "floodgate", "release", "release", "resow", "resow"
     ]
     assert data["preset"]["action_die_cost"] == 2
-    assert set(data["die_faces_per_game"]) == {"floodgate", "release", "resow"}
+    assert set(data["die_faces_per_game"]) == {
+        "floodgate", "release", "resow", "good_season", "drought"
+    }
     assert set(data["score_terms"]) == {
-        "vineyards", "bodega", "rights_paid", "rights_collected", "debt", "total"
+        "vineyards", "bodega", "rights_paid", "rights_collected", "debt", "season", "drought",
+        "total",
     }
     assert set(data["winning_score"]) == {"mean", "stdev"}
 

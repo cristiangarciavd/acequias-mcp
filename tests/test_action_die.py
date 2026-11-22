@@ -428,7 +428,9 @@ async def test_simulate_game_tool_accepts_and_echoes_the_die_overrides():
     data = result.structured_content
     for key in ("bribe_rules", "action_die", "action_die_cost", "bag_mix"):
         assert data["preset"][key] == DIE_JSON[key]
-    assert set(data["die_faces_per_game"]) == {"floodgate", "release", "resow"}
+    assert set(data["die_faces_per_game"]) == {
+        "floodgate", "release", "resow", "good_season", "drought"
+    }
 
 
 @pytest.mark.anyio

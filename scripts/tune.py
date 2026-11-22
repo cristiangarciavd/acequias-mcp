@@ -49,8 +49,9 @@ A *configuration* is a mode, a player count (2 to 5), and a seating:
 alternate saboteur and greedy, seat 1 saboteur). Sweeps vary one or two
 parameters around their base with ``SWEEP_GAMES`` games: #20's sweeps
 around ``SWEEP_BASE`` from ``SWEEP_SEED``; #103's Rules v2 sweeps ``b0``
-to ``b4`` (score_aware seating) around ``V2_BASE`` (``b0``: the shipped
-presets) from ``V2_SWEEP_SEED``. ``b3`` and ``b4`` run at B2's best
+to ``b4`` and ``b3b`` (score_aware seating) around ``V2_BASE`` (``b0``: the shipped
+presets) from ``V2_SWEEP_SEED``. ``b3``, ``b3b`` (#130: the constructive
+die and the season roll) and ``b4`` run at B2's best
 ``--scale`` and ``--rare-bonus``. The final validation runs ``PROPOSED``
 at ``final_games(players)`` games from ``FINAL_SEED``, a seed no sweep
 uses; ``--candidate SWEEP LABEL`` validates one sweep candidate instead
@@ -97,6 +98,7 @@ from types import MappingProxyType
 
 import acequias
 from acequias.config import (
+    CONSTRUCTIVE_DIE_FACES,
     ROULETTE_POINTS,
     BribeRules,
     Preset,
@@ -258,6 +260,8 @@ RARE_VARIETALS = (Varietal.BONARDA, Varietal.CABERNET_FRANC)
 """The varietals worth a bit more under roulette rules (owner goal 5 of #103)."""
 COMMON_POINTS = min(ROULETTE_POINTS.values())
 """The points of a common varietal at scale 1 (``ROULETTE_POINTS``)."""
+B3B_SEASON_EVERY: Mapping[Mode, tuple[int, ...]] = {Mode.NORMAL: (2, 3, 4), Mode.FLASH: (2,)}
+"""Sweep b3b's ``season_roll_every`` values (#130): a season roll every X rounds."""
 NO_DIE = {"bribe_rules": BribeRules.D6}
 """Rules v2 with no action die and no bribe: d6 bribe rules, so the die is never
 offered, and a bag without floodgates, so there is nothing to bribe."""
@@ -457,6 +461,15 @@ def v2_sweeps(scale: int = 1, rare_bonus: int = 1) -> tuple[Sweep, ...]:
                                                  action_die=die_faces(*faces)))
                      for cost in (0, 1, 2)
                      for faces in ((2, 2, 2), (3, 2, 1))
+                 ) + (("no die (no bribe either)", v2(mode, scale, rare_bonus, **NO_DIE)),) for mode in Mode}),
+        v2_sweep("b3b", "Constructive die (floodgate/release/resow x2/good season/drought) x cost x "
+                 f"season roll every X rounds, and no die; {best}",
+                 {mode: tuple(
+                     (f"constructive die, cost {cost}, season roll every {every}",
+                      v2(mode, scale, rare_bonus, action_die=CONSTRUCTIVE_DIE_FACES,
+                         action_die_cost=cost, season_roll_every=every))
+                     for cost in (1, 2)
+                     for every in B3B_SEASON_EVERY[mode]
                  ) + (("no die (no bribe either)", v2(mode, scale, rare_bonus, **NO_DIE)),) for mode in Mode}),
         v2_sweep("b4", f"Vineyard plots and board (distance 4); {best}",
                  {
