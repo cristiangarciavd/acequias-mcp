@@ -1673,6 +1673,7 @@
     "hexes_per_player": 12,
     "market_size": 4,
     "mode": "normal",
+    "multiple_bodegas": false,
     "roulette": [
      "malbec",
      "malbec",
@@ -2841,6 +2842,7 @@
     "hexes_per_player": 12,
     "market_size": 4,
     "mode": "normal",
+    "multiple_bodegas": false,
     "roulette": [
      "malbec",
      "malbec",
@@ -5181,6 +5183,7 @@
     "hexes_per_player": 12,
     "market_size": 4,
     "mode": "normal",
+    "multiple_bodegas": false,
     "roulette": [
      "malbec",
      "malbec",
@@ -6893,6 +6896,7 @@
     "hexes_per_player": 7,
     "market_size": 4,
     "mode": "flash",
+    "multiple_bodegas": false,
     "roulette": [
      "malbec",
      "malbec",
@@ -9223,6 +9227,7 @@
     "hexes_per_player": 7,
     "market_size": 4,
     "mode": "flash",
+    "multiple_bodegas": false,
     "roulette": [
      "malbec",
      "malbec",
@@ -10269,6 +10274,7 @@
     "hexes_per_player": 7,
     "market_size": 4,
     "mode": "flash",
+    "multiple_bodegas": false,
     "roulette": [
      "malbec",
      "malbec",

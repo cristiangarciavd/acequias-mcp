@@ -36,6 +36,7 @@ SCORE_KEYS = {
     "total",
     "watered",
     "watered_vineyards",
+    "bodegas",
 }
 TERMS = ("vineyards", "bodega", "rights_paid", "rights_collected", "debt", "total")
 
@@ -281,6 +282,27 @@ async def test_flash_mode_uses_the_flash_bodega_bonus():
     assert data["mode"] == "flash"
     assert data["scores"][0]["bodega"] == 1
     assert data["scores"][0]["total"] == 4
+
+
+async def test_score_json_shows_the_number_of_bodegas():
+    arguments = three_player_game()
+    async with Client(app) as client:
+        single = (await call(client, **arguments)).structured_content
+        arguments["overrides"] = {"multiple_bodegas": True, "bodega_varietals": 1}
+        multi = (await call(client, **arguments)).structured_content
+    first = single["scores"][0]
+    assert first["bodegas"] == 1 and first["bodega"] == 2
+    watered = multi["scores"][0]["watered"]
+    assert multi["scores"][0]["bodegas"] == watered and multi["scores"][0]["bodega"] == 2 * watered
+
+
+async def test_multiple_bodegas_override_must_be_a_bool():
+    arguments = three_player_game()
+    arguments["overrides"] = {"multiple_bodegas": 1}
+    async with Client(app) as client:
+        result = await call(client, **arguments)
+    assert result.is_error
+    assert "multiple_bodegas" in text_of(result)
 
 
 @pytest.mark.parametrize("seed", range(5))

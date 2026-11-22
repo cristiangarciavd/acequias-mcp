@@ -399,7 +399,7 @@ def _assert_immutable_value(value):
         for v in value:
             _assert_immutable_value(v)
     else:
-        assert value is None or type(value) in (int, float, str), value
+        assert value is None or type(value) in (bool, int, float, str), value
 
 
 def test_result_is_frozen_and_holds_only_plain_values():

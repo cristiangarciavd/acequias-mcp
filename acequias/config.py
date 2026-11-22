@@ -127,7 +127,10 @@ class Preset:
     vineyard's distance from the river. ``stone_share`` is the percentage of
     non-river hexes that are stone, and ``bag_mix`` the percentage of the bag
     for each ``PieceKind``. A player whose watered vineyards include
-    ``bodega_varietals`` distinct varietals earns ``bodega_points``.
+    ``bodega_varietals`` distinct varietals earns ``bodega_points``. With
+    ``multiple_bodegas`` (off by default) a player earns it once per
+    disjoint group of ``bodega_varietals`` watered vineyards of distinct
+    varietals (``acequias.scoring.bodega_count``).
     ``water_right_points`` is what a watered claimed vineyard pays each
     distinct rival who owns a canal on its water path.
 
@@ -185,6 +188,7 @@ class Preset:
     season_points: int | None = None
     drought_points: int | None = None
     season_roll_every: int | None = None
+    multiple_bodegas: bool = False
 
     def __post_init__(self) -> None:
         _check_type("mode", self.mode, Mode)
@@ -216,6 +220,7 @@ class Preset:
         for name in ("season_points", "drought_points", "season_roll_every"):
             if getattr(self, name) is not None:
                 _check_count(name, getattr(self, name))
+        _check_type("multiple_bodegas", self.multiple_bodegas, bool)
         if self.season_roll_every is not None and self.bribe_rules is not BribeRules.ACTION_DIE:
             raise ValueError("season_roll_every needs action_die bribe rules")
         if self.bribe_rules is BribeRules.ACTION_DIE:
