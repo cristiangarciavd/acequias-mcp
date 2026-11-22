@@ -380,8 +380,9 @@ _DROUGHT_POINTS_DESCRIPTION = (
     "rounded down, at least 1."
 )
 _SEASON_ROLL_DESCRIPTION = (
-    "Every this many rounds the round's start player rolls the action die for free before "
-    "their turn (action_die rules); null: off."
+    "Every this many rounds the season die's holder rolls the action die for free before "
+    "the start player's turn, without spending their own (action_die rules); the season die "
+    "starts with the first start player and passes left after each season roll. null: off."
 )
 
 
