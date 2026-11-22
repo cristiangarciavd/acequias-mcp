@@ -144,9 +144,10 @@ class DieFace(Enum):
 class SeasonRoll(Enum):
     """Where the round's free season roll is (``Preset.season_roll_every``).
 
-    ``DUE``: the start player must roll the action die for free before
-    their turn. ``ROLLED``: they rolled a personal face and must use or
-    decline it; then they take their turn.
+    ``DUE``: the season die's holder (``current_player``, see
+    ``acequias.game.season_holder``) must roll the action die for free
+    before the start player's turn. ``ROLLED``: they rolled a personal face
+    and must use or decline it; then the start player takes their turn.
     """
 
     DUE = "due"
@@ -536,7 +537,7 @@ class GameState:
     face applies at once and is never pending).
 
     ``season_roll`` is the round's free season roll: ``DUE`` before the
-    start player rolls it (no face pending), ``ROLLED`` while its personal
+    season die's holder (``current_player`` meanwhile) rolls it (no face pending), ``ROLLED`` while its personal
     face is pending, ``None`` otherwise. It is set only when the preset
     has a ``season_roll_every``.
     """

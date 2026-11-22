@@ -9,9 +9,15 @@ actions by the same player: the roll, then the face's use or
 ``DeclineFace``; the turn moves on only once no face is pending. A
 rolled season face (good season, drought) applies at once and ends the
 turn. With ``Preset.season_roll_every`` X, every X-th round starts with a
-free season roll by its start player (``GameState.season_roll``): the
+free season roll (``GameState.season_roll``) by the season die's holder
+(``season_holder``): the k-th season roll of the game is made by the seat
+k-1 places after the game's first start player (the season die passes to
+the next seat after each season roll), so every seat makes the same number
+of season rolls, within one, whatever X and the player count. While the
+roll is due or its face pending, ``current_player`` is the holder; the
 roll, and the use or decline of a personal face, do not spend a turn;
-then the same player takes their turn. The game ends after the preset's round
+then the round's start player takes their turn. ``next_season_roll``
+says when the next season roll is due and who makes it. The game ends after the preset's round
 count: the state after the last turn has ``round == rounds + 1``.
 
 ``act`` checks the turn and applies one action through
@@ -41,6 +47,8 @@ __all__ = [
     "play_game",
     "replay",
     "game_rngs",
+    "season_holder",
+    "next_season_roll",
 ]
 
 Bot = Callable[[GameState, str, random.Random], Action]
@@ -99,10 +107,11 @@ def act(state: GameState, player: str, action: Action, rng: random.Random) -> Ga
     ``ValueError`` from ``apply`` for an illegal action. After the last
     player of a round acts, the round goes up by one and the start player
     moves to the next seat, who acts first. While ``apply`` leaves a die
-    face pending, the turn does not move: the same player acts again. Nor
-    does it after the season roll (or its face): the start player then
-    takes their turn. A new round that is a season round
-    (``Preset.is_season_round``) starts with ``season_roll`` ``DUE``.
+    face pending, the turn does not move: the same player acts again.
+    After the season roll (or its face) the round's start player takes
+    their turn. A new round that is a season round
+    (``Preset.is_season_round``) starts with ``season_roll`` ``DUE`` and
+    the season die's holder (``season_holder``) as ``current_player``.
     """
     if game_over(state):
         raise ValueError(f"the game is over: all {_round_count(state)} rounds have been played")
@@ -116,8 +125,10 @@ def _next_turn(state: GameState, after: GameState, player: str) -> GameState:
 
     The bots use this to plan a season face without rolling.
     """
-    if after.pending_face is not None or state.season_roll is not None:
+    if after.pending_face is not None:
         return after
+    if state.season_roll is not None:  # the season roll is done: the start player's turn
+        return replace(after, current_player=after.start_player)
 
     order = turn_order(state, state.round)
     position = order.index(player)
@@ -127,10 +138,51 @@ def _next_turn(state: GameState, after: GameState, player: str) -> GameState:
     start = seats[(seats.index(state.start_player) + 1) % len(seats)]
     round = state.round + 1
     p = state.preset or shipped_preset(state.mode)
-    due = SeasonRoll.DUE if round <= _round_count(state) and p.is_season_round(round) else None
-    return replace(
-        after, round=round, start_player=start, current_player=start, season_roll=due
-    )
+    if round <= _round_count(state) and p.is_season_round(round):
+        return replace(
+            after, round=round, start_player=start,
+            current_player=season_holder(state, round), season_roll=SeasonRoll.DUE,
+        )
+    return replace(after, round=round, start_player=start, current_player=start, season_roll=None)
+
+
+def season_holder(state: GameState, round: int) -> str:
+    """Who makes the season roll of season round ``round`` (``Preset.is_season_round``).
+
+    The k-th season roll (round k * X, X the preset's ``season_roll_every``)
+    is made by the seat k-1 places after the game's first start player, in
+    seat order: the season die passes to the next seat after each season
+    roll. Worked out from ``state.start_player`` and ``state.round``, like
+    ``turn_order``, so every state of the same game gives the same answer.
+    Raises ``ValueError`` for a round outside the game or not a season round.
+    """
+    turn_order(state, round)  # checks the round
+    p = state.preset or shipped_preset(state.mode)
+    if not p.is_season_round(round):
+        raise ValueError(f"round {round} has no season roll")
+    seats = _seat_order(state)
+    first = seats.index(state.start_player) - (state.round - 1)
+    k = round // p.season_roll_every
+    return seats[(first + k - 1) % len(seats)]
+
+
+def next_season_roll(state: GameState) -> tuple[int, str] | None:
+    """The round of the next season roll and the player who holds the season die for it.
+
+    While a season roll is due or its face pending, that is the current
+    round and ``current_player``; otherwise the next season round after
+    ``state.round``. ``None`` when the game has no season roll left.
+    """
+    if state.season_roll is not None:
+        return state.round, state.current_player
+    p = state.preset or shipped_preset(state.mode)
+    every = p.season_roll_every
+    if every is None:
+        return None
+    round = (state.round // every + 1) * every
+    if round > _round_count(state):
+        return None
+    return round, season_holder(state, round)
 
 
 def play_game(

@@ -33,11 +33,12 @@ or ``Preset.drought_loss`` to every ``Player.drought`` (scoring clamps
 the drought so no total goes below 0).
 
 With ``Preset.season_roll_every``, a ``GameState.season_roll`` of ``DUE``
-allows only ``RollActionDie()`` by ``current_player`` (the round's start
+allows only ``RollActionDie()`` by ``current_player`` (the season die's
+holder, ``acequias.game.season_holder``, who may not be the round's start
 player): a free roll, with no cost. A season face applies and clears it;
 a personal face is pending with ``season_roll`` ``ROLLED`` until it is
-used or declined, which clears both. The round loop then gives the same
-player their own turn. The rng order of the die:
+used or declined, which clears both. The round loop then gives the
+round's start player their turn. The rng order of the die:
 
 - ``RollActionDie`` (voluntary or season roll): one
   ``rng.choice(preset.action_die)``, nothing else.

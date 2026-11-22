@@ -100,7 +100,7 @@ def test_phase_b_sweeps_are_listed_with_new_seeds(capsys):
     assert tune.V2_SWEEP_SEED == 103_001 and tune.V2_FINAL_SEED == 103_002
     assert {tune.V2_SWEEP_SEED, tune.V2_FINAL_SEED}.isdisjoint({tune.SWEEP_SEED, tune.FINAL_SEED})
     v2 = {s.name: s for s in tune.v2_sweeps()}
-    assert list(v2) == ["b0", "b1", "b2", "b3", "b3b", "b4"]
+    assert list(v2) == ["b0", "b1", "b2", "b3", "b3b", "b4", "b5"]
     for sweep in v2.values():
         assert sweep.seed == tune.V2_SWEEP_SEED and sweep.seatings == ("score_aware",)
     assert v2["b0"].base == {mode: {} for mode in Mode}
@@ -114,6 +114,7 @@ def test_phase_b_sweeps_are_listed_with_new_seeds(capsys):
     assert {c["season_roll_every"] for _, c in v2["b3b"].candidates[Mode.FLASH][:-1]} == {2}
     assert v2["b3b"].candidates[Mode.FLASH][-1][1]["bribe_rules"] is tune.BribeRules.D6
     assert (len(v2["b4"].candidates[Mode.NORMAL]), len(v2["b4"].candidates[Mode.FLASH])) == (8, 2)
+    assert [len(v2["b5"].candidates[m]) for m in Mode] == [5, 5]  # 2 costs x 2 X, + no die
     assert tune.main(["--list"]) == 0
     out = capsys.readouterr().out
     for name in v2:
@@ -127,6 +128,27 @@ def test_no_die_candidate_never_offers_the_die_or_a_bribe(mode):
     assert label.startswith("no die")
     p = with_overrides(preset(mode), **{**tune.V2_BASE[mode], **changes})
     assert p.bribe_rules is BribeRules.D6 and p.bag_mix[PieceKind.FLOODGATE] == 0
+
+
+@pytest.mark.parametrize("mode", list(Mode))
+def test_b5_combines_the_best_board_with_the_constructive_die(mode):
+    b5 = {s.name: s for s in tune.v2_sweeps(2, 1)}["b5"]
+    every = {Mode.NORMAL: {3, 4}, Mode.FLASH: {2, 3}}[mode]
+    *die, (label, no_die) = b5.candidates[mode]
+    assert label.startswith("no die") and no_die["bribe_rules"] is BribeRules.D6
+    assert {(c["action_die_cost"], c["season_roll_every"]) for _, c in die} == {
+        (cost, x) for cost in (1, 2) for x in every
+    }
+    for _, changes in (*die, (label, no_die)):
+        p = with_overrides(preset(mode), **{**tune.V2_BASE[mode], **changes})
+        assert p.varietal_points[Varietal.MALBEC] == 4 and p.varietal_points[Varietal.BONARDA] == 5
+        if mode is Mode.NORMAL:
+            assert (p.vineyards_per_player, p.hexes_per_player, p.grape_clusters_per_player) == (2, 18, None)
+        else:
+            assert (p.vineyards_per_player, p.hexes_per_player) == (
+                tune.V2_PRESET[mode].vineyards_per_player, tune.V2_PRESET[mode].hexes_per_player)
+    for _, changes in die:
+        assert changes["action_die"] == tune.CONSTRUCTIVE_DIE_FACES
 
 
 def test_b3_and_b4_follow_the_best_scale():
