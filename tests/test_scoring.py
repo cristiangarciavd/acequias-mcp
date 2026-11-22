@@ -1,5 +1,6 @@
 import ast
 import dataclasses
+import itertools
 from pathlib import Path
 from types import MappingProxyType
 
@@ -19,7 +20,7 @@ from acequias.model import (
     Tile,
     Varietal,
 )
-from acequias.scoring import Score, WateredVineyard, calculate_score, winners
+from acequias.scoring import Score, WateredVineyard, bodega_count, calculate_score, winners
 
 MALBEC, BONARDA, TORRONTES = Varietal.MALBEC, Varietal.BONARDA, Varietal.TORRONTES
 
@@ -400,6 +401,103 @@ def test_duplicate_varietals_count_once():
     scores = calculate_score(state)
     assert terms(scores["a"]) == (8, 0, 0, 0, 0, 8)
     assert_rights_balance(scores)
+
+
+# --- Multiple bodegas (#135) --------------------------------------------------
+
+MULTI = with_overrides(NORMAL, multiple_bodegas=True)
+M, B, T = MALBEC, BONARDA, TORRONTES
+
+
+def owned(varietals, claimant="a"):
+    return [lane(i, [claimant], v, claimant) for i, v in enumerate(varietals)]
+
+
+@pytest.mark.parametrize(
+    ("varietals", "size", "expected"),
+    [
+        ((), 3, 0),
+        ((M, B), 3, 0),
+        ((M, B, T), 3, 1),
+        ((M, M, M, B, B, T), 3, 1),
+        ((M, M, B, B, T, T), 3, 2),
+        ((M, M, B, B, T), 3, 1),
+        ((M, M, M, B, B, B, T, T, T), 3, 3),
+        ((M, M, M, B, B, T), 2, 3),
+        ((M, M, M, M, B), 2, 1),
+        ((M, M, M), 1, 3),
+    ],
+)
+def test_bodega_count_is_the_largest_number_of_disjoint_distinct_groups(varietals, size, expected):
+    assert bodega_count(varietals, size) == expected
+
+
+def test_bodega_count_matches_a_brute_force_search():
+    def brute(items, size):
+        best = 0
+        for group in set(itertools.combinations(sorted(items, key=lambda v: v.name), size)):
+            if len(set(group)) == size:
+                rest = list(items)
+                for v in group:
+                    rest.remove(v)
+                best = max(best, 1 + brute(rest, size))
+        return best
+
+    for n in range(8):
+        for items in itertools.combinations_with_replacement((M, B, T, Varietal.MERLOT), n):
+            for size in (1, 2, 3):
+                assert bodega_count(items, size) == brute(list(items), size), (items, size)
+
+
+def test_bodega_count_rejects_a_size_below_one():
+    with pytest.raises(ValueError):
+        bodega_count((M,), 0)
+
+
+def test_multiple_bodegas_is_off_in_the_shipped_presets():
+    assert NORMAL.multiple_bodegas is False and FLASH.multiple_bodegas is False
+
+
+def test_multiple_bodegas_needs_a_bool():
+    with pytest.raises(TypeError):
+        with_overrides(NORMAL, multiple_bodegas=1)
+
+
+def test_three_malbecs_two_bonardas_one_torrontes_give_one_bodega():
+    scores = calculate_score(make_state(owned((M, M, M, B, B, T))), MULTI)
+    assert (scores["a"].bodegas, scores["a"].bodega) == (1, 2)
+
+
+def test_two_of_each_varietal_give_two_bodegas():
+    scores = calculate_score(make_state(owned((M, M, B, B, T, T))), MULTI)
+    # 2 x (3 + 2 + 1) = 12, plus two bonuses of 2.
+    assert terms(scores["a"]) == (12, 4, 0, 0, 0, 16)
+    assert scores["a"].bodegas == 2
+    assert scores["b"].bodegas == 0 and scores["b"].bodega == 0
+    assert_total_formula(scores)
+
+
+def test_without_the_option_two_full_sets_give_one_bodega():
+    scores = calculate_score(make_state(owned((M, M, B, B, T, T))))
+    assert (scores["a"].bodegas, scores["a"].bodega) == (1, 2)
+
+
+def test_dry_vineyards_do_not_count_toward_a_bodega():
+    lanes = owned((M, B, T)) + [dry(3, M, "a"), dry(4, B, "a"), dry(5, T, "a")]
+    scores = calculate_score(make_state(lanes), MULTI)
+    assert (scores["a"].bodegas, scores["a"].bodega, scores["a"].watered) == (1, 2, 3)
+
+
+def test_rival_vineyards_do_not_count_toward_a_bodega():
+    lanes = owned((M, B, T)) + [lane(3 + i, ["b"], v, "b") for i, v in enumerate((M, B, T))]
+    scores = calculate_score(make_state(lanes), MULTI)
+    assert scores["a"].bodegas == 1 and scores["b"].bodegas == 1
+
+
+def test_multiple_bodegas_scale_with_the_preset():
+    two_varietals = with_overrides(MULTI, bodega_varietals=2, bodega_points=3)
+    scores = calculate_score(make_state(owned((M, M, M, B, B, T))), two_varietals)
+    assert (scores["a"].bodegas, scores["a"].bodega) == (3, 9)
 
 
 def test_no_preset_uses_the_mode_preset():

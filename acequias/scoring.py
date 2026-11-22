@@ -22,13 +22,20 @@ For each watered claimed vineyard, the claimant pays
 other player who owns a canal on its path, and each of them collects the
 same. Unclaimed vineyards score nothing and cause no rights.
 
+The bodega term is ``preset.bodega_points`` times ``Score.bodegas``: 1 or
+0 (``bodega_varietals`` distinct watered varietals or not), or, with
+``preset.multiple_bodegas``, the largest number of disjoint groups of
+``bodega_varietals`` watered vineyards, each of distinct varietals
+(``bodega_count``).
+
 This module is pure: it reads a ``GameState``, changes nothing, and has no
 randomness.
 """
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections import Counter
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
 
@@ -64,7 +71,8 @@ class Score:
     the rival-vineyard pairs times the preset's ``water_right_points``.
     ``watered`` is the number of the player's claimed vineyards that are
     watered (the tie-break), and ``watered_vineyards`` lists them in hex
-    order.
+    order. ``bodegas`` is the number of bodega bonuses earned, so
+    ``bodega == bodegas * bodega_points``.
     """
 
     player: str
@@ -79,6 +87,26 @@ class Score:
     watered_vineyards: tuple[WateredVineyard, ...]
     season: int = 0
     drought: int = 0
+    bodegas: int = 0
+
+
+def bodega_count(varietals: Iterable[Varietal], size: int) -> int:
+    """The largest number of disjoint groups of ``size`` items of ``varietals``,
+    each group of ``size`` distinct varietals.
+
+    ``varietals`` holds one item per watered vineyard (repeats allowed).
+    ``t`` groups fit exactly when ``sum(min(count, t)) >= size * t`` over
+    the varietal counts: each varietal gives at most one vineyard per
+    group, and any ``size * t`` vineyards that respect that can be dealt
+    into ``t`` groups round-robin. The count is the largest such ``t``.
+    """
+    if size < 1:
+        raise ValueError(f"size must be at least 1, got {size}")
+    counts = Counter(varietals).values()
+    groups = sum(counts) // size
+    while groups > 0 and sum(min(c, groups) for c in counts) < size * groups:
+        groups -= 1
+    return groups
 
 
 def calculate_score(state: GameState, preset: Preset | None = None) -> Mapping[str, Score]:
@@ -122,8 +150,10 @@ def calculate_score(state: GameState, preset: Preset | None = None) -> Mapping[s
     for p in players:
         mine = tuple(owned[p.id])
         vineyards = sum(points[v.varietal] for v in mine)
-        varietals = {v.varietal for v in mine}
-        bodega = preset.bodega_points if len(varietals) >= preset.bodega_varietals else 0
+        bodegas = bodega_count((v.varietal for v in mine), preset.bodega_varietals)
+        if not preset.multiple_bodegas:
+            bodegas = min(bodegas, 1)
+        bodega = preset.bodega_points * bodegas
         paid = sum(len(v.pays) for v in mine) * preset.water_right_points
         before = vineyards + bodega - paid + collected[p.id] - p.debt + p.season
         drought = min(p.drought, max(0, before))
@@ -141,6 +171,7 @@ def calculate_score(state: GameState, preset: Preset | None = None) -> Mapping[s
             watered_vineyards=mine,
             season=p.season,
             drought=drought,
+            bodegas=bodegas,
         )
     return MappingProxyType(scores)
 

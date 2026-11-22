@@ -49,7 +49,7 @@ by value, `varietal_points` keyed by varietal name, `roulette` as a list of
 varietal names, `grape_clusters_per_player` as an int or null (no cap),
 `bribe_rules` by value, `action_die` as a list of face values,
 `season_points`, `drought_points` and `season_roll_every` as an int or null,
-the rest as ints. `overrides_from_json` turns those keys
+`multiple_bodegas` as a bool, the rest as ints. `overrides_from_json` turns those keys
 back into `int`, `PieceKind`, and `Varietal`, the names into `VarietalRules`,
 `BribeRules`, `DieFace`, and `Varietal`, and the lists into tuples; every value check is left to
 `Preset`.
@@ -73,7 +73,15 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, StrictInt, with_config
+from pydantic import (
+    BaseModel,
+    BeforeValidator,
+    ConfigDict,
+    Field,
+    StrictBool,
+    StrictInt,
+    with_config,
+)
 from typing_extensions import TypedDict
 
 from acequias.assembly import AssemblyStep
@@ -309,6 +317,12 @@ class WateredVineyardJSON(BaseModel):
     )
 
 
+_BODEGAS_DESCRIPTION = (
+    "Bodega bonuses earned: 0 or 1, or with multiple_bodegas the largest number of disjoint "
+    "groups of bodega_varietals watered vineyards, each of distinct varietals."
+)
+
+
 class ScoreJSON(BaseModel):
     """One player's final score, by term."""
 
@@ -317,7 +331,9 @@ class ScoreJSON(BaseModel):
     player: str = Field(description="Player id.")
     seat: int = Field(description="Seat number, 1 to N in the order of the input players.")
     vineyards: int = Field(description="Points from the player's watered claimed vineyards.")
-    bodega: int = Field(description="Bodega bonus for watering enough different varietals.")
+    bodega: int = Field(
+        description="Bodega bonus for watering enough different varietals: bodegas x bodega_points."
+    )
     rights_paid: int = Field(
         description=(
             "Water rights paid to rivals, in points: water_right_points per rival per vineyard."
@@ -339,6 +355,7 @@ class ScoreJSON(BaseModel):
     watered_vineyards: list[WateredVineyardJSON] = Field(
         description="The player's watered claimed vineyards, by hex."
     )
+    bodegas: int = Field(description=_BODEGAS_DESCRIPTION)
 
 
 _ROUNDS_DESCRIPTION = 'Rounds per player count, keyed "2" to "5".'
@@ -379,6 +396,10 @@ _DROUGHT_POINTS_DESCRIPTION = (
     "Points every player loses on a drought face; null: half the good season gain, "
     "rounded down, at least 1."
 )
+_MULTIPLE_BODEGAS_DESCRIPTION = (
+    "Whether a player can earn the bodega bonus more than once: once per disjoint group of "
+    "bodega_varietals watered vineyards of distinct varietals. false: at most once."
+)
 _SEASON_ROLL_DESCRIPTION = (
     "Every this many rounds the season die's holder rolls the action die for free before "
     "the start player's turn, without spending their own (action_die rules); the season die "
@@ -415,6 +436,7 @@ class PresetJSON(BaseModel):
     season_points: int | None = Field(description=_SEASON_POINTS_DESCRIPTION)
     drought_points: int | None = Field(description=_DROUGHT_POINTS_DESCRIPTION)
     season_roll_every: int | None = Field(description=_SEASON_ROLL_DESCRIPTION)
+    multiple_bodegas: bool = Field(description=_MULTIPLE_BODEGAS_DESCRIPTION)
 
 
 @with_config(ConfigDict(extra="forbid"))
@@ -499,6 +521,7 @@ class PresetOverridesJSON(TypedDict, total=False):
     season_roll_every: Annotated[
         StrictInt | None, Field(description=_SEASON_ROLL_DESCRIPTION + " An int is 1 or more.")
     ]
+    multiple_bodegas: Annotated[StrictBool, Field(description=_MULTIPLE_BODEGAS_DESCRIPTION)]
 
 
 def overrides_from_json(overrides: Mapping[str, Any]) -> dict[str, Any]:
@@ -940,4 +963,5 @@ def score_to_json(score: Score) -> dict[str, Any]:
         "total": score.total,
         "watered": score.watered,
         "watered_vineyards": [watered_vineyard_to_json(v) for v in score.watered_vineyards],
+        "bodegas": score.bodegas,
     }

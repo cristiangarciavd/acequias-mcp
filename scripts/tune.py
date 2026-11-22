@@ -53,7 +53,8 @@ to ``b5`` and ``b3b`` (score_aware seating) around ``V2_BASE`` (``b0``: the ship
 presets) from ``V2_SWEEP_SEED``. ``b3``, ``b3b`` (#130: the constructive
 die and the season roll), ``b4`` and ``b5`` (#132: B4's best board with
 the constructive die and the season roll) run at B2's best
-``--scale`` and ``--rare-bonus``. The final validation runs ``PROPOSED``
+``--scale`` and ``--rare-bonus``; ``--multiple-bodegas`` (#135) turns on
+``multiple_bodegas`` in every b5 candidate, for phase D. The final validation runs ``PROPOSED``
 at ``final_games(players)`` games from ``FINAL_SEED``, a seed no sweep
 uses; ``--candidate SWEEP LABEL`` validates one sweep candidate instead
 (#103 phase D: seed ``V2_FINAL_SEED`` for a Rules v2 sweep):
@@ -438,14 +439,18 @@ SWEEPS: tuple[Sweep, ...] = (
 )
 
 
-def v2_sweeps(scale: int = 1, rare_bonus: int = 1) -> tuple[Sweep, ...]:
+def v2_sweeps(scale: int = 1, rare_bonus: int = 1, multiple_bodegas: bool = False) -> tuple[Sweep, ...]:
     """#103 phase B: score_aware seating, seed ``V2_SWEEP_SEED``. B3 and B4
     run at B2's best ``scale`` and ``rare_bonus`` (``--scale``,
     ``--rare-bonus``; the defaults are the provisional 2/3 points). B5
     (#132) combines the best of B2-B4: B4's best board (``B5_BOARD``) with
     the constructive die x cost x season roll, and no die, at the same
-    scale and rare bonus."""
+    scale and rare bonus; ``multiple_bodegas`` (#135, ``--multiple-bodegas``)
+    turns that option on in every b5 candidate."""
     best = f"scale {scale}, rare +{rare_bonus}"
+    b5_base = {mode: {**B5_BOARD[mode], **({"multiple_bodegas": True} if multiple_bodegas else {})}
+               for mode in Mode}
+    b5_bodegas = ", multiple bodegas" if multiple_bodegas else ""
     seats = ("score_aware",)
     shipped = {mode: {} for mode in Mode}
 
@@ -498,14 +503,14 @@ def v2_sweeps(scale: int = 1, rare_bonus: int = 1) -> tuple[Sweep, ...]:
                      ),
                  }),
         v2_sweep("b5", "Best board (Normal: 2 plots, 18 hexes/player) x constructive die x cost x "
-                 f"season roll every X rounds, and no die; {best}",
+                 f"season roll every X rounds, and no die; {best}{b5_bodegas}",
                  {mode: tuple(
                      (f"constructive die, cost {cost}, season roll every {every}",
-                      v2(mode, scale, rare_bonus, **B5_BOARD[mode], action_die=CONSTRUCTIVE_DIE_FACES,
+                      v2(mode, scale, rare_bonus, **b5_base[mode], action_die=CONSTRUCTIVE_DIE_FACES,
                          action_die_cost=cost, season_roll_every=every))
                      for cost in (1, 2)
                      for every in B5_SEASON_EVERY[mode]
-                 ) + (("no die (no bribe either)", v2(mode, scale, rare_bonus, **B5_BOARD[mode], **NO_DIE)),)
+                 ) + (("no die (no bribe either)", v2(mode, scale, rare_bonus, **b5_base[mode], **NO_DIE)),)
                   for mode in Mode}),
     )
 
@@ -1189,6 +1194,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--rare-bonus", type=_workers, default=1,
                         help="Bonarda and Cabernet Franc score the common value + this in sweeps b3, b3b, b4 and b5: "
                              "B2's best (default 1)")
+    parser.add_argument("--multiple-bodegas", action="store_true",
+                        help="turn on multiple_bodegas (#135) in every b5 candidate (#103 phase D)")
     parser.add_argument("--games", type=int,
                         help=f"games per configuration (default: {SWEEP_GAMES} in a sweep, the final count otherwise)")
     parser.add_argument("--smoke", action="store_true",
@@ -1216,8 +1223,10 @@ def main(argv: list[str] | None = None) -> int:
     if games is not None and games < 1:
         parser.error("--games must be at least 1")
     modes = [Mode(args.mode)] if args.mode else list(Mode)
-    sweeps = V1_SWEEPS + v2_sweeps(args.scale, args.rare_bonus)
+    sweeps = V1_SWEEPS + v2_sweeps(args.scale, args.rare_bonus, args.multiple_bodegas)
     flags = "" if (args.scale, args.rare_bonus) == (1, 1) else f" --scale {args.scale} --rare-bonus {args.rare_bonus}"
+    if args.multiple_bodegas:
+        flags += " --multiple-bodegas"
     players_list = [args.players] if args.players else list(PLAYER_COUNTS)
     candidate = None
     if args.candidate:

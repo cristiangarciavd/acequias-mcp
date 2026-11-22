@@ -151,6 +151,27 @@ def test_b5_combines_the_best_board_with_the_constructive_die(mode):
         assert changes["action_die"] == tune.CONSTRUCTIVE_DIE_FACES
 
 
+@pytest.mark.parametrize("mode", list(Mode))
+def test_multiple_bodegas_flag_switches_it_on_in_every_b5_candidate(mode):
+    off = {s.name: s for s in tune.v2_sweeps(2, 1)}
+    on = {s.name: s for s in tune.v2_sweeps(2, 1, multiple_bodegas=True)}
+    for _, changes in off["b5"].candidates[mode]:
+        assert "multiple_bodegas" not in changes
+    assert [label for label, _ in on["b5"].candidates[mode]] == [label for label, _ in off["b5"].candidates[mode]]
+    for _, changes in on["b5"].candidates[mode]:
+        p = with_overrides(preset(mode), **{**tune.V2_BASE[mode], **changes})
+        assert p.multiple_bodegas is True
+    assert "multiple bodegas" in on["b5"].title
+    for name in ("b0", "b1", "b2", "b3", "b3b", "b4"):
+        assert on[name] == off[name]
+
+
+def test_multiple_bodegas_flag_reaches_the_b5_sweep(capsys):
+    assert tune.main(["--list", "--multiple-bodegas"]) == 0
+    b5 = [line for line in capsys.readouterr().out.splitlines() if line.startswith("b5:")]
+    assert len(b5) == 1 and "multiple bodegas" in b5[0]
+
+
 def test_b3_and_b4_follow_the_best_scale():
     b3 = tune.v2_sweeps(2, 2)[3]
     for label, changes in b3.candidates[Mode.FLASH]:
