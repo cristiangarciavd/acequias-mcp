@@ -1088,7 +1088,7 @@ Findings:
 - Normal: cost 2, season every 3 is inside the margin at every player count (cost 1 every 3 too).
 - Flash: every 2 is the better choice. Every 3 is biased at 3p because only about 2 rolls happen per game. The 3p/5p Flash advantage is already near or over the margin without the die.
 
-### Phase C candidates (pending the owner)
+### Phase C candidates
 
 All use scale 3 and rare +1.
 
@@ -1099,3 +1099,48 @@ All use scale 3 and rare +1.
 | C | no die | - | 2 plots, 18 hexes per player |
 
 Open: the bodega threshold (the bodega rate is under 1% in every sweep).
+
+### Phase C: lookahead spot checks (A, B, C)
+
+Script `output/tuning-103/phase-c.sh`, one run per candidate and mode:
+`uv run python scripts/tune.py --candidate b5 "<candidate>" --mode <mode> --seating lookahead --games 100 --scale 3 --rare-bonus 1 --workers 3`.
+100 games per row, seed 103002. The 95% margin is ±0.196 / 0.277 / 0.339 / 0.392 at 2p / 3p / 4p / 5p. The die is rolled in 100% of games with A and B.
+
+| Mode | Candidate | Advantage 2p / 3p / 4p / 5p | At most 0.10 | Shared wins | Winning score | Die use rate | Bodega rate |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Normal | A (cost 2) | 0.010 / 0.090 / 0.220 / 0.175 | 2p, 3p | 0.32-0.46 | 5.51-7.12 | 0.56-0.60 | 0.000-0.015 |
+| Normal | B (cost 1) | 0.030 / 0.030 / 0.163 / 0.154 | 2p, 3p | 0.33-0.50 | 5.05-7.03 | 0.57-0.61 | 0.000-0.015 |
+| Normal | C (no die) | 0.130 / 0.045 / 0.150 / 0.335 | 3p | 0.20-0.49 | 3.92-6.28 | - | 0.002-0.035 |
+| Flash | A (cost 2) | 0.040 / 0.225 / 0.140 / 0.297 | 2p | 0.40-0.52 | 3.82-5.37 | 0.47-0.53 | 0.000-0.005 |
+| Flash | B (cost 1) | 0.050 / 0.190 / 0.147 / 0.297 | 2p | 0.41-0.54 | 3.63-5.10 | 0.48-0.54 | 0.000-0.007 |
+| Flash | C (no die) | 0.100 / 0.285 / 0.230 / 0.170 | none | 0.34-0.56 | 2.57-4.68 | - | 0.000-0.015 |
+
+Findings:
+
+- The die is in play in every game, and lookahead uses 56-61% of its Normal rolls (47-54% in Flash) instead of declining them.
+- Winning scores are higher with the die (Normal 5.1-7.1 vs 3.9-6.3 without; Flash 3.6-5.4 vs 2.6-4.7).
+- 100 games per row cannot separate A and B: their margins are wider than the gap between them.
+- The owner picked B (cost 1) for phase D.
+
+### Phase D: candidate B with multiple bodegas
+
+Script `output/tuning-103/phase-d.sh`, one run per mode and bot:
+`uv run python scripts/tune.py --scale 3 --rare-bonus 1 --multiple-bodegas --workers 3 --candidate b5 "<B for the mode>" --mode <mode> --seating <bot>`,
+plus `--games 500` for lookahead. score_aware and greedy use the final validation counts (margin ±0.044 / 0.049 / 0.049 / 0.049); lookahead uses 500 games per configuration (margin ±0.088 / 0.124 / 0.152 / 0.175). Seed 103002. The die is rolled in 100% of games.
+
+| Mode | Bot | Advantage 2p / 3p / 4p / 5p | At most 0.10 | Shared wins | Winning score | Rolls/game | Die use rate | Bodega rate |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Normal | score_aware | 0.028 / 0.041 / 0.070 / **0.136** | 2p-4p | 0.37-0.41 | 5.49-6.48 | 3.32-6.13 | 0.46-0.51 | 0.001-0.002 |
+| Normal | greedy | 0.052 / 0.065 / 0.050 / 0.068 | all | 0.43-0.60 | 4.84-8.07 | 3.00-5.00 | 0.48-0.62 | 0.003-0.009 |
+| Normal | lookahead | 0.028 / 0.153 / 0.148 / 0.123 | 2p | 0.35-0.51 | 5.34-6.53 | 3.41-5.81 | 0.61-0.63 | 0.000-0.006 |
+| Flash | score_aware | 0.008 / 0.049 / **0.173** / **0.142** | 2p, 3p | 0.38-0.49 | 3.99-4.93 | 2.08-3.27 | 0.39-0.43 | 0.000-0.001 |
+| Flash | greedy | 0.027 / 0.058 / **0.226** / **0.210** | 2p, 3p | 0.51-0.61 | 4.06-6.56 | 2.00-3.00 | 0.41-0.50 | 0.001-0.004 |
+| Flash | lookahead | 0.150 / 0.178 / **0.261** / **0.365** | none | 0.43-0.55 | 3.69-5.15 | 2.03-3.19 | 0.52-0.56 | 0.001-0.003 |
+
+Findings:
+
+- Normal: score_aware passes at 2p-4p and fails at 5p (0.136 ± 0.049); greedy passes at every player count. Lookahead's 3p-5p values are over 0.10 but inside their wider margins.
+- Flash: 4p and 5p fail with every bot (0.14-0.37).
+- Root cause hypothesis: fewer season rolls than players. Normal has 5 / 4 / 3 rolls at 3p / 4p / 5p (5p: 10 rounds / every 3 = 3 rolls); Flash 4p-5p has 4 rounds / every 2 = 2 rolls. With fewer rolls than seats, some seats never get the season roll's personal face.
+- The bodega rate stays under 4% (under 1% in phase D) even with multiple bodegas.
+- Verdict: B is not ready to ship, and #126 waits for a fix. Options for the owner: the season roll applies only good season or drought, or set X (season roll every X rounds) per player count.
