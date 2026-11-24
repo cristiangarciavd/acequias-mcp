@@ -305,6 +305,19 @@ async def test_multiple_bodegas_override_must_be_a_bool():
     assert "multiple_bodegas" in text_of(result)
 
 
+async def test_season_roll_personal_faces_override_must_be_a_bool():
+    arguments = three_player_game()
+    arguments["overrides"] = {"season_roll_personal_faces": 0}
+    async with Client(app) as client:
+        result = await call(client, **arguments)
+    assert result.is_error
+    assert "season_roll_personal_faces" in text_of(result)
+    arguments["overrides"] = {"season_roll_personal_faces": False}
+    async with Client(app) as client:
+        result = await call(client, **arguments)
+    assert not result.is_error
+
+
 @pytest.mark.parametrize("seed", range(5))
 async def test_the_order_of_the_lists_does_not_change_the_result(seed):
     arguments = three_player_game()

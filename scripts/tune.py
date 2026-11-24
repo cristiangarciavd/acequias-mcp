@@ -54,7 +54,9 @@ presets) from ``V2_SWEEP_SEED``. ``b3``, ``b3b`` (#130: the constructive
 die and the season roll), ``b4`` and ``b5`` (#132: B4's best board with
 the constructive die and the season roll) run at B2's best
 ``--scale`` and ``--rare-bonus``; ``--multiple-bodegas`` (#135) turns on
-``multiple_bodegas`` in every b5 candidate, for phase D. The final validation runs ``PROPOSED``
+``multiple_bodegas`` in every b5 candidate, for phase D, and
+``--season-global-only`` (#138) turns ``season_roll_personal_faces`` off
+in every b5 candidate (combinable). The final validation runs ``PROPOSED``
 at ``final_games(players)`` games from ``FINAL_SEED``, a seed no sweep
 uses; ``--candidate SWEEP LABEL`` validates one sweep candidate instead
 (#103 phase D: seed ``V2_FINAL_SEED`` for a Rules v2 sweep):
@@ -439,18 +441,26 @@ SWEEPS: tuple[Sweep, ...] = (
 )
 
 
-def v2_sweeps(scale: int = 1, rare_bonus: int = 1, multiple_bodegas: bool = False) -> tuple[Sweep, ...]:
+def v2_sweeps(
+    scale: int = 1, rare_bonus: int = 1, multiple_bodegas: bool = False, season_global_only: bool = False,
+) -> tuple[Sweep, ...]:
     """#103 phase B: score_aware seating, seed ``V2_SWEEP_SEED``. B3 and B4
     run at B2's best ``scale`` and ``rare_bonus`` (``--scale``,
     ``--rare-bonus``; the defaults are the provisional 2/3 points). B5
     (#132) combines the best of B2-B4: B4's best board (``B5_BOARD``) with
     the constructive die x cost x season roll, and no die, at the same
     scale and rare bonus; ``multiple_bodegas`` (#135, ``--multiple-bodegas``)
-    turns that option on in every b5 candidate."""
+    turns that option on in every b5 candidate, and ``season_global_only``
+    (#138, ``--season-global-only``) turns ``season_roll_personal_faces``
+    off in every b5 candidate."""
     best = f"scale {scale}, rare +{rare_bonus}"
-    b5_base = {mode: {**B5_BOARD[mode], **({"multiple_bodegas": True} if multiple_bodegas else {})}
-               for mode in Mode}
-    b5_bodegas = ", multiple bodegas" if multiple_bodegas else ""
+    b5_options = {
+        **({"multiple_bodegas": True} if multiple_bodegas else {}),
+        **({"season_roll_personal_faces": False} if season_global_only else {}),
+    }
+    b5_base = {mode: {**B5_BOARD[mode], **b5_options} for mode in Mode}
+    b5_bodegas = (", multiple bodegas" if multiple_bodegas else "") + (
+        ", season roll applies season faces only" if season_global_only else "")
     seats = ("score_aware",)
     shipped = {mode: {} for mode in Mode}
 
@@ -1196,6 +1206,9 @@ def main(argv: list[str] | None = None) -> int:
                              "B2's best (default 1)")
     parser.add_argument("--multiple-bodegas", action="store_true",
                         help="turn on multiple_bodegas (#135) in every b5 candidate (#103 phase D)")
+    parser.add_argument("--season-global-only", action="store_true",
+                        help="turn off season_roll_personal_faces (#138) in every b5 candidate: "
+                             "a season roll applies only the season faces")
     parser.add_argument("--games", type=int,
                         help=f"games per configuration (default: {SWEEP_GAMES} in a sweep, the final count otherwise)")
     parser.add_argument("--smoke", action="store_true",
@@ -1223,10 +1236,12 @@ def main(argv: list[str] | None = None) -> int:
     if games is not None and games < 1:
         parser.error("--games must be at least 1")
     modes = [Mode(args.mode)] if args.mode else list(Mode)
-    sweeps = V1_SWEEPS + v2_sweeps(args.scale, args.rare_bonus, args.multiple_bodegas)
+    sweeps = V1_SWEEPS + v2_sweeps(args.scale, args.rare_bonus, args.multiple_bodegas, args.season_global_only)
     flags = "" if (args.scale, args.rare_bonus) == (1, 1) else f" --scale {args.scale} --rare-bonus {args.rare_bonus}"
     if args.multiple_bodegas:
         flags += " --multiple-bodegas"
+    if args.season_global_only:
+        flags += " --season-global-only"
     players_list = [args.players] if args.players else list(PLAYER_COUNTS)
     candidate = None
     if args.candidate:
