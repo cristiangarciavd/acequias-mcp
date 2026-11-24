@@ -36,7 +36,7 @@ from dataclasses import dataclass, replace
 
 from acequias.config import preset as shipped_preset
 from acequias.model import DieFace, GameState, SeasonRoll
-from acequias.turn import Action, RollActionDie, apply
+from acequias.turn import Action, RollActionDie, apply, roll_face
 
 __all__ = [
     "Bot",
@@ -204,8 +204,8 @@ def play_game(
         player = state.current_player
         action = bots[player](state, player, bot_rng)
         round = state.round
-        before, state = state, act(state, player, action, dice_rng)
-        face = _rolled_face(before, state) if isinstance(action, RollActionDie) else None
+        face = _rolled_face(state, dice_rng) if isinstance(action, RollActionDie) else None
+        state = act(state, player, action, dice_rng)
         log.append(TurnRecord(round, player, action, face))
     return state, tuple(log)
 
@@ -247,16 +247,16 @@ def game_rngs(seed: int) -> tuple[random.Random, random.Random]:
 # --- Helpers -----------------------------------------------------------------
 
 
-def _rolled_face(before: GameState, after: GameState) -> DieFace:
-    """The face a ``RollActionDie`` from ``before`` gave in ``after``.
+def _rolled_face(state: GameState, dice_rng: random.Random) -> DieFace:
+    """The face a ``RollActionDie`` on ``state`` will roll with ``dice_rng``; ``dice_rng`` is untouched.
 
-    A personal face is pending; a season face raised every player's
-    ``season`` or ``drought`` (gains and losses are at least 1).
+    The roll is the dice rng's first draw (``acequias.turn.roll_face``), so
+    a copy of the rng rolls the same face; this also names a personal face
+    that a season roll ignores (``Preset.season_roll_personal_faces`` off).
     """
-    if after.pending_face is not None:
-        return after.pending_face
-    gained = after.players[0].season > before.players[0].season
-    return DieFace.GOOD_SEASON if gained else DieFace.DROUGHT
+    copy = random.Random()
+    copy.setstate(dice_rng.getstate())
+    return roll_face(state.preset or shipped_preset(state.mode), copy)
 
 
 def _seat_order(state: GameState) -> tuple[str, ...]:

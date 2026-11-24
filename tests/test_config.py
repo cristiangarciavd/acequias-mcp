@@ -96,6 +96,7 @@ README_VALUES = {
         drought_points=None,
         season_roll_every=None,
         multiple_bodegas=False,
+        season_roll_personal_faces=True,
     ),
     Mode.FLASH: dict(
         rounds={2: 6, 3: 6, 4: 4, 5: 4},
@@ -120,6 +121,7 @@ README_VALUES = {
         drought_points=None,
         season_roll_every=None,
         multiple_bodegas=False,
+        season_roll_personal_faces=True,
     ),
 }
 

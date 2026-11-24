@@ -1698,6 +1698,7 @@
     },
     "season_points": null,
     "season_roll_every": null,
+    "season_roll_personal_faces": true,
     "stone_share": 10,
     "varietal_points": {
      "bonarda": 2,
@@ -2867,6 +2868,7 @@
     },
     "season_points": null,
     "season_roll_every": null,
+    "season_roll_personal_faces": true,
     "stone_share": 10,
     "varietal_points": {
      "bonarda": 2,
@@ -5208,6 +5210,7 @@
     },
     "season_points": null,
     "season_roll_every": null,
+    "season_roll_personal_faces": true,
     "stone_share": 10,
     "varietal_points": {
      "bonarda": 2,
@@ -6921,6 +6924,7 @@
     },
     "season_points": null,
     "season_roll_every": null,
+    "season_roll_personal_faces": true,
     "stone_share": 10,
     "varietal_points": {
      "bonarda": 2,
@@ -9252,6 +9256,7 @@
     },
     "season_points": null,
     "season_roll_every": null,
+    "season_roll_personal_faces": true,
     "stone_share": 10,
     "varietal_points": {
      "bonarda": 2,
@@ -10299,6 +10304,7 @@
     },
     "season_points": null,
     "season_roll_every": null,
+    "season_roll_personal_faces": true,
     "stone_share": 10,
     "varietal_points": {
      "bonarda": 2,

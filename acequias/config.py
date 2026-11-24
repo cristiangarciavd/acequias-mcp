@@ -163,7 +163,9 @@ class Preset:
     (``None``: off, the default) starts every X-th round with a free roll
     of the action die by the season die's holder, which passes to the
     next seat after each season roll (``acequias.game.season_holder``);
-    it needs action die rules.
+    it needs action die rules. With ``season_roll_personal_faces`` off
+    (on by default), a season roll applies only a season face: a
+    personal face it rolls does nothing (voluntary rolls are unchanged).
     """
 
     mode: Mode
@@ -189,6 +191,7 @@ class Preset:
     drought_points: int | None = None
     season_roll_every: int | None = None
     multiple_bodegas: bool = False
+    season_roll_personal_faces: bool = True
 
     def __post_init__(self) -> None:
         _check_type("mode", self.mode, Mode)
@@ -221,6 +224,7 @@ class Preset:
             if getattr(self, name) is not None:
                 _check_count(name, getattr(self, name))
         _check_type("multiple_bodegas", self.multiple_bodegas, bool)
+        _check_type("season_roll_personal_faces", self.season_roll_personal_faces, bool)
         if self.season_roll_every is not None and self.bribe_rules is not BribeRules.ACTION_DIE:
             raise ValueError("season_roll_every needs action_die bribe rules")
         if self.bribe_rules is BribeRules.ACTION_DIE:

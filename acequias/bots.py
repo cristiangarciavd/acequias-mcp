@@ -46,8 +46,9 @@ amount (a drought less for a player near 0, which scoring clamps), so
 the score-aware bots weigh it at 0 (an approximation: it changes no total
 against the best rival), and a free roll has no cost; lookahead plans a
 season face as the end of the roll (the turn moves on after a voluntary
-roll, and goes to the round's start player after the free one). The
-season die's holder may not be the start player, so a bot can make the
+roll, and goes to the round's start player after the free one), and
+plans a personal face the same way when the season roll ignores it
+(``Preset.season_roll_personal_faces`` off). The season die's holder may not be the start player, so a bot can make the
 season roll outside its own turn; it then plays its turn when it comes.
 
 Claims come from ``_board_after``, which follows the cluster cap, so the
@@ -678,13 +679,15 @@ class _Lookahead:
         """The mean, over the faces ``player`` may roll, of the planned value.
 
         A personal face is ``value(rolled state, extra)``; a season face
-        (no effect on the leaf value) is ``settled`` on the state once the
-        roll is done.
+        (no effect on the leaf value), or a personal face that the season
+        roll ignores (``Preset.season_roll_personal_faces`` off), is
+        ``settled`` on the state once the roll is done.
         """
         extra = _add(extra, player, Fraction(_roll_cost(state, self.preset)))
+        ignored = state.season_roll is SeasonRoll.DUE and not self.preset.season_roll_personal_faces
         total = Fraction(0)
         for face, count in self.faces.items():
-            if face.is_season:
+            if face.is_season or ignored:
                 after = _next_turn(state, replace(state, season_roll=None), player)
                 total += count * settled(after, extra)
             else:

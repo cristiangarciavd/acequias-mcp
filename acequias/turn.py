@@ -37,8 +37,11 @@ allows only ``RollActionDie()`` by ``current_player`` (the season die's
 holder, ``acequias.game.season_holder``, who may not be the round's start
 player): a free roll, with no cost. A season face applies and clears it;
 a personal face is pending with ``season_roll`` ``ROLLED`` until it is
-used or declined, which clears both. The round loop then gives the
-round's start player their turn. The rng order of the die:
+used or declined, which clears both. With
+``Preset.season_roll_personal_faces`` off, a personal face from the
+season roll does nothing: it is never pending, and the roll just clears
+``season_roll``. The round loop then gives the round's start player
+their turn. The rng order of the die:
 
 - ``RollActionDie`` (voluntary or season roll): one
   ``rng.choice(preset.action_die)``, nothing else.
@@ -103,6 +106,7 @@ __all__ = [
     "apply",
     "legal_actions",
     "season_applied",
+    "roll_face",
 ]
 
 
@@ -517,15 +521,26 @@ def _roll(
 
     A personal face is left pending, with ``season_roll`` set to
     ``rolled``; a season face applies at once and clears ``season_roll``.
+    A personal face from the season roll (``rolled`` set) does nothing
+    when ``Preset.season_roll_personal_faces`` is off: ``season_roll`` is
+    cleared and no face is pending.
     """
-    face = rng.choice(_preset(state).action_die)
+    preset = _preset(state)
+    face = roll_face(preset, rng)
     players = tuple(
         replace(p, debt=p.debt + cost) if p.id == player else p for p in state.players
     )
     state = replace(state, players=players)
     if face.is_season:
         return season_applied(state, face)
+    if rolled is not None and not preset.season_roll_personal_faces:
+        return replace(state, season_roll=None)
     return replace(state, pending_face=face, season_roll=rolled)
+
+
+def roll_face(preset: Preset, rng: random.Random) -> DieFace:
+    """One roll of ``preset``'s action die: ``rng.choice(preset.action_die)``."""
+    return rng.choice(preset.action_die)
 
 
 def season_applied(state: GameState, face: DieFace) -> GameState:

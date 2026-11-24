@@ -49,7 +49,7 @@ by value, `varietal_points` keyed by varietal name, `roulette` as a list of
 varietal names, `grape_clusters_per_player` as an int or null (no cap),
 `bribe_rules` by value, `action_die` as a list of face values,
 `season_points`, `drought_points` and `season_roll_every` as an int or null,
-`multiple_bodegas` as a bool, the rest as ints. `overrides_from_json` turns those keys
+`multiple_bodegas` and `season_roll_personal_faces` as bools, the rest as ints. `overrides_from_json` turns those keys
 back into `int`, `PieceKind`, and `Varietal`, the names into `VarietalRules`,
 `BribeRules`, `DieFace`, and `Varietal`, and the lists into tuples; every value check is left to
 `Preset`.
@@ -400,6 +400,11 @@ _MULTIPLE_BODEGAS_DESCRIPTION = (
     "Whether a player can earn the bodega bonus more than once: once per disjoint group of "
     "bodega_varietals watered vineyards of distinct varietals. false: at most once."
 )
+_SEASON_ROLL_PERSONAL_FACES_DESCRIPTION = (
+    "Whether a season roll's personal face (floodgate, release, resow) is the holder's to use. "
+    "false: the season roll applies only a good season or a drought, and a personal face does "
+    "nothing. Voluntary rolls keep every face."
+)
 _SEASON_ROLL_DESCRIPTION = (
     "Every this many rounds the season die's holder rolls the action die for free before "
     "the start player's turn, without spending their own (action_die rules); the season die "
@@ -437,6 +442,7 @@ class PresetJSON(BaseModel):
     drought_points: int | None = Field(description=_DROUGHT_POINTS_DESCRIPTION)
     season_roll_every: int | None = Field(description=_SEASON_ROLL_DESCRIPTION)
     multiple_bodegas: bool = Field(description=_MULTIPLE_BODEGAS_DESCRIPTION)
+    season_roll_personal_faces: bool = Field(description=_SEASON_ROLL_PERSONAL_FACES_DESCRIPTION)
 
 
 @with_config(ConfigDict(extra="forbid"))
@@ -522,6 +528,9 @@ class PresetOverridesJSON(TypedDict, total=False):
         StrictInt | None, Field(description=_SEASON_ROLL_DESCRIPTION + " An int is 1 or more.")
     ]
     multiple_bodegas: Annotated[StrictBool, Field(description=_MULTIPLE_BODEGAS_DESCRIPTION)]
+    season_roll_personal_faces: Annotated[
+        StrictBool, Field(description=_SEASON_ROLL_PERSONAL_FACES_DESCRIPTION)
+    ]
 
 
 def overrides_from_json(overrides: Mapping[str, Any]) -> dict[str, Any]:

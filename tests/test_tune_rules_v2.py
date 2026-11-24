@@ -241,3 +241,23 @@ def test_unknown_candidate_is_an_argument_error(capsys):
 def test_rules_of_accepts_the_new_seatings():
     rules = tune.rules_of(tune.Job("t", Mode.FLASH, 3, "lookahead", {}, 1, 1))
     assert rules == SimRules(Mode.FLASH, 3, ("lookahead",) * 3)
+
+
+@pytest.mark.parametrize("mode", list(Mode))
+def test_season_global_only_flag_turns_off_personal_faces_in_every_b5_candidate(mode):
+    off = {s.name: s for s in tune.v2_sweeps(2, 1)}
+    on = {s.name: s for s in tune.v2_sweeps(2, 1, multiple_bodegas=True, season_global_only=True)}
+    for _, changes in off["b5"].candidates[mode]:
+        assert "season_roll_personal_faces" not in changes
+    for _, changes in on["b5"].candidates[mode]:
+        p = with_overrides(preset(mode), **{**tune.V2_BASE[mode], **changes})
+        assert p.season_roll_personal_faces is False and p.multiple_bodegas is True
+    assert "season faces only" in on["b5"].title and "multiple bodegas" in on["b5"].title
+    for name in ("b0", "b1", "b2", "b3", "b3b", "b4"):
+        assert on[name] == off[name]
+
+
+def test_season_global_only_flag_reaches_the_b5_sweep(capsys):
+    assert tune.main(["--list", "--season-global-only"]) == 0
+    b5 = [line for line in capsys.readouterr().out.splitlines() if line.startswith("b5:")]
+    assert len(b5) == 1 and "season faces only" in b5[0]
