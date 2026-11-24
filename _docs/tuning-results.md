@@ -1187,3 +1187,22 @@ Findings:
 - A 1-point seat bonus overshoots by far. Flash scores are low and lumpy (winning score about 4-5, many ties), so 1 point mostly breaks ties and flips the bias to the bonus seats. The final-round starter's real edge is well under 1 point.
 - 5 rounds fixes greedy 4p (0.055) but not score_aware 4p or 5p, and 5p (25 minutes) leaves the length target.
 - Verdict: no fix passes. #126 still waits.
+
+### Phase F: tiebreak against the final-round starter
+
+Script `output/tuning-103/phase-f.sh`. Scale 6, rare +2, and die cost 2 double every score and cost of candidate B, so every score is even and a +1 seat bonus only breaks ties. The bonus goes to every seat except the one that starts the final round (Flash 4p: 1,1,1,0; 5p: 1,1,1,0,0; Normal 5p: 1,1,1,1,0). Final validation counts, seed 103002.
+
+| Run | Bot | Advantage | Win rate by position | Shared wins |
+| --- | --- | --- | --- | --- |
+| Flash x2, no bonus | score_aware | 4p 0.169 / 5p 0.143 | same as the phase D re-run | 0.39 / 0.38 |
+| Flash x2, no bonus | greedy | 4p 0.188 / 5p 0.231 | same as the phase D re-run | 0.55 / 0.48 |
+| Flash x2, tiebreak | score_aware | 4p **0.694** / 5p **0.614** | 4p 0.34 / 0.30 / 0.29 / 0.08 | 0.38 / 0.35 |
+| Flash x2, tiebreak | greedy | 4p **0.534** / 5p **0.331** | 4p 0.29 / 0.29 / 0.30 / 0.12 | 0.35 / 0.33 |
+| Normal 5p x2, tiebreak | score_aware | **0.589** | 0.25 / 0.24 / 0.22 / 0.21 / 0.08 | 0.28 |
+| Normal 5p x2, tiebreak | greedy | **0.454** | 0.20 / 0.21 / 0.22 / 0.25 / 0.11 | 0.28 |
+
+Findings:
+
+- Doubling every value gives the same results as candidate B (x2, no bonus), so the doubling is a fair stand-in.
+- A tiebreak alone gives the same numbers as phase E's +1 bonus: at scale 3, +1 was already acting as a tiebreak. Ties are so frequent (shared wins 0.33-0.55) that any rule that picks a side among tied players overshoots.
+- Verdict: compensation by points or tiebreak cannot be tuned finely enough. The remaining options are fewer ties (more scoring in short games) or limiting Flash to 2-3 players.
