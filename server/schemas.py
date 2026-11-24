@@ -49,7 +49,8 @@ by value, `varietal_points` keyed by varietal name, `roulette` as a list of
 varietal names, `grape_clusters_per_player` as an int or null (no cap),
 `bribe_rules` by value, `action_die` as a list of face values,
 `season_points`, `drought_points` and `season_roll_every` as an int or null,
-`multiple_bodegas` and `season_roll_personal_faces` as bools, the rest as ints. `overrides_from_json` turns those keys
+`multiple_bodegas` and `season_roll_personal_faces` as bools, `seat_bonus`
+keyed by player count as a string with a list of ints each, the rest as ints. `overrides_from_json` turns those keys
 back into `int`, `PieceKind`, and `Varietal`, the names into `VarietalRules`,
 `BribeRules`, `DieFace`, and `Varietal`, and the lists into tuples; every value check is left to
 `Preset`.
@@ -349,13 +350,19 @@ class ScoreJSON(BaseModel):
         )
     )
     total: int = Field(
-        description="vineyards + bodega - rights_paid + rights_collected - debt + season - drought."
+        description=(
+            "vineyards + bodega - rights_paid + rights_collected - debt + season + seat_bonus "
+            "- drought."
+        )
     )
     watered: int = Field(description="Number of watered claimed vineyards (the tie-break).")
     watered_vineyards: list[WateredVineyardJSON] = Field(
         description="The player's watered claimed vineyards, by hex."
     )
     bodegas: int = Field(description=_BODEGAS_DESCRIPTION)
+    seat_bonus: int = Field(
+        description="Seat bonus points for the player's position in round 1's turn order."
+    )
 
 
 _ROUNDS_DESCRIPTION = 'Rounds per player count, keyed "2" to "5".'
@@ -405,6 +412,10 @@ _SEASON_ROLL_PERSONAL_FACES_DESCRIPTION = (
     "false: the season roll applies only a good season or a drought, and a personal face does "
     "nothing. Voluntary rolls keep every face."
 )
+_SEAT_BONUS_DESCRIPTION = (
+    'Seat bonus points per player count, keyed "2" to "5": one value per seat, the first for '
+    "round 1's start player, then in turn order. A player count not given has no bonus; {} is off."
+)
 _SEASON_ROLL_DESCRIPTION = (
     "Every this many rounds the season die's holder rolls the action die for free before "
     "the start player's turn, without spending their own (action_die rules); the season die "
@@ -443,6 +454,7 @@ class PresetJSON(BaseModel):
     season_roll_every: int | None = Field(description=_SEASON_ROLL_DESCRIPTION)
     multiple_bodegas: bool = Field(description=_MULTIPLE_BODEGAS_DESCRIPTION)
     season_roll_personal_faces: bool = Field(description=_SEASON_ROLL_PERSONAL_FACES_DESCRIPTION)
+    seat_bonus: dict[PlayerCountName, list[int]] = Field(description=_SEAT_BONUS_DESCRIPTION)
 
 
 @with_config(ConfigDict(extra="forbid"))
@@ -531,12 +543,16 @@ class PresetOverridesJSON(TypedDict, total=False):
     season_roll_personal_faces: Annotated[
         StrictBool, Field(description=_SEASON_ROLL_PERSONAL_FACES_DESCRIPTION)
     ]
+    seat_bonus: Annotated[
+        dict[PlayerCountName, list[StrictInt]],
+        Field(description=_SEAT_BONUS_DESCRIPTION + " Each list has one int >= 0 per player."),
+    ]
 
 
 def overrides_from_json(overrides: Mapping[str, Any]) -> dict[str, Any]:
     """The `with_overrides` keyword arguments for an overrides JSON object.
 
-    `rounds` keys become `int`, `bag_mix` keys `PieceKind`, `varietal_points`
+    `rounds` and `seat_bonus` keys become `int` (`seat_bonus` lists tuples), `bag_mix` keys `PieceKind`, `varietal_points`
     keys `Varietal`, `varietal_rules` a `VarietalRules`, `roulette` a tuple
     of `Varietal`, `bribe_rules` a `BribeRules`, `action_die` a tuple of
     `DieFace`, and `vineyard_distance` a tuple; every other value is
@@ -550,6 +566,13 @@ def overrides_from_json(overrides: Mapping[str, Any]) -> dict[str, Any]:
         changes["rounds"] = {
             _lookup("rounds key", key, _PLAYER_COUNT_BY_NAME): value
             for key, value in changes["rounds"].items()
+        }
+    if isinstance(changes.get("seat_bonus"), Mapping):
+        changes["seat_bonus"] = {
+            _lookup("seat_bonus key", key, _PLAYER_COUNT_BY_NAME): (
+                tuple(value) if isinstance(value, (list, tuple)) else value
+            )
+            for key, value in changes["seat_bonus"].items()
         }
     if isinstance(changes.get("bag_mix"), Mapping):
         changes["bag_mix"] = {
@@ -973,4 +996,5 @@ def score_to_json(score: Score) -> dict[str, Any]:
         "watered": score.watered,
         "watered_vineyards": [watered_vineyard_to_json(v) for v in score.watered_vineyards],
         "bodegas": score.bodegas,
+        "seat_bonus": score.seat_bonus,
     }

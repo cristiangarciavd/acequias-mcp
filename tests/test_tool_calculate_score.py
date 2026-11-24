@@ -37,6 +37,7 @@ SCORE_KEYS = {
     "watered",
     "watered_vineyards",
     "bodegas",
+    "seat_bonus",
 }
 TERMS = ("vineyards", "bodega", "rights_paid", "rights_collected", "debt", "total")
 
@@ -558,3 +559,25 @@ async def test_water_right_points_override_rejects(bad):
         result = await call(client, **small_game(overrides={"water_right_points": bad}))
     assert result.is_error
     assert "water_right_points" in text_of(result)
+
+
+async def test_seat_bonus_override_adds_the_bonus_by_seat():
+    arguments = three_player_game()
+    async with Client(app) as client:
+        plain = (await call(client, **arguments)).structured_content
+        arguments["overrides"] = {"seat_bonus": {"3": [2, 1, 0]}}
+        result = await call(client, **arguments)
+    assert not result.is_error, text_of(result)
+    scores = result.structured_content["scores"]
+    assert [s["seat_bonus"] for s in scores] == [2, 1, 0]
+    assert [s["seat_bonus"] for s in plain["scores"]] == [0, 0, 0]
+    assert [s["total"] - p["total"] for s, p in zip(scores, plain["scores"])] == [2, 1, 0]
+
+
+@pytest.mark.parametrize("bonus", [{"3": [1, 1]}, {"3": [1, 1, -1]}, {"6": [0] * 6}, {"3": [1, True, 0]}])
+async def test_bad_seat_bonus_override_is_a_tool_error(bonus):
+    arguments = three_player_game()
+    arguments["overrides"] = {"seat_bonus": bonus}
+    async with Client(app) as client:
+        result = await call(client, **arguments)
+    assert result.is_error

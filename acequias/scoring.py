@@ -4,7 +4,7 @@ Rules come from ``README.md`` (End and scoring, Water rights, Bodega bonus).
 Each player scores
 
     vineyard values + bodega bonus - water rights paid
-    + water rights collected - bribe debt + season - drought
+    + water rights collected - bribe debt + season + seat bonus - drought
 
 ``season`` is ``Player.season``, the action die's good season gains.
 ``drought`` is ``Player.drought``, its drought losses, clamped so a drought
@@ -27,6 +27,12 @@ The bodega term is ``preset.bodega_points`` times ``Score.bodegas``: 1 or
 ``preset.multiple_bodegas``, the largest number of disjoint groups of
 ``bodega_varietals`` watered vineyards, each of distinct varietals
 (``bodega_count``).
+
+The seat bonus is ``preset.seat_bonus[P][k]`` for the player ``k`` seats
+after round 1's start player in a ``P``-player game (0 when the preset
+gives none for ``P``); round 1's start player is worked out from
+``state.start_player`` and ``state.round``, like ``acequias.game.turn_order``.
+The drought clamp counts it like any other term.
 
 This module is pure: it reads a ``GameState``, changes nothing, and has no
 randomness.
@@ -65,14 +71,15 @@ class Score:
     """A player's final score, by term.
 
     ``total == vineyards + bodega - rights_paid + rights_collected - debt
-    + season - drought``, where ``drought`` is the drought loss actually
+    + season + seat_bonus - drought``, where ``drought`` is the drought loss actually
     taken (clamped so a drought never takes the total below 0).
     Every term is in points: ``rights_paid`` and ``rights_collected`` are
     the rival-vineyard pairs times the preset's ``water_right_points``.
     ``watered`` is the number of the player's claimed vineyards that are
     watered (the tie-break), and ``watered_vineyards`` lists them in hex
     order. ``bodegas`` is the number of bodega bonuses earned, so
-    ``bodega == bodegas * bodega_points``.
+    ``bodega == bodegas * bodega_points``. ``seat_bonus`` is the
+    preset's seat bonus for the player's round 1 position.
     """
 
     player: str
@@ -88,6 +95,7 @@ class Score:
     season: int = 0
     drought: int = 0
     bodegas: int = 0
+    seat_bonus: int = 0
 
 
 def bodega_count(varietals: Iterable[Varietal], size: int) -> int:
@@ -128,6 +136,7 @@ def calculate_score(state: GameState, preset: Preset | None = None) -> Mapping[s
     board = state.board
     players = sorted(state.players, key=lambda p: p.seat)
     seat_of = {p.id: p.seat for p in players}
+    bonus_of = _seat_bonuses(state, players, preset)
 
     owned: dict[str, list[WateredVineyard]] = {p.id: [] for p in players}
     collected: dict[str, int] = {p.id: 0 for p in players}
@@ -155,7 +164,7 @@ def calculate_score(state: GameState, preset: Preset | None = None) -> Mapping[s
             bodegas = min(bodegas, 1)
         bodega = preset.bodega_points * bodegas
         paid = sum(len(v.pays) for v in mine) * preset.water_right_points
-        before = vineyards + bodega - paid + collected[p.id] - p.debt + p.season
+        before = vineyards + bodega - paid + collected[p.id] - p.debt + p.season + bonus_of[p.id]
         drought = min(p.drought, max(0, before))
         total = before - drought
         scores[p.id] = Score(
@@ -172,8 +181,19 @@ def calculate_score(state: GameState, preset: Preset | None = None) -> Mapping[s
             season=p.season,
             drought=drought,
             bodegas=bodegas,
+            seat_bonus=bonus_of[p.id],
         )
     return MappingProxyType(scores)
+
+
+def _seat_bonuses(state: GameState, players: list, preset: Preset) -> dict[str, int]:
+    """Each player's seat bonus, by player id: by their position in round 1's turn order."""
+    bonus = preset.seat_bonus.get(len(players))
+    if bonus is None:
+        return {p.id: 0 for p in players}
+    ids = [p.id for p in players]
+    first = (ids.index(state.start_player) - (state.round - 1)) % len(ids)
+    return {pid: bonus[(k - first) % len(ids)] for k, pid in enumerate(ids)}
 
 
 def winners(scores: Mapping[str, Score]) -> tuple[str, ...]:
