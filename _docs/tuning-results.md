@@ -1166,3 +1166,24 @@ Findings:
 - Flash 4p and 5p still fail with every bot. The last seat wins most (4p: 0.29-0.33; 5p seat 4 or 5: 0.22-0.28).
 - The season-roll hypothesis does not explain the Flash failure. In sweep `b5`, Flash with no die was already biased at 4p-5p (0.147 / 0.208), and so was Normal 5p (0.136). The bias comes from the short game (Flash 4p-5p is 4 rounds, with almost no passes), not from the die.
 - Verdict: B is still not ready to ship, and #126 still waits. Normal 2p-4p is ready; Flash 4p-5p and Normal 5p need a structural fix, a turn-order compensation, for example.
+
+### Phase E: Flash turn-order fixes for candidate B (#142)
+
+Script `output/tuning-103/phase-e.sh`: the phase D re-run command for Flash plus `--seat-bonus` or `--rounds`. Final validation counts, seed 103002. Baseline is the phase D re-run.
+
+| Fix | Bot | Advantage 4p / 5p | Win rate by position 4p | Win rate by position 5p |
+| --- | --- | --- | --- | --- |
+| none (baseline) | score_aware | 0.169 / 0.143 | 0.27 / 0.24 / 0.21 / 0.29 | 0.21 / 0.19 / 0.17 / 0.22 / 0.22 |
+| none (baseline) | greedy | 0.188 / 0.231 | 0.23 / 0.24 / 0.23 / 0.30 | 0.18 / 0.18 / 0.18 / 0.25 / 0.22 |
+| +1 to seat 0 | score_aware | **1.423** / **1.619** | 0.61 / 0.11 / 0.11 / 0.18 | 0.52 / 0.10 / 0.10 / 0.14 / 0.14 |
+| +1 to seat 0 | greedy | **0.877** / **0.827** | 0.47 / 0.16 / 0.16 / 0.21 | 0.37 / 0.12 / 0.13 / 0.21 / 0.17 |
+| +1 to all but the final-round starter (4p: 1,1,1,0; 5p: 1,1,1,0,0) | score_aware | **0.700** / **0.624** | 0.34 / 0.30 / 0.29 / 0.07 | 0.30 / 0.27 / 0.25 / 0.08 / 0.10 |
+| +1 to all but the final-round starter | greedy | **0.546** / **0.333** | 0.29 / 0.29 / 0.30 / 0.11 | 0.24 / 0.23 / 0.26 / 0.14 / 0.13 |
+| 5 rounds at 4p-5p | score_aware | **0.165** / **0.235** | 0.29 / 0.25 / 0.21 / 0.25 | 0.21 / 0.19 / 0.16 / 0.19 / 0.25 |
+| 5 rounds at 4p-5p | greedy | 0.055 / **0.137** | 0.24 / 0.25 / 0.25 / 0.26 | 0.18 / 0.19 / 0.20 / 0.21 / 0.23 |
+
+Findings:
+
+- A 1-point seat bonus overshoots by far. Flash scores are low and lumpy (winning score about 4-5, many ties), so 1 point mostly breaks ties and flips the bias to the bonus seats. The final-round starter's real edge is well under 1 point.
+- 5 rounds fixes greedy 4p (0.055) but not score_aware 4p or 5p, and 5p (25 minutes) leaves the length target.
+- Verdict: no fix passes. #126 still waits.
