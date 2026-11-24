@@ -1144,3 +1144,25 @@ Findings:
 - Root cause hypothesis: fewer season rolls than players. Normal has 5 / 4 / 3 rolls at 3p / 4p / 5p (5p: 10 rounds / every 3 = 3 rolls); Flash 4p-5p has 4 rounds / every 2 = 2 rolls. With fewer rolls than seats, some seats never get the season roll's personal face.
 - The bodega rate stays under 4% (under 1% in phase D) even with multiple bodegas.
 - Verdict: B is not ready to ship, and #126 waits for a fix. Options for the owner: the season roll applies only good season or drought, or set X (season roll every X rounds) per player count.
+
+### Phase D re-run: candidate B, season roll applies only good season or drought
+
+The owner's fix for phase D (option 1, #138): a season roll applies only good season or drought; a personal face on a season roll does nothing. Script `output/tuning-103/phase-d2.sh`: the phase D commands plus `--season-global-only`. Same seeds, game counts, and margins as phase D.
+
+| Mode | Bot | Advantage 2p / 3p / 4p / 5p | At most 0.10 | Shared wins | Winning score | Rolls/game | Die use rate | Bodega rate |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Normal | score_aware | 0.022 / 0.011 / 0.054 / **0.114** | 2p-4p | 0.32-0.35 | 5.61-6.95 | 3.32-6.13 | 0.87-0.97 | 0.000-0.002 |
+| Normal | greedy | 0.024 / 0.061 / 0.107 / 0.106 | 2p, 3p | 0.36-0.47 | 5.30-9.25 | 3.00-5.00 | 1.00 | 0.005-0.013 |
+| Normal | lookahead | 0.032 / 0.284 / 0.177 / 0.107 | 2p | 0.31-0.43 | 5.58-7.07 | 3.45-5.80 | 0.94-0.98 | 0.000-0.011 |
+| Flash | score_aware | 0.026 / 0.081 / **0.169** / **0.143** | 2p, 3p | 0.35-0.48 | 4.10-5.16 | 2.08-3.27 | 0.97-0.99 | 0.000-0.001 |
+| Flash | greedy | 0.016 / 0.063 / **0.188** / **0.231** | 2p, 3p | 0.43-0.55 | 4.26-7.13 | 2.00-3.00 | 1.00 | 0.002-0.006 |
+| Flash | lookahead | 0.160 / 0.114 / **0.303** / **0.378** | none | 0.35-0.53 | 3.88-5.37 | 2.05-3.24 | 0.98-1.00 | 0.000-0.003 |
+
+The die use rate is now near 1 because a season roll can no longer be declined.
+
+Findings:
+
+- Normal improves at 3p-4p with score_aware (0.011 / 0.054), but 5p is still just over the line (0.114 ± 0.049). Greedy 4p-5p (0.107 / 0.106) and lookahead 5p (0.107) are just over 0.10 and inside their margins.
+- Flash 4p and 5p still fail with every bot. The last seat wins most (4p: 0.29-0.33; 5p seat 4 or 5: 0.22-0.28).
+- The season-roll hypothesis does not explain the Flash failure. In sweep `b5`, Flash with no die was already biased at 4p-5p (0.147 / 0.208), and so was Normal 5p (0.136). The bias comes from the short game (Flash 4p-5p is 4 rounds, with almost no passes), not from the die.
+- Verdict: B is still not ready to ship, and #126 still waits. Normal 2p-4p is ready; Flash 4p-5p and Normal 5p need a structural fix, a turn-order compensation, for example.
