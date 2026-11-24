@@ -107,8 +107,9 @@ def calculate_score(
     """Score an Acequias board state: each player's points by term, and the winners.
 
     Each player scores vineyards + bodega - rights_paid + rights_collected -
-    debt + season - drought (the action die's good season gains and drought
-    losses; drought never takes a total below 0); every term is in points, and each rival on a vineyard's water path
+    debt + season + seat_bonus - drought (the action die's good season gains and drought
+    losses; drought never takes a total below 0; seat_bonus from the preset's seat_bonus,
+    seat 1 being round 1's start player); every term is in points, and each rival on a vineyard's water path
     gets water_right_points (1 in the shipped presets). Every watered claimed
     vineyard is listed with the canal path its water takes and the rivals its
     claimant pays, so the water rights can be checked by hand. The state is scored as given, finished or not.
@@ -129,9 +130,10 @@ def calculate_score(
     preset = with_overrides(shipped_preset(game_mode), **overrides_from_json(overrides))
     game_players = players_from_json(players)
     first = game_players[0].id if game_players else ""
-    # Scoring reads only the board, the players, and the preset. The fields the
-    # input does not carry get fixed values: round 1, the first player as
-    # start and current player, and an empty market and bag.
+    # Scoring reads only the board, the players, the preset, and round 1's start
+    # player (for the seat bonus). The fields the input does not carry get fixed
+    # values: round 1, the first player (seat 1) as start and current player, and
+    # an empty market and bag.
     state = GameState(
         board=board,
         players=game_players,

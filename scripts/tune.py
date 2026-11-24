@@ -56,7 +56,10 @@ the constructive die and the season roll) run at B2's best
 ``--scale`` and ``--rare-bonus``; ``--multiple-bodegas`` (#135) turns on
 ``multiple_bodegas`` in every b5 candidate, for phase D, and
 ``--season-global-only`` (#138) turns ``season_roll_personal_faces`` off
-in every b5 candidate (combinable). The final validation runs ``PROPOSED``
+in every b5 candidate (combinable). ``--seat-bonus`` (#142, e.g.
+``4=1,1,1,0;5=1,1,1,0,0``) sets ``seat_bonus`` and ``--rounds`` (#142, e.g.
+``4=5,5=5``) the round count of those player counts (the rest keep the
+mode's shipped rounds) in every b5 candidate, the same way. The final validation runs ``PROPOSED``
 at ``final_games(players)`` games from ``FINAL_SEED``, a seed no sweep
 uses; ``--candidate SWEEP LABEL`` validates one sweep candidate instead
 (#103 phase D: seed ``V2_FINAL_SEED`` for a Rules v2 sweep):
@@ -443,6 +446,7 @@ SWEEPS: tuple[Sweep, ...] = (
 
 def v2_sweeps(
     scale: int = 1, rare_bonus: int = 1, multiple_bodegas: bool = False, season_global_only: bool = False,
+    seat_bonus: Mapping[int, tuple[int, ...]] | None = None, rounds: Mapping[int, int] | None = None,
 ) -> tuple[Sweep, ...]:
     """#103 phase B: score_aware seating, seed ``V2_SWEEP_SEED``. B3 and B4
     run at B2's best ``scale`` and ``rare_bonus`` (``--scale``,
@@ -452,15 +456,25 @@ def v2_sweeps(
     scale and rare bonus; ``multiple_bodegas`` (#135, ``--multiple-bodegas``)
     turns that option on in every b5 candidate, and ``season_global_only``
     (#138, ``--season-global-only``) turns ``season_roll_personal_faces``
-    off in every b5 candidate."""
+    off in every b5 candidate; ``seat_bonus`` (#142, ``--seat-bonus``) sets
+    that field, and ``rounds`` (#142, ``--rounds``) the round count of its
+    player counts over the mode's shipped rounds, in every b5 candidate."""
     best = f"scale {scale}, rare +{rare_bonus}"
     b5_options = {
         **({"multiple_bodegas": True} if multiple_bodegas else {}),
         **({"season_roll_personal_faces": False} if season_global_only else {}),
     }
-    b5_base = {mode: {**B5_BOARD[mode], **b5_options} for mode in Mode}
+    if seat_bonus:
+        b5_options["seat_bonus"] = dict(seat_bonus)
+    b5_base = {
+        mode: {**B5_BOARD[mode], **b5_options,
+               **({"rounds": {**shipped_preset(mode).rounds, **rounds}} if rounds else {})}
+        for mode in Mode
+    }
     b5_bodegas = (", multiple bodegas" if multiple_bodegas else "") + (
-        ", season roll applies season faces only" if season_global_only else "")
+        ", season roll applies season faces only" if season_global_only else "") + (
+        f", seat bonus {seat_bonus_label(seat_bonus)}" if seat_bonus else "") + (
+        f", rounds {rounds_label(rounds)}" if rounds else "")
     seats = ("score_aware",)
     shipped = {mode: {} for mode in Mode}
 
@@ -523,6 +537,59 @@ def v2_sweeps(
                  ) + (("no die (no bribe either)", v2(mode, scale, rare_bonus, **b5_base[mode], **NO_DIE)),)
                   for mode in Mode}),
     )
+
+
+def seat_bonus_label(bonus: Mapping[int, tuple[int, ...]]) -> str:
+    """``--seat-bonus`` text: ``4=1,1,1,0;5=1,1,1,0,0``."""
+    return ";".join(f"{players}={','.join(map(str, points))}" for players, points in sorted(bonus.items()))
+
+
+def rounds_label(rounds: Mapping[int, int]) -> str:
+    """``--rounds`` text: ``4=5,5=5``."""
+    return ",".join(f"{players}={count}" for players, count in sorted(rounds.items()))
+
+
+def _player_count(text: str) -> int:
+    players = int(text)
+    if players not in PLAYER_COUNTS:
+        raise ValueError(f"player count must be {PLAYER_COUNTS[0]} to {PLAYER_COUNTS[-1]}, got {players}")
+    return players
+
+
+def parse_seat_bonus(text: str) -> dict[int, tuple[int, ...]]:
+    """``--seat-bonus``: ``P=b1,b2,...`` per player count, separated by ``;``;
+    one value per seat, seat 0 first (round 1's start player)."""
+    try:
+        bonus = {}
+        for part in text.split(";"):
+            players, _, points = part.partition("=")
+            players = _player_count(players)
+            if players in bonus:
+                raise ValueError(f"player count {players} is given twice")
+            values = tuple(int(v) for v in points.split(","))
+            if len(values) != players or any(v < 0 for v in values):
+                raise ValueError(f"{players} players need {players} values >= 0, got {points!r}")
+            bonus[players] = values
+    except ValueError as error:
+        raise argparse.ArgumentTypeError(f"expected e.g. 4=1,1,1,0;5=1,1,1,0,0 ({error})") from None
+    return bonus
+
+
+def parse_rounds(text: str) -> dict[int, int]:
+    """``--rounds``: ``P=R`` per player count, separated by ``,``."""
+    try:
+        rounds = {}
+        for part in text.split(","):
+            players, _, count = part.partition("=")
+            players = _player_count(players)
+            if players in rounds:
+                raise ValueError(f"player count {players} is given twice")
+            rounds[players] = int(count)
+            if rounds[players] < 1:
+                raise ValueError(f"rounds must be at least 1, got {count!r}")
+    except ValueError as error:
+        raise argparse.ArgumentTypeError(f"expected e.g. 4=5,5=5 ({error})") from None
+    return rounds
 
 
 V1_SWEEPS = SWEEPS
@@ -1087,6 +1154,8 @@ def describe(overrides: Mapping[str, object]) -> str:
             value = _bag_label(value)
         elif key == "vineyard_distance":
             value = f"{value[0]}-{value[1]}"
+        elif key == "seat_bonus":
+            value = seat_bonus_label(value)
         elif key == "varietal_points":
             value = "/".join(f"{v.name.lower()} {points}" for v, points in value.items())
         elif key == "action_die":
@@ -1209,6 +1278,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--season-global-only", action="store_true",
                         help="turn off season_roll_personal_faces (#138) in every b5 candidate: "
                              "a season roll applies only the season faces")
+    parser.add_argument("--seat-bonus", type=parse_seat_bonus, metavar="P=B,...;P=B,...",
+                        help="set seat_bonus (#142) in every b5 candidate, e.g. 4=1,1,1,0;5=1,1,1,0,0: "
+                             "bonus points by round 1 position, the start player first")
+    parser.add_argument("--rounds", type=parse_rounds, metavar="P=R,...",
+                        help="set the round count of these player counts (#142) in every b5 candidate, "
+                             "e.g. 4=5,5=5; the others keep the mode's shipped rounds")
     parser.add_argument("--games", type=int,
                         help=f"games per configuration (default: {SWEEP_GAMES} in a sweep, the final count otherwise)")
     parser.add_argument("--smoke", action="store_true",
@@ -1236,12 +1311,17 @@ def main(argv: list[str] | None = None) -> int:
     if games is not None and games < 1:
         parser.error("--games must be at least 1")
     modes = [Mode(args.mode)] if args.mode else list(Mode)
-    sweeps = V1_SWEEPS + v2_sweeps(args.scale, args.rare_bonus, args.multiple_bodegas, args.season_global_only)
+    sweeps = V1_SWEEPS + v2_sweeps(args.scale, args.rare_bonus, args.multiple_bodegas, args.season_global_only,
+                                   args.seat_bonus, args.rounds)
     flags = "" if (args.scale, args.rare_bonus) == (1, 1) else f" --scale {args.scale} --rare-bonus {args.rare_bonus}"
     if args.multiple_bodegas:
         flags += " --multiple-bodegas"
     if args.season_global_only:
         flags += " --season-global-only"
+    if args.seat_bonus:
+        flags += f' --seat-bonus "{seat_bonus_label(args.seat_bonus)}"'
+    if args.rounds:
+        flags += f" --rounds {rounds_label(args.rounds)}"
     players_list = [args.players] if args.players else list(PLAYER_COUNTS)
     candidate = None
     if args.candidate:

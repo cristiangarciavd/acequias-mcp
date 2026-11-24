@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import dataclasses
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from types import MappingProxyType
 
@@ -166,6 +166,14 @@ class Preset:
     it needs action die rules. With ``season_roll_personal_faces`` off
     (on by default), a season roll applies only a season face: a
     personal face it rolls does nothing (voluntary rolls are unchanged).
+
+    ``seat_bonus`` (empty by default: off) maps a player count to each
+    seat's bonus points at the start, in round 1's turn order: entry 0 is
+    the first start player's, entry 1 the next seat's, and so on (the
+    "position" of ``acequias.sim``). A player count it does not list gets
+    no bonus. Each tuple has one int >= 0 per player. The bonus is a term
+    of the final score (``acequias.scoring``). It is read-only, keyed in
+    player count order.
     """
 
     mode: Mode
@@ -192,6 +200,7 @@ class Preset:
     season_roll_every: int | None = None
     multiple_bodegas: bool = False
     season_roll_personal_faces: bool = True
+    seat_bonus: Mapping[int, tuple[int, ...]] = field(default_factory=lambda: MappingProxyType({}))
 
     def __post_init__(self) -> None:
         _check_type("mode", self.mode, Mode)
@@ -225,6 +234,7 @@ class Preset:
                 _check_count(name, getattr(self, name))
         _check_type("multiple_bodegas", self.multiple_bodegas, bool)
         _check_type("season_roll_personal_faces", self.season_roll_personal_faces, bool)
+        _set(self, "seat_bonus", _seat_bonus(self.seat_bonus))
         if self.season_roll_every is not None and self.bribe_rules is not BribeRules.ACTION_DIE:
             raise ValueError("season_roll_every needs action_die bribe rules")
         if self.bribe_rules is BribeRules.ACTION_DIE:
@@ -361,6 +371,31 @@ def _rounds(value: object) -> Mapping[int, int]:
     for players in PLAYER_COUNTS:
         _check_count(f"rounds[{players}]", value[players])
     return MappingProxyType({players: value[players] for players in PLAYER_COUNTS})
+
+
+def _seat_bonus(value: object) -> Mapping[int, tuple[int, ...]]:
+    _check_type("seat_bonus", value, Mapping)
+    extra = [n for n in value if n not in PLAYER_COUNTS or isinstance(n, bool)]
+    if extra:
+        raise ValueError(
+            f"seat_bonus gives player counts {extra}; only {MIN_PLAYERS} to {MAX_PLAYERS} are allowed"
+        )
+    bonus: dict[int, tuple[int, ...]] = {}
+    for players in PLAYER_COUNTS:
+        if players not in value:
+            continue
+        points = value[players]
+        if isinstance(points, (str, bytes, Mapping)) or not hasattr(points, "__iter__"):
+            raise TypeError(f"seat_bonus[{players}] must be a tuple of ints, got {points!r}")
+        points = tuple(points)
+        if len(points) != players:
+            raise ValueError(
+                f"seat_bonus[{players}] must give one value per seat ({players}), got {len(points)}"
+            )
+        for seat, bonus_points in enumerate(points):
+            _check_non_negative(f"seat_bonus[{players}][{seat}]", bonus_points)
+        bonus[players] = points
+    return MappingProxyType(bonus)
 
 
 def _distance(value: object) -> tuple[int, int]:
