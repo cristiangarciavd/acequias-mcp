@@ -127,7 +127,8 @@ player, bodegas built per game, the share of players who meet the
 bodega requirement, the mean round they first meet it and the share who
 build (a building row runs with 2 reds and 2 or 1 whites,
 ``V3BLENDS_WHITES``), and how often each blend scores (share of
-player-games). The ``score_target`` end condition (#163) is not in yet:
+player-games). It runs with the round count end; ``v3end`` (#163) tries the
+others:
 
     uv run python scripts/tune.py --sweep v3blends
 
@@ -142,6 +143,23 @@ share of floodgate and release rolls used, the mean score swing of a
 floodgate use (user less best rival, before the bribe), and the mean debt:
 
     uv run python scripts/tune.py --sweep v3bribe
+
+Sweep ``v3end`` (#163) diagnoses the 4-5p seat bias and tries end of game
+conditions around ``v3end_base`` (``v3_best_base`` with the round count end
+written out; edit ``v3_best_base`` to move every v3 sweep), score_aware
+seating, seed ``V3END_SWEEP_SEED``. Rows: the base; seats rotated and
+shuffled per game (``SEAT_KEY``, a tune-only job key applied by
+``play_seated``); the unlimited bag; and each end condition
+(``bag_empty``, ``vineyards_out`` at the default markers, ``score_target``
+at #160's winning scores x1 / x1.5 / x2) with ``finish_round`` on and off.
+Its table has the advantage, win rate by position and by seat, shared
+wins, turns counted from the log (and minutes), rounds played, the bodega
+rate (a bonus or a building), the share of games the round cap ended and
+the winning score; then one line per player count naming the rows under
+``ADVANTAGE_BIAS_LIMIT``, and a per-round score trace by position for
+every row, one table per player count (``end_stats``):
+
+    uv run python scripts/tune.py --sweep v3end
 
 Turns and minutes count turns (rounds x P), not log records: under action
 die rules a die turn is 2 records, so ``turns_per_game`` would overcount. A candidate the preset or the board
@@ -165,6 +183,7 @@ import math
 import multiprocessing
 import os
 import pickle
+import random
 import signal
 import sys
 import time
@@ -192,7 +211,9 @@ from acequias.config import (
     ROULETTE_POINTS,
     RULES_V1,
     BribeRules,
+    EndCondition,
     Preset,
+    SCORE_TARGETS,
     action_die_rules,
     roulette_rules,
     scaled,
@@ -200,10 +221,12 @@ from acequias.config import (
 )
 from acequias.config import players_text
 from acequias.config import preset as shipped_preset
-from acequias.model import DieFace, Mode, PieceKind, Varietal
+from acequias.model import DieFace, GameState, Mode, PieceKind, Varietal
 from acequias.sim import GameRecord, SimRules, game_seed, play_one, summarize
-from acequias.game import act, game_rngs
-from acequias.scoring import calculate_score
+from acequias.sim import _bots, _preset
+from acequias.game import act, game_rngs, play_game, turn_order
+from acequias.scoring import calculate_score, winners
+from acequias.setup import new_game
 from acequias.turn import BuildBodega, PlaceFloodgate, Release, RollActionDie, can_build_bodega
 
 # --- Constants ---------------------------------------------------------------
@@ -978,10 +1001,64 @@ def v3bribe_sweeps(costs=V3BRIBE_COSTS) -> tuple[Sweep, ...]:
     )
 
 
+# --- Rules v3 seat bias and end conditions (#163) -----------------------------------
+
+V3END_SWEEP_SEED = 163_001
+"""The run seed of sweep ``v3end`` (#163); no earlier run used it."""
+SEAT_KEY = "seat_assignment"
+"""A tune-only job key (#163), not a ``Preset`` field: how seats are assigned per game
+(``SEAT_ASSIGNMENTS``); ``rules_of`` leaves it out of the preset and ``run_chunk`` applies it."""
+SEAT_ASSIGNMENTS = ("fixed", "rotated", "shuffled")
+"""``fixed``: as ``new_game`` deals them (seats p1..pN, a random first start player).
+``rotated``: game ``i`` starts with seat ``i % P + 1``, so every seat starts equally often.
+``shuffled``: the seat numbers (the order around the table) are shuffled per game from the
+game seed. The river strip has no segment owned by a seat, so these test whether the bias
+follows the seat or the turn position; the turn order rules stay as they are."""
+V3END_TARGET_FACTORS = ((1, 1), (3, 2), (2, 1))
+"""Sweep ``v3end``'s score targets: ``SCORE_TARGETS`` (#160's winning scores) x1, x1.5, x2."""
+ADVANTAGE_BIAS_LIMIT = 0.2
+"""#163: the advantage under which an option is said to remove the 4-5p seat bias."""
+
+
+def v3end_base(mode: Mode) -> dict[str, object]:
+    """The base of sweep ``v3end``: ``v3_best_base`` (one place to move it) with the round count end
+    written out, so a ``v3end`` row is told apart (``is_v3end``) and plays as the base does."""
+    return {**v3_best_base(mode), "end_condition": EndCondition.ROUNDS}
+
+
+def v3end_sweeps() -> tuple[Sweep, ...]:
+    """Sweep ``v3end`` (#163): diagnosis rows (seat assignment, unlimited bag) and each end condition
+    x ``finish_round`` on / off, around ``v3end_base``."""
+
+    def candidates(mode: Mode) -> tuple[tuple[str, dict], ...]:
+        rows: list[tuple[str, dict]] = [("base", {})]
+        rows += [(f"seats {a}", {SEAT_KEY: a}) for a in SEAT_ASSIGNMENTS[1:]]
+        rows.append(("unlimited bag", {"unlimited_bag": True}))
+        counts = shipped_preset(mode).player_counts
+        for finish in (True, False):
+            tail = "finish round" if finish else "ends at once"
+            rows.append((f"bag_empty, {tail}", {"end_condition": EndCondition.BAG_EMPTY, "finish_round": finish}))
+            rows.append((f"vineyards_out, {tail}",
+                         {"end_condition": EndCondition.VINEYARDS_OUT, "finish_round": finish}))
+            for factor in V3END_TARGET_FACTORS:
+                target = {n: _times(SCORE_TARGETS[mode][n], factor) for n in counts}
+                rows.append((f"score_target {_factor_label(factor)} ({rounds_label(target)}), {tail}", {
+                    "end_condition": EndCondition.SCORE_TARGET, "finish_round": finish, "score_target": target,
+                }))
+        return tuple(rows)
+
+    return (
+        Sweep("v3end", "Rules v3 seat bias diagnosis and end conditions (#163), around the best "
+                       "#160/#166 setup (v3_best_base)",
+              {mode: candidates(mode) for mode in Mode}, ("score_aware",),
+              {mode: v3end_base(mode) for mode in Mode}, V3END_SWEEP_SEED),
+    )
+
+
 V1_SWEEPS = SWEEPS
 """The sweeps of #20 (Rules v1, greedy and mixed seatings)."""
 SWEEPS = (V1_SWEEPS + v2_sweeps() + strip_sweeps() + v3_sweeps() + v3split_sweeps() + v3blends_sweeps()
-          + v3bribe_sweeps())
+          + v3bribe_sweeps() + v3end_sweeps())
 SWEEP_NAMES = tuple(s.name for s in SWEEPS)
 
 
@@ -1059,8 +1136,38 @@ copyreg.pickle(MappingProxyType, lambda proxy: (_mapping_proxy, (dict(proxy),)))
 
 def rules_of(job: Job) -> SimRules:
     """The job's ``SimRules``: its overrides over ``V1_OVERRIDES`` (they are relative to ``V1_PRESET``)."""
+    overrides = {k: v for k, v in job.overrides.items() if k != SEAT_KEY}
     return SimRules(job.mode, job.players, policies(job.seating, job.players),
-                    {**V1_OVERRIDES[job.mode], **job.overrides})
+                    {**V1_OVERRIDES[job.mode], **overrides})
+
+
+def reseat(start: GameState, assignment: str, i: int, seed: int) -> GameState:
+    """``start`` with its seats assigned as ``assignment`` says (``SEAT_ASSIGNMENTS``) for game ``i``
+    of game seed ``seed``; deterministic."""
+    players = len(start.players)
+    if assignment == "fixed":
+        return start
+    if assignment == "rotated":
+        first = f"p{i % players + 1}"
+        return dataclasses.replace(start, start_player=first, current_player=first)
+    if assignment == "shuffled":
+        seats = random.Random(f"seats:{seed}").sample(range(1, players + 1), players)
+        return dataclasses.replace(
+            start, players=tuple(dataclasses.replace(p, seat=s) for p, s in zip(start.players, seats))
+        )
+    raise ValueError(f"seat_assignment must be one of {SEAT_ASSIGNMENTS}, got {assignment!r}")
+
+
+def play_seated(rules: SimRules, seed: int, i: int, assignment: str) -> GameRecord:
+    """Game ``i`` (game seed ``seed``) under ``rules`` with ``reseat``'s seats: ``play_one`` with the
+    start state reseated; ``fixed`` is ``play_one`` itself."""
+    if assignment == "fixed":
+        return play_one(rules, seed)
+    start = reseat(new_game(rules.players, seed, rules.mode, preset=_preset(rules)), assignment, i, seed)
+    bots = _bots(rules)
+    final, log = play_game(start, {p.id: bots[p.seat - 1] for p in start.players}, *game_rngs(seed))
+    scores = calculate_score(final)
+    return GameRecord(seed, start, final, log, scores, winners(scores))
 
 
 def plays(mode: Mode, players: int, overrides: Mapping[str, object]) -> bool:
@@ -1169,6 +1276,9 @@ def run_chunk(job: Job, start: int, stop: int) -> ChunkResult:
     ``FAILED``, each with its message."""
     try:
         rules = rules_of(job)
+        assignment = job.overrides.get(SEAT_KEY, "fixed")
+        if assignment not in SEAT_ASSIGNMENTS:
+            raise ValueError(f"seat_assignment must be one of {SEAT_ASSIGNMENTS}, got {assignment!r}")
     except ValueError as error:
         return ChunkResult(INFEASIBLE, error=str(error), priority_warning=_worker_warning)
     except Exception as error:  # noqa: BLE001 - reported with its job, the run goes on
@@ -1177,7 +1287,7 @@ def run_chunk(job: Job, start: int, stop: int) -> ChunkResult:
     for i in range(start, stop):
         seed = game_seed(job.seed, i)
         try:
-            records.append(play_one(rules, seed))
+            records.append(play_seated(rules, seed, i, assignment))
         except ValueError as error:
             return ChunkResult(INFEASIBLE, error=f"game {i} (game seed {seed}): {error}",
                                priority_warning=_worker_warning)
@@ -1430,6 +1540,8 @@ def run_all(jobs: list[Job], workers: int, checkpoints: Checkpoints | None = Non
                 data["blend_stats"] = blend_stats(games)
             if is_v3bribe(job.overrides):
                 data["bribe_stats"] = bribe_stats(games)
+            if is_v3end(job.overrides):
+                data["end_stats"] = end_stats(games)
             outcomes.append(Outcome("ok", data=data))
         except Exception as error:  # noqa: BLE001 - reported with its job, the run goes on
             outcomes.append(Outcome(FAILED, error=f"{type(error).__name__}: {error}"))
@@ -1555,6 +1667,48 @@ def bribe_stats(records: list[GameRecord]) -> dict[str, float | None]:
     }
 
 
+def end_stats(records: list[GameRecord]) -> dict[str, object]:
+    """End of game figures (#163), replaying each game: ``turns`` and ``rounds`` (mean per game; a
+    turn is a run of log records by one player in one round), ``capped`` (the share of games whose
+    end condition never fired, so the round cap ended them; None under the round count end),
+    ``bodega`` (the share of player-games with a bodega bonus or a bodega building), and
+    ``trace``: for each round, the games still running at its start and the mean total by
+    position (round 1's turn order) at the end of that round, or at the game's end in it."""
+    turns = rounds = capped = bodegas = 0
+    trace: dict[int, list] = {}
+    preset = records[0].start.preset
+    for record in records:
+        last = None
+        for r in record.log:
+            if (r.round, r.player) != last:
+                turns += 1
+                last = (r.round, r.player)
+        played = record.log[-1].round if record.log else 0
+        rounds += played
+        capped += record.final.end_triggered is None
+        bodegas += sum(s.bodega > 0 or s.buildings > 0 for s in record.scores.values())
+        order = turn_order(record.start, 1)
+        state, dice = record.start, game_rngs(record.game_seed)[0]
+        log = record.log
+        for k, r in enumerate(log):
+            state = act(state, r.player, r.action, dice)
+            if k + 1 == len(log) or log[k + 1].round != r.round:
+                totals = calculate_score(state)
+                row = trace.setdefault(r.round, [0, [0] * len(order)])
+                row[0] += 1
+                for j, pid in enumerate(order):
+                    row[1][j] += totals[pid].total
+    games = len(records)
+    players = len(records[0].start.players)
+    return {
+        "turns": turns / games,
+        "rounds": rounds / games,
+        "capped": None if preset.end_condition is EndCondition.ROUNDS else capped / games,
+        "bodega": bodegas / (games * players),
+        "trace": {str(rnd): {"games": n, "mean": [t / n for t in sums]} for rnd, (n, sums) in sorted(trace.items())},
+    }
+
+
 def _bribe_columns(data: Mapping[str, object]) -> str:
     """The #168 columns: floodgates placed / released per game, share of their rolls used, swing, debt."""
     b = data.get("bribe_stats")
@@ -1638,6 +1792,61 @@ def is_v3blends(overrides: Mapping[str, object]) -> bool:
 def is_v3bribe(overrides: Mapping[str, object]) -> bool:
     """Whether a job's overrides set ``bribe_optional`` (#168; off too, as sweep ``v3bribe`` does)."""
     return "bribe_optional" in overrides
+
+
+def is_v3end(overrides: Mapping[str, object]) -> bool:
+    """Whether a job is a #163 job: it sets ``end_condition`` (the ``v3end`` base writes it out)."""
+    return "end_condition" in overrides
+
+
+END_HEADER = (
+    "| Candidate | P | Advantage ± 95% | Win rate by position | Win rate by seat | Shared wins "
+    "| Turns (min) | Rounds | Bodega rate | Ended by the cap | Winning score |"
+)
+"""The columns of sweep ``v3end`` (#163)."""
+END_COLUMNS = 11
+
+
+def end_row(job: Job, outcome: Outcome) -> str:
+    """A ``v3end`` row: ``END_HEADER``'s columns."""
+    head = f"| {job.label} | {job.players} |"
+    data = outcome.data
+    if data is None:
+        return f"{head} {_not_run(outcome)} |" + " |" * (END_COLUMNS - 3)
+    e = data["end_stats"]
+    return (
+        f"{head} {data['turn_order_advantage']:.3f} ± {margin(job.players, job.n):.3f} "
+        f"| {_list(data['win_rate_by_position'])} | {_list(data['win_rate_by_seat'])} "
+        f"| {_f(data['shared_win_rate'])} | {e['turns']:.1f} ({e['turns'] * MINUTES_PER_TURN:.0f}) "
+        f"| {e['rounds']:.1f} | {e['bodega']:.3f} | {_f(e['capped'], 3)} | {_spread(data['winning_score'])} |"
+    )
+
+
+def end_report(rows: list[tuple[Job, Outcome]]) -> list[str]:
+    """Sweep ``v3end``'s lines after its table: one verdict line per player count (which rows bring
+    the advantage under ``ADVANTAGE_BIAS_LIMIT``), then the base row's per-round score trace, and
+    each other row's, one table per player count."""
+    lines: list[str] = []
+    counts = sorted({job.players for job, _ in rows})
+    for players in counts:
+        mine = [(j, o) for j, o in rows if j.players == players and o.data is not None]
+        under = [j.label for j, o in mine if o.data["turn_order_advantage"] < ADVANTAGE_BIAS_LIMIT]
+        lines.append(f"- {players}p: advantage under {ADVANTAGE_BIAS_LIMIT} with "
+                     + (", ".join(f"`{label}`" for label in under) if under else "no option"))
+    lines.append("")
+    for players in counts:
+        lines.append(f"#### Score trace, {players}p (mean total by position at the end of each round)")
+        lines.append("")
+        header = "| Candidate | Round | Games | " + " | ".join(f"Position {j}" for j in range(1, players + 1)) + " |"
+        lines += [header, "|" + " --- |" * (players + 3)]
+        for job, outcome in rows:
+            if job.players != players or outcome.data is None:
+                continue
+            for rnd, t in outcome.data["end_stats"]["trace"].items():
+                lines.append(f"| {job.label} | {rnd} | {t['games']} | "
+                             + " | ".join(f"{x:.1f}" for x in t["mean"]) + " |")
+        lines.append("")
+    return lines
 
 
 def is_v3(overrides: Mapping[str, object]) -> bool:
@@ -1778,6 +1987,8 @@ def describe(overrides: Mapping[str, object]) -> str:
             value = f"{value[0]}-{value[1]}"
         elif key == "seat_bonus":
             value = seat_bonus_label(value)
+        elif key in ("score_target", "vineyard_markers"):
+            value = "/".join(f"{p}p {n}" for p, n in sorted(value.items()))
         elif key == "bag_size":
             value = "/".join(f"{p}p {n}" for p, n in sorted(value.items()))
         elif key == "varietal_points":
@@ -1826,6 +2037,17 @@ def do_sweeps(sweeps: list[Sweep], run, modes, games: int, players_list=PLAYER_C
                 continue
             print(f"### {mode.value.capitalize()}\n")
             print(f"Base: {describe(sweep.base[mode])}.\n")
+            if is_v3end(rows[0][0].overrides):
+                print("Turns here are counted from the log, since an end condition changes the length.")
+                print()
+                print(END_HEADER)
+                print("|" + " --- |" * END_COLUMNS)
+                for job, outcome in rows:
+                    print(end_row(job, outcome))
+                print()
+                for line in end_report(rows):
+                    print(line)
+                continue
             v3 = is_v3(rows[0][0].overrides)
             blended = v3 and any(is_v3blends(j.overrides) for j, _ in rows)
             bribed = v3 and any(is_v3bribe(j.overrides) for j, _ in rows)
@@ -1966,7 +2188,7 @@ def main(argv: list[str] | None = None) -> int:
     modes = [Mode(args.mode)] if args.mode else list(Mode)
     sweeps = V1_SWEEPS + v2_sweeps(args.scale, args.rare_bonus, args.multiple_bodegas, args.season_global_only,
                                    args.seat_bonus, args.rounds) + strip_sweeps(args.river_hexes, args.bag_per_player) \
-        + v3_sweeps(args.v3_river_hexes, args.v3_bag_per_player) + v3split_sweeps() + v3blends_sweeps()
+        + v3_sweeps(args.v3_river_hexes, args.v3_bag_per_player) + v3split_sweeps() + v3blends_sweeps()         + v3bribe_sweeps() + v3end_sweeps()
     flags = "" if (args.scale, args.rare_bonus) == (1, 1) else f" --scale {args.scale} --rare-bonus {args.rare_bonus}"
     if args.multiple_bodegas:
         flags += " --multiple-bodegas"

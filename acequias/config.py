@@ -109,6 +109,41 @@ class BodegaPlacement(Enum):
     REPLACE = "replace"
 
 
+class EndCondition(Enum):
+    """What ends the game (Rules v3, opt-in, #163; ``Preset.end_condition``).
+
+    ``ROUNDS``: after the preset's round count (the default; every shipped
+    game). ``BAG_EMPTY``: when the canal bag and the market are both empty.
+    ``VINEYARDS_OUT``: when a player has planted all their vineyard markers
+    (``Preset.markers_for``). ``SCORE_TARGET``: when a player's total
+    reaches ``Preset.target_for``. With ``Preset.finish_round`` the game
+    ends after the round in which the trigger fired; otherwise right after
+    the turn that fired it. A game whose trigger never fires ends after
+    ``END_CAP_FACTOR`` times the round count (``Preset.round_cap``).
+    """
+
+    ROUNDS = "rounds"
+    BAG_EMPTY = "bag_empty"
+    VINEYARDS_OUT = "vineyards_out"
+    SCORE_TARGET = "score_target"
+
+
+END_CAP_FACTOR = 2
+"""Under an end condition other than ``ROUNDS``, the game ends at the latest after this many
+times the preset's round count (#163: the shipped rounds x2)."""
+VINEYARD_MARKERS: Mapping[Mode, Mapping[int, int]] = MappingProxyType({
+    Mode.NORMAL: MappingProxyType({2: 6, 3: 9, 4: 7, 5: 6}),
+    Mode.FLASH: MappingProxyType({2: 3, 3: 3}),
+})
+"""Vineyard markers per player by default for ``VINEYARDS_OUT`` (#163): about the vineyards
+planted per player in #160's any-vertex games."""
+SCORE_TARGETS: Mapping[Mode, Mapping[int, int]] = MappingProxyType({
+    Mode.NORMAL: MappingProxyType({2: 30, 3: 51, 4: 43, 5: 37}),
+    Mode.FLASH: MappingProxyType({2: 14, 3: 14}),
+})
+"""Score targets by default for ``SCORE_TARGET`` (#163): #160's mean winning scores."""
+
+
 @dataclass(frozen=True, slots=True)
 class Blend:
     """A blend (*corte*): a set of at least 2 varietals, and its bonus points (#166).
@@ -357,6 +392,18 @@ class Preset:
     removes a floodgate, and declining costs nothing. Off, those faces are
     mandatory when they have a use and the bribe is paid on the roll. It
     needs vertex planting.
+
+    End of the game (opt-in, #163): ``end_condition`` (``EndCondition``,
+    ``ROUNDS`` by default and in the shipped presets) says what ends the
+    game, and ``finish_round`` (on by default) whether the round in which
+    the trigger fired is played out. ``vineyard_markers`` and
+    ``score_target`` map a player count to the markers per player and the
+    target score (empty by default: ``VINEYARD_MARKERS`` and
+    ``SCORE_TARGETS`` of the mode). Under ``VINEYARDS_OUT`` a player
+    cannot plant more vineyards than their markers. Any end condition
+    but ``ROUNDS`` needs vertex planting. ``unlimited_bag`` (off by
+    default) makes the bag never run out: each piece drawn goes back to
+    the bottom of the bag, so the market always refills.
     """
 
     mode: Mode
@@ -400,6 +447,11 @@ class Preset:
     bodega_building_points: int = 12
     bodegas_per_player: int | None = 1
     bribe_optional: bool = False
+    end_condition: EndCondition = EndCondition.ROUNDS
+    finish_round: bool = True
+    vineyard_markers: Mapping[int, int] = field(default_factory=lambda: MappingProxyType({}))
+    score_target: Mapping[int, int] = field(default_factory=lambda: MappingProxyType({}))
+    unlimited_bag: bool = False
 
     def __post_init__(self) -> None:
         _check_type("mode", self.mode, Mode)
@@ -463,6 +515,7 @@ class Preset:
         _check_type("bribe_optional", self.bribe_optional, bool)
         if self.bribe_optional and self.planting is not PlantingRules.VERTICES:
             raise ValueError("bribe_optional needs vertex planting")
+        self._check_end()
         if self.season_roll_every is not None and self.bribe_rules is not BribeRules.ACTION_DIE:
             raise ValueError("season_roll_every needs action_die bribe rules")
         if self.bribe_rules is BribeRules.ACTION_DIE:
@@ -534,6 +587,53 @@ class Preset:
         )
         if missing:
             raise ValueError(f"blend varietals {missing} are not on the roulette")
+
+    def _check_end(self) -> None:
+        """Check and normalize the #163 options: the end condition and the unlimited bag."""
+        _check_type("end_condition", self.end_condition, EndCondition)
+        _check_type("finish_round", self.finish_round, bool)
+        _check_type("unlimited_bag", self.unlimited_bag, bool)
+        _set(self, "vineyard_markers", _per_count("vineyard_markers", self.vineyard_markers, self.player_counts))
+        _set(self, "score_target", _per_count("score_target", self.score_target, self.player_counts))
+        if self.end_condition is EndCondition.ROUNDS:
+            return
+        if self.planting is not PlantingRules.VERTICES:
+            raise ValueError(f"end_condition {self.end_condition.value} needs vertex planting")
+        defaults = {
+            EndCondition.VINEYARDS_OUT: ("vineyard_markers", VINEYARD_MARKERS),
+            EndCondition.SCORE_TARGET: ("score_target", SCORE_TARGETS),
+        }.get(self.end_condition)
+        if defaults is not None:
+            name, table = defaults
+            given = getattr(self, name)
+            missing = [n for n in self.player_counts if n not in given and n not in table[self.mode]]
+            if missing:
+                raise ValueError(f"end_condition {self.end_condition.value} needs {name} for {missing}")
+
+    def markers_for(self, players: int) -> int:
+        """Vineyard markers per player for ``VINEYARDS_OUT``: ``vineyard_markers`` or the default."""
+        self.check_players(players)
+        return self.vineyard_markers.get(players, VINEYARD_MARKERS[self.mode].get(players, 0))
+
+    def target_for(self, players: int) -> int:
+        """The target score for ``SCORE_TARGET``: ``score_target`` or the default."""
+        self.check_players(players)
+        return self.score_target.get(players, SCORE_TARGETS[self.mode].get(players, 0))
+
+    def round_cap(self, players: int) -> int:
+        """The last round a game can reach: the round count, or ``END_CAP_FACTOR`` times it
+        under an end condition other than ``ROUNDS``."""
+        rounds = self.rounds_for(players)
+        return rounds if self.end_condition is EndCondition.ROUNDS else rounds * END_CAP_FACTOR
+
+    def plant_cap(self, players: int) -> int | None:
+        """The most vineyards a player may hold: ``grape_clusters_per_player``, and under
+        ``VINEYARDS_OUT`` at most ``markers_for(players)``; ``None``: no cap."""
+        cap = self.grape_clusters_per_player
+        if self.end_condition is EndCondition.VINEYARDS_OUT:
+            markers = self.markers_for(players)
+            cap = markers if cap is None else min(cap, markers)
+        return cap
 
     @property
     def vineyard_tiles_per_player(self) -> int:
@@ -706,6 +806,18 @@ def _bag_size(value: object, counts: tuple[int, ...]) -> Mapping[int, int]:
     for players in counts:
         if players in value:
             _check_count(f"bag_size[{players}]", value[players])
+    return MappingProxyType({n: value[n] for n in counts if n in value})
+
+
+def _per_count(name: str, value: object, counts: tuple[int, ...]) -> Mapping[int, int]:
+    """A mapping of player count (one of ``counts``) to an int of 1 or more, read-only."""
+    _check_type(name, value, Mapping)
+    extra = [n for n in value if n not in counts or isinstance(n, bool)]
+    if extra:
+        raise ValueError(f"{name} gives player counts {extra}; rounds has only {players_text(counts)}")
+    for players in counts:
+        if players in value:
+            _check_count(f"{name}[{players}]", value[players])
     return MappingProxyType({n: value[n] for n in counts if n in value})
 
 

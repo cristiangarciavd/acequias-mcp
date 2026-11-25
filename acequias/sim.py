@@ -33,6 +33,7 @@ from acequias.bots import policy
 from acequias.config import (
     RIVER_HEXES_PER_SEGMENT,
     BoardShape,
+    EndCondition,
     PlantingRules,
     Preset,
     VarietalRules,
@@ -449,6 +450,14 @@ _V3_SCORING_DEFAULTS = {
     )
 }
 """The Rules v3 scoring options (#166) and ``bribe_optional`` (#168), with their defaults."""
+_END_DEFAULTS = {
+    "end_condition": EndCondition.ROUNDS,
+    "finish_round": True,
+    "vineyard_markers": {},
+    "score_target": {},
+    "unlimited_bag": False,
+}
+"""The end of game options (#163), with their defaults."""
 
 
 def _preset_values(preset: Preset) -> Mapping[str, object]:
@@ -476,6 +485,15 @@ def _preset_values(preset: Preset) -> Mapping[str, object]:
         if f.name == "bag_size":
             if value:
                 values[f.name] = MappingProxyType(dict(value))
+            continue
+        if f.name in _END_DEFAULTS:
+            # #163 options, written only when not at their default, like ``planting``.
+            if value != _END_DEFAULTS[f.name]:
+                if isinstance(value, Enum):
+                    value = value.value
+                elif isinstance(value, Mapping):
+                    value = MappingProxyType(dict(value))
+                values[f.name] = value
             continue
         if f.name in _V3_SCORING_DEFAULTS:
             # #166 options, written only when not at their default, like ``planting``.

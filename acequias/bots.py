@@ -969,7 +969,7 @@ class _Evaluator:
         makes a canal that opens spots worth more than a pass, and less
         than planting.
         """
-        cap = self.preset.grape_clusters_per_player
+        cap = self.preset.plant_cap(len(self.rivals) + 1)
         if cap is not None and planted >= cap:
             return Fraction(0)
         return self.reach * min(spots, SPOT_TARGET) / SPOT_TARGET

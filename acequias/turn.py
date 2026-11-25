@@ -916,8 +916,8 @@ def _check_plant(state: GameState, player: str, vertex: Vertex, preset: Preset) 
         )
     if not _below_cap(state, player, preset):
         raise IllegalAction(
-            f"{player} already holds grape_clusters_per_player "
-            f"({preset.grape_clusters_per_player}) vineyards"
+            f"{player} already holds {preset.plant_cap(len(state.players))} vineyards, the most "
+            f"allowed (grape_clusters_per_player, or the vineyard markers under vineyards_out)"
         )
 
 
@@ -976,7 +976,7 @@ def _bodega_board(state: GameState, player: str, vertex: Vertex, preset: Preset)
 
 
 def _below_cap(state: GameState, player: str, preset: Preset) -> bool:
-    cap = preset.grape_clusters_per_player
+    cap = preset.plant_cap(len(state.players))
     return cap is None or sum(1 for v in state.board.planted if v.owner == player) < cap
 
 
@@ -1055,7 +1055,8 @@ def _take_from_market(state: GameState, board: Board, market_take: PieceKind) ->
     bag = state.bag
     if bag:
         market.append(bag[0])
-        bag = bag[1:]
+        # Under unlimited_bag (#163) the piece drawn goes back to the bottom of the bag.
+        bag = bag[1:] + (bag[0],) if _preset(state).unlimited_bag else bag[1:]
     return replace(state, board=board, market=tuple(market), bag=bag)
 
 
