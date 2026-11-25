@@ -86,7 +86,8 @@ from pydantic import (
 from typing_extensions import TypedDict
 
 from acequias.assembly import AssemblyStep
-from acequias.config import PLAYER_COUNTS, BribeRules, VarietalRules
+from acequias.config import PLAYER_COUNTS, BribeRules, VarietalRules, players_text
+from acequias.config import preset as shipped_preset
 from acequias.hex import Direction, Hex
 from acequias.model import (
     ROTATIONS,
@@ -136,6 +137,11 @@ _KIND_BY_NAME = {kind.name.lower(): kind for kind in PieceKind if kind.is_canal}
 _DIRECTION_BY_NAME = {direction.name: direction for direction in Direction}
 _PIECE_BY_NAME = {kind.name.lower(): kind for kind in PieceKind}
 _PLAYER_COUNT_BY_NAME = {str(players): players for players in PLAYER_COUNTS}
+
+MODE_PLAYERS = "; ".join(
+    f"{mode.value} {players_text(shipped_preset(mode).player_counts)}" for mode in Mode
+)
+"""The player counts each mode is for, from the shipped presets: "normal 2 to 5; flash 2 to 3"."""
 
 
 # --- String mappings --------------------------------------------------------
@@ -365,7 +371,10 @@ class ScoreJSON(BaseModel):
     )
 
 
-_ROUNDS_DESCRIPTION = 'Rounds per player count, keyed "2" to "5".'
+_ROUNDS_DESCRIPTION = (
+    'Rounds per player count, keyed "2" to "5"; the keys are the player counts the mode is '
+    f"for ({MODE_PLAYERS} in the shipped presets), and any other count is rejected."
+)
 _BAG_MIX_DESCRIPTION = (
     'Percentage of the bag for each piece kind, keyed "straight", "gentle_curve", '
     '"sharp_curve", "symmetric_y", "t_branch", "claw", "floodgate".'
@@ -468,7 +477,10 @@ class PresetOverridesJSON(TypedDict, total=False):
 
     rounds: Annotated[
         dict[PlayerCountName, StrictInt],
-        Field(description=_ROUNDS_DESCRIPTION + " Give every key, e.g. {\"2\": 10, ...}."),
+        Field(
+            description=_ROUNDS_DESCRIPTION
+            + " Give every player count to play, e.g. {\"2\": 10, ...}; it replaces the mode's."
+        ),
     ]
     hexes_per_player: Annotated[StrictInt, Field(description="Board hexes per player.")]
     vineyards_per_player: Annotated[StrictInt, Field(description="Vineyard plots per player.")]

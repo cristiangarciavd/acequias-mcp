@@ -9,7 +9,7 @@ import pytest
 
 from acequias import board as board_module
 from acequias.board import generate_board, reachable_vineyards
-from acequias.config import FLASH, NORMAL, preset, with_overrides
+from acequias.config import RULES_V1, preset, with_overrides
 from acequias.hex import Hex
 from acequias.model import (
     MAX_PLAYERS,
@@ -20,6 +20,10 @@ from acequias.model import (
     Tile,
     Varietal,
 )
+
+PIN_RULES_V1 = True
+"""``conftest.py``: these tests check the engine under the Rules v1 presets."""
+NORMAL, FLASH = RULES_V1[Mode.NORMAL], RULES_V1[Mode.FLASH]
 
 PLAYER_COUNTS = range(MIN_PLAYERS, MAX_PLAYERS + 1)
 ROOT = Path(__file__).resolve().parent.parent
@@ -160,11 +164,12 @@ def test_same_inputs_give_equal_boards(players, mode):
 def test_same_board_in_a_fresh_process_with_another_hash_seed():
     script = (
         "from acequias.board import generate_board\n"
+        "from acequias.config import RULES_V1\n"
         "from acequias.model import Mode\n"
         "for mode in Mode:\n"
         "    for players in range(2, 6):\n"
         "        for seed in range(5):\n"
-        "            print(repr(generate_board(players, seed, mode).tiles))\n"
+        "            print(repr(generate_board(players, seed, mode, preset=RULES_V1[mode]).tiles))\n"
     )
     outputs = []
     for hash_seed in ("1", "12345"):
@@ -182,7 +187,7 @@ def test_same_board_in_a_fresh_process_with_another_hash_seed():
         )
         outputs.append(result.stdout)
     expected = "".join(
-        repr(generate_board(players, seed, mode).tiles) + "\n"
+        repr(generate_board(players, seed, mode, preset=RULES_V1[mode]).tiles) + "\n"
         for mode in Mode
         for players in range(2, 6)
         for seed in range(5)

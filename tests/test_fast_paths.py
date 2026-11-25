@@ -26,6 +26,9 @@ from acequias.turn import (
     legal_actions,
 )
 
+PIN_RULES_V1 = True
+"""``conftest.py``: these tests check the engine under the Rules v1 presets."""
+
 MEMBERS = list(Direction)
 
 

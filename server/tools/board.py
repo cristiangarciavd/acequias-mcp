@@ -16,6 +16,7 @@ from acequias.assembly import assembly_instructions
 from acequias.board import generate_board as build_board
 from acequias.model import MAX_PLAYERS, MIN_PLAYERS
 from server.schemas import (
+    MODE_PLAYERS,
     AssemblyStepJSON,
     HexJSON,
     ModeName,
@@ -59,7 +60,7 @@ def generate_board(
             strict=True,
             ge=MIN_PLAYERS,
             le=MAX_PLAYERS,
-            description=f"Number of players, {MIN_PLAYERS} to {MAX_PLAYERS}.",
+            description=f"Number of players, {MIN_PLAYERS} to {MAX_PLAYERS}; by mode: {MODE_PLAYERS}.",
         ),
     ],
     mode: Annotated[

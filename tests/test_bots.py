@@ -31,6 +31,9 @@ from acequias.config import with_overrides
 from acequias.setup import new_game
 from acequias.turn import Bribe, Pass, PlaceCanal, PlaceFloodgate, legal_actions
 
+PIN_RULES_V1 = True
+"""``conftest.py``: these tests check the engine under the Rules v1 presets."""
+
 E, NE, NW, W, SW, SE = list(Direction)
 STRAIGHT, GENTLE, SHARP, Y, T, CLAW, GATE = list(PieceKind)
 MALBEC, BONARDA, TORRONTES = Varietal.MALBEC, Varietal.BONARDA, Varietal.TORRONTES

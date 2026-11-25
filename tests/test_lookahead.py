@@ -28,12 +28,16 @@ from test_score_aware import (
 
 from acequias import sim
 from acequias.bots import POLICIES, greedy_bot, lookahead_bot, policy, score_aware_bot
-from acequias.config import action_die_rules, preset, scaled, with_overrides
+from acequias.config import RULES_V1, action_die_rules, preset, scaled, with_overrides
 from acequias.hex import Hex
 from acequias.model import DieFace, Mode
 from acequias.sim import SimRules, simulate_game
 from acequias.turn import PlaceCanal, PlaceFloodgate, RollActionDie, legal_actions
 from server.app import app
+
+PIN_RULES_V1 = True
+"""``conftest.py``: these tests check the engine under the Rules v1 presets."""
+NORMAL, FLASH = RULES_V1[Mode.NORMAL], RULES_V1[Mode.FLASH]
 
 FAR_FAR_E = Hex(3, 0)
 

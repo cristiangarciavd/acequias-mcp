@@ -15,7 +15,6 @@ import pytest
 from acequias.config import (
     BribeRules,
     action_die_rules,
-    preset,
     roulette_rules,
     scaled,
     with_overrides,
@@ -74,21 +73,21 @@ def test_greedy_and_mixed_give_the_same_numbers_as_before(key):
 
 @pytest.mark.parametrize("mode", list(Mode))
 def test_v2_base_is_roulette_then_action_die_rules(mode):
-    expected = action_die_rules(roulette_rules(preset(mode)))
-    assert with_overrides(preset(mode), **tune.V2_BASE[mode]) == expected
+    expected = action_die_rules(roulette_rules(tune.V1_PRESET[mode]))
+    assert with_overrides(tune.V1_PRESET[mode], **tune.V2_BASE[mode]) == expected
     assert expected.bag_mix[PieceKind.FLOODGATE] == 0
 
 
 @pytest.mark.parametrize("mode", list(Mode))
 def test_v2_candidates_express_scale_points_die_and_board(mode):
-    v2 = action_die_rules(roulette_rules(preset(mode)))
-    assert with_overrides(preset(mode), **tune.v2(mode)) == v2
-    assert with_overrides(preset(mode), **tune.v2(mode, 3)) == scaled(v2, 3)
-    p = with_overrides(preset(mode), **tune.v2(mode, 2, 1))
+    v2 = action_die_rules(roulette_rules(tune.V1_PRESET[mode]))
+    assert with_overrides(tune.V1_PRESET[mode], **tune.v2(mode)) == v2
+    assert with_overrides(tune.V1_PRESET[mode], **tune.v2(mode, 3)) == scaled(v2, 3)
+    p = with_overrides(tune.V1_PRESET[mode], **tune.v2(mode, 2, 1))
     assert p.varietal_points[Varietal.BONARDA] == p.varietal_points[Varietal.CABERNET_FRANC] == 5
-    assert p.varietal_points[Varietal.MALBEC] == 4 and p.bodega_points == 2 * preset(mode).bodega_points
+    assert p.varietal_points[Varietal.MALBEC] == 4 and p.bodega_points == 2 * tune.V1_PRESET[mode].bodega_points
     faces = tune.die_faces(3, 2, 1)
-    p = with_overrides(preset(mode), **tune.v2(
+    p = with_overrides(tune.V1_PRESET[mode], **tune.v2(
         mode, action_die_cost=1, action_die=faces, vineyards_per_player=3,
         grape_clusters_per_player=2, hexes_per_player=18))
     assert (p.action_die_cost, p.action_die, p.vineyards_per_player, p.grape_clusters_per_player,
@@ -100,7 +99,7 @@ def test_phase_b_sweeps_are_listed_with_new_seeds(capsys):
     assert tune.V2_SWEEP_SEED == 103_001 and tune.V2_FINAL_SEED == 103_002
     assert {tune.V2_SWEEP_SEED, tune.V2_FINAL_SEED}.isdisjoint({tune.SWEEP_SEED, tune.FINAL_SEED})
     v2 = {s.name: s for s in tune.v2_sweeps()}
-    assert list(v2) == ["b0", "b1", "b2", "b3", "b3b", "b4", "b5"]
+    assert list(v2) == ["b0", "b1", "b2", "b3", "b3b", "b4", "b5", "shipped"]
     for sweep in v2.values():
         assert sweep.seed == tune.V2_SWEEP_SEED and sweep.seatings == ("score_aware",)
     assert v2["b0"].base == {mode: {} for mode in Mode}
@@ -126,7 +125,7 @@ def test_phase_b_sweeps_are_listed_with_new_seeds(capsys):
 def test_no_die_candidate_never_offers_the_die_or_a_bribe(mode):
     label, changes = tune.v2_sweeps()[3].candidates[mode][-1]
     assert label.startswith("no die")
-    p = with_overrides(preset(mode), **{**tune.V2_BASE[mode], **changes})
+    p = with_overrides(tune.V1_PRESET[mode], **{**tune.V2_BASE[mode], **changes})
     assert p.bribe_rules is BribeRules.D6 and p.bag_mix[PieceKind.FLOODGATE] == 0
 
 
@@ -140,7 +139,7 @@ def test_b5_combines_the_best_board_with_the_constructive_die(mode):
         (cost, x) for cost in (1, 2) for x in every
     }
     for _, changes in (*die, (label, no_die)):
-        p = with_overrides(preset(mode), **{**tune.V2_BASE[mode], **changes})
+        p = with_overrides(tune.V1_PRESET[mode], **{**tune.V2_BASE[mode], **changes})
         assert p.varietal_points[Varietal.MALBEC] == 4 and p.varietal_points[Varietal.BONARDA] == 5
         if mode is Mode.NORMAL:
             assert (p.vineyards_per_player, p.hexes_per_player, p.grape_clusters_per_player) == (2, 18, None)
@@ -159,7 +158,7 @@ def test_multiple_bodegas_flag_switches_it_on_in_every_b5_candidate(mode):
         assert "multiple_bodegas" not in changes
     assert [label for label, _ in on["b5"].candidates[mode]] == [label for label, _ in off["b5"].candidates[mode]]
     for _, changes in on["b5"].candidates[mode]:
-        p = with_overrides(preset(mode), **{**tune.V2_BASE[mode], **changes})
+        p = with_overrides(tune.V1_PRESET[mode], **{**tune.V2_BASE[mode], **changes})
         assert p.multiple_bodegas is True
     assert "multiple bodegas" in on["b5"].title
     for name in ("b0", "b1", "b2", "b3", "b3b", "b4"):
@@ -177,7 +176,7 @@ def test_b3_and_b4_follow_the_best_scale():
     for label, changes in b3.candidates[Mode.FLASH]:
         if label.startswith("cost 0"):
             continue  # Preset rejects cost 0 (#125 comment); the run reports it as infeasible
-        assert with_overrides(preset(Mode.FLASH), **{**b3.base[Mode.FLASH], **changes}).varietal_points[
+        assert with_overrides(tune.V1_PRESET[Mode.FLASH], **{**b3.base[Mode.FLASH], **changes}).varietal_points[
             Varietal.BONARDA] == 6
 
 
@@ -203,7 +202,7 @@ def test_rows_under_v1_and_v2_rules():
     assert v2.data["actions_per_game"]["die"] > 0, "the seed must roll the die"
     assert "-" not in tune._die(v2.data)
     # Turns are rounds x P; turns_per_game counts a die turn twice.
-    turns = preset(Mode.FLASH).rounds[2] * 2
+    turns = tune.V1_PRESET[Mode.FLASH].rounds[2] * 2
     assert tune._turns(v2_job, v2.data) == turns
     assert v2.data["turns_per_game"] == pytest.approx(turns + v2.data["actions_per_game"]["die"])
 
@@ -240,7 +239,8 @@ def test_unknown_candidate_is_an_argument_error(capsys):
 
 def test_rules_of_accepts_the_new_seatings():
     rules = tune.rules_of(tune.Job("t", Mode.FLASH, 3, "lookahead", {}, 1, 1))
-    assert rules == SimRules(Mode.FLASH, 3, ("lookahead",) * 3)
+    # A job's overrides are relative to the Rules v1 preset.
+    assert rules == SimRules(Mode.FLASH, 3, ("lookahead",) * 3, tune.V1_OVERRIDES[Mode.FLASH])
 
 
 @pytest.mark.parametrize("mode", list(Mode))
@@ -250,7 +250,7 @@ def test_season_global_only_flag_turns_off_personal_faces_in_every_b5_candidate(
     for _, changes in off["b5"].candidates[mode]:
         assert "season_roll_personal_faces" not in changes
     for _, changes in on["b5"].candidates[mode]:
-        p = with_overrides(preset(mode), **{**tune.V2_BASE[mode], **changes})
+        p = with_overrides(tune.V1_PRESET[mode], **{**tune.V2_BASE[mode], **changes})
         assert p.season_roll_personal_faces is False and p.multiple_bodegas is True
     assert "season faces only" in on["b5"].title and "multiple bodegas" in on["b5"].title
     for name in ("b0", "b1", "b2", "b3", "b3b", "b4"):

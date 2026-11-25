@@ -15,8 +15,7 @@ from mcp import Client
 from acequias.assembly import assembly_instructions
 from acequias.board import generate_board
 from acequias.config import (
-    FLASH,
-    NORMAL,
+    RULES_V1,
     ROULETTE_POINTS,
     ROULETTE_SECTORS,
     VarietalRules,
@@ -47,6 +46,10 @@ from server.schemas import (
     overrides_from_json,
     planting_from_json,
 )
+
+PIN_RULES_V1 = True
+"""``conftest.py``: these tests check the engine under the Rules v1 presets."""
+NORMAL, FLASH = RULES_V1[Mode.NORMAL], RULES_V1[Mode.FLASH]
 
 V = Varietal
 ROULETTE = {"varietal_rules": VarietalRules.ROULETTE, "varietal_points": ROULETTE_POINTS}

@@ -19,6 +19,7 @@ from acequias.model import MAX_PLAYERS, MIN_PLAYERS, Board, GameState
 from acequias.scoring import calculate_score as score_state
 from acequias.scoring import winners as winners_of
 from server.schemas import (
+    MODE_PLAYERS,
     CanalJSON,
     ClaimJSON,
     FloodgateJSON,
@@ -70,7 +71,8 @@ def calculate_score(
             min_length=MIN_PLAYERS,
             max_length=MAX_PLAYERS,
             description=(
-                f"{MIN_PLAYERS} to {MAX_PLAYERS} players in seat order (seats 1 to N), "
+                f"{MIN_PLAYERS} to {MAX_PLAYERS} players in seat order (seats 1 to N; by mode: "
+                f"{MODE_PLAYERS}), "
                 "each with its id, bribe debt, and optional season and drought points (default 0)."
             ),
         ),
@@ -110,7 +112,7 @@ def calculate_score(
     debt + season + seat_bonus - drought (the action die's good season gains and drought
     losses; drought never takes a total below 0; seat_bonus from the preset's seat_bonus,
     seat 1 being round 1's start player); every term is in points, and each rival on a vineyard's water path
-    gets water_right_points (1 in the shipped presets). Every watered claimed
+    gets water_right_points (3 in the shipped presets). Every watered claimed
     vineyard is listed with the canal path its water takes and the rivals its
     claimant pays, so the water rights can be checked by hand. The state is scored as given, finished or not.
     """
@@ -129,6 +131,7 @@ def calculate_score(
     game_mode = mode_from_json(mode)
     preset = with_overrides(shipped_preset(game_mode), **overrides_from_json(overrides))
     game_players = players_from_json(players)
+    preset.check_players(len(game_players))
     first = game_players[0].id if game_players else ""
     # Scoring reads only the board, the players, the preset, and round 1's start
     # player (for the seat bonus). The fields the input does not carry get fixed

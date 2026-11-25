@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from acequias.config import NORMAL, with_overrides
+from acequias.config import RULES_V1, with_overrides
 from acequias.hex import Direction, Hex
 from acequias.model import (
     Board,
@@ -29,6 +29,10 @@ from acequias.turn import (
     apply,
     legal_actions,
 )
+
+PIN_RULES_V1 = True
+"""``conftest.py``: these tests check the engine under the Rules v1 presets."""
+NORMAL, FLASH = RULES_V1[Mode.NORMAL], RULES_V1[Mode.FLASH]
 
 E, NE, NW, W, SW, SE = list(Direction)
 STRAIGHT, GENTLE, SHARP, Y, T, CLAW, GATE = list(PieceKind)

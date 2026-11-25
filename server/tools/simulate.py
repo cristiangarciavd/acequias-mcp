@@ -17,6 +17,7 @@ from acequias.model import MAX_PLAYERS, MIN_PLAYERS
 from acequias.sim import SimRules
 from acequias.sim import simulate_game as run_simulation
 from server.schemas import (
+    MODE_PLAYERS,
     ModeName,
     PresetJSON,
     PresetOverridesJSON,
@@ -137,7 +138,10 @@ def simulate_game(
             strict=True,
             ge=MIN_PLAYERS,
             le=MAX_PLAYERS,
-            description=f"Number of players, {MIN_PLAYERS} to {MAX_PLAYERS}.",
+            description=(
+                f"Number of players, {MIN_PLAYERS} to {MAX_PLAYERS}; by mode: {MODE_PLAYERS} "
+                "(overrides.rounds can change the counts)."
+            ),
         ),
     ],
     games: Annotated[

@@ -13,6 +13,9 @@ from acequias.sim import SimRules, play_one
 from acequias.turn import DeclineFace, PlaceCanal, RollActionDie, legal_actions
 from tests.test_season_die import EVERY2, H1, P, _overrides, state
 
+PIN_RULES_V1 = True
+"""``conftest.py``: these tests check the engine under the Rules v1 presets."""
+
 PERSONAL = (DieFace.FLOODGATE, DieFace.RELEASE, DieFace.RESOW)
 SEASON = (DieFace.GOOD_SEASON, DieFace.DROUGHT)
 

@@ -31,7 +31,7 @@ from collections.abc import Sequence
 from acequias.config import Preset, VarietalRules, _ceil_share
 from acequias.config import preset as shipped_preset
 from acequias.hex import Direction, Hex
-from acequias.model import MAX_PLAYERS, MIN_PLAYERS, Board, Mode, Terrain, Tile, Varietal
+from acequias.model import Board, Mode, Terrain, Tile, Varietal
 
 # How many layouts the generator tries before it gives up on a preset.
 MAX_ATTEMPTS = 200
@@ -44,7 +44,8 @@ def generate_board(
 
     ``preset`` replaces the shipped preset for ``mode`` (for the
     simulation); its mode must be ``mode``. The same arguments always give
-    an equal board. Raises ``ValueError`` if the preset cannot be met.
+    an equal board. Raises ``ValueError`` if the preset cannot be met, or
+    if ``players`` is not one of its ``player_counts`` (Flash: 2 or 3).
     """
     _check_int("players", players)
     _check_int("seed", seed)
@@ -54,8 +55,7 @@ def generate_board(
         preset = shipped_preset(mode)
     elif not isinstance(preset, Preset):
         raise TypeError(f"preset must be a Preset, got {preset!r}")
-    if not MIN_PLAYERS <= players <= MAX_PLAYERS:
-        raise ValueError(f"players must be {MIN_PLAYERS} to {MAX_PLAYERS}, got {players}")
+    preset.check_players(players)
     if preset.mode is not mode:
         raise ValueError(
             f"preset is for mode {preset.mode.name}, but mode is {mode.name}"

@@ -13,6 +13,7 @@ from mcp import Client
 
 from acequias.bots import greedy_bot, saboteur_bot
 from acequias.config import (
+    RULES_V1,
     ROULETTE_SECTORS,
     BribeRules,
     action_die_rules,
@@ -52,8 +53,11 @@ from acequias.turn import (
 )
 from server.app import app
 
+PIN_RULES_V1 = True
+"""``conftest.py``: these tests check the engine under the Rules v1 presets."""
+
 V = Varietal
-DIE = {m: action_die_rules(roulette_rules(preset(m))) for m in Mode}
+DIE = {m: action_die_rules(roulette_rules(RULES_V1[m])) for m in Mode}
 P = DIE[Mode.NORMAL]
 
 R, H1 = Hex(0, 0), Hex(1, 0)

@@ -21,6 +21,9 @@ from acequias.model import (
     Varietal,
 )
 
+PIN_RULES_V1 = True
+"""``conftest.py``: these tests check the engine under the Rules v1 presets."""
+
 R = Terrain.RIVER
 V = Terrain.VINEYARD
 S = Terrain.STONE

@@ -20,24 +20,56 @@ import pytest
 
 from acequias.flow import water
 from acequias.hex import Hex
-from acequias.model import Mode
+from acequias.config import ACTION_DIE_FACES, BribeRules, VarietalRules
+from acequias.model import Mode, PieceKind, Varietal
 from acequias.sim import SimRules, game_seed, play_one, simulate_game
 from acequias.turn import Bribe, Pass, PlaceCanal, PlaceFloodgate
 
 DATA = Path(__file__).parent / "data" / "golden_games.json"
 
-# The shipped preset values when the file was recorded (before #20 tuned
-# them). The runs pin them as overrides, so retuning the presets changes no
-# golden game: these runs check the engine, not the shipped numbers.
+# The shipped preset values when the file was recorded (Rules v1, before #20
+# tuned them). The runs pin every one of them as overrides, so retuning the
+# presets (#20) or shipping Rules v2 (#126) changes no golden game: these
+# runs check the engine, not the shipped numbers.
+RULES_V1 = {
+    "vineyards_per_player": 2,
+    "stone_share": 10,
+    "market_size": 4,
+    "bag_mix": {
+        PieceKind.STRAIGHT: 40,
+        PieceKind.GENTLE_CURVE: 20,
+        PieceKind.SHARP_CURVE: 15,
+        PieceKind.SYMMETRIC_Y: 5,
+        PieceKind.T_BRANCH: 5,
+        PieceKind.CLAW: 5,
+        PieceKind.FLOODGATE: 10,
+    },
+    "die_faces": 6,
+    "bodega_varietals": 3,
+    "water_right_points": 1,
+    "varietal_rules": VarietalRules.FIXED,
+    "varietal_points": {Varietal.MALBEC: 3, Varietal.BONARDA: 2, Varietal.TORRONTES: 1},
+    "grape_clusters_per_player": None,
+    "bribe_rules": BribeRules.D6,
+    "action_die_cost": 2,
+    "action_die": ACTION_DIE_FACES,
+    "season_roll_every": None,
+    "multiple_bodegas": False,
+    "season_roll_personal_faces": True,
+}
 RECORDED_NORMAL = {
+    **RULES_V1,
     "rounds": {2: 12, 3: 12, 4: 12, 5: 12},
     "hexes_per_player": 12,
     "vineyard_distance": (4, 5),
+    "bodega_points": 2,
 }
 RECORDED_FLASH = {
+    **RULES_V1,
     "rounds": {2: 5, 3: 5, 4: 5, 5: 5},
     "hexes_per_player": 7,
     "vineyard_distance": (2, 3),
+    "bodega_points": 1,
 }
 
 # (id, mode, players, policies seat 1 first, overrides, run seed, n)

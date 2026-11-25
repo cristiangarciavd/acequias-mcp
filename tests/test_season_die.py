@@ -15,6 +15,7 @@ from mcp import Client
 from acequias.config import (
     ACTION_DIE_FACES,
     CONSTRUCTIVE_DIE_FACES,
+    RULES_V1,
     action_die_rules,
     common_vineyard_points,
     preset,
@@ -62,8 +63,11 @@ from acequias.turn import (
 )
 from server.app import app
 
+PIN_RULES_V1 = True
+"""``conftest.py``: these tests check the engine under the Rules v1 presets."""
+
 V = Varietal
-DIE = action_die_rules(roulette_rules(preset(Mode.NORMAL)))
+DIE = action_die_rules(roulette_rules(RULES_V1[Mode.NORMAL]))
 P = with_overrides(DIE, action_die=CONSTRUCTIVE_DIE_FACES)
 GOOD = with_overrides(P, action_die=(DieFace.GOOD_SEASON,))
 DRY = with_overrides(P, action_die=(DieFace.DROUGHT,))

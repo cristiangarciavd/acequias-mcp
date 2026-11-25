@@ -6,7 +6,7 @@ from types import MappingProxyType
 
 import pytest
 
-from acequias.config import FLASH, NORMAL, preset, scaled, with_overrides
+from acequias.config import RULES_V1, preset, scaled, with_overrides
 from acequias.flow import water
 from acequias.hex import Direction, Hex
 from acequias.model import (
@@ -21,6 +21,10 @@ from acequias.model import (
     Varietal,
 )
 from acequias.scoring import Score, WateredVineyard, bodega_count, calculate_score, winners
+
+PIN_RULES_V1 = True
+"""``conftest.py``: these tests check the engine under the Rules v1 presets."""
+NORMAL, FLASH = RULES_V1[Mode.NORMAL], RULES_V1[Mode.FLASH]
 
 MALBEC, BONARDA, TORRONTES = Varietal.MALBEC, Varietal.BONARDA, Varietal.TORRONTES
 
