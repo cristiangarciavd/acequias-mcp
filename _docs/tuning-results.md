@@ -1206,3 +1206,46 @@ Findings:
 - Doubling every value gives the same results as candidate B (x2, no bonus), so the doubling is a fair stand-in.
 - A tiebreak alone gives the same numbers as phase E's +1 bonus: at scale 3, +1 was already acting as a tiebreak. Ties are so frequent (shared wins 0.33-0.55) that any rule that picks a side among tied players overshoots.
 - Verdict: compensation by points or tiebreak cannot be tuned finely enough. The remaining options are fewer ties (more scoring in short games) or limiting Flash to 2-3 players.
+
+## Rules v3 (#149)
+
+Overnight run, `score_aware` seating. Raw output: `output/tuning-149/night1.md` (sweeps `strip` and `v3`, 500 games per row, seeds 154001 and 153001) and `night2-4p.md` / `night2-5p.md` (sweep `v3` at 4p and 5p, 2000 games per row). Base: river strip with 5 river hexes per segment, bag 16 pieces per player, shipped Rules v2 values. The quality target is a turn-order advantage of at most 0.10.
+
+### Sweep `strip`: river hexes per segment x bag size (500 games)
+
+- 2p and Flash 2p are within the margin at every setting (0.01-0.14 ± 0.09).
+- 3p sits at 0.06-0.29 ± 0.12; no setting is clearly better.
+- 4p (0.16-0.33 ± 0.15) and 5p (0.19-0.45 ± 0.18) fail at every setting.
+- River hexes and bag size barely change game flow: about 7 vineyards planted per player at 2p, 11 at 3p, 9 at 4p and 7.5 at 5p; bodega rate 0.79-0.86 at 2p, above 0.93 at 3-5p, about 0.65 in Flash.
+- Passes almost never happen (at most 0.6 per game, with 4 river hexes).
+
+### Sweep `v3`: one value at a time (Normal 4p and 5p, 2000 games)
+
+| Candidate | 4p advantage ± 0.076 | 4p win rate by position | 5p advantage ± 0.088 | 5p win rate by position |
+| --- | --- | --- | --- | --- |
+| base | **0.207** | 0.24 / 0.25 / 0.30 / 0.20 | **0.365** | 0.17 / 0.20 / 0.24 / 0.26 / 0.13 |
+| rounds -4 | **0.250** | 0.23 / 0.26 / 0.31 / 0.20 | **0.214** | 0.16 / 0.17 / 0.20 / 0.24 / 0.24 |
+| rounds -2 | **0.277** | 0.32 / 0.19 / 0.22 / 0.27 | **0.310** | 0.25 / 0.26 / 0.14 / 0.16 / 0.19 |
+| rounds +2 | **0.254** | 0.30 / 0.19 / 0.23 / 0.27 | **0.282** | 0.26 / 0.15 / 0.17 / 0.19 / 0.23 |
+| die cost 0 | **0.275** | 0.25 / 0.26 / 0.31 / 0.18 | **0.324** | 0.16 / 0.22 / 0.25 / 0.24 / 0.14 |
+| die cost 2 | **0.239** | 0.24 / 0.27 / 0.30 / 0.19 | **0.372** | 0.17 / 0.21 / 0.23 / 0.27 / 0.13 |
+| points 2 / rare 3 | **0.202** | 0.22 / 0.28 / 0.30 / 0.20 | **0.304** | 0.17 / 0.20 / 0.24 / 0.25 / 0.14 |
+| points 4 / rare 5 | **0.198** | 0.23 / 0.27 / 0.30 / 0.20 | **0.375** | 0.17 / 0.20 / 0.24 / 0.27 / 0.12 |
+| points 6 / rare 9 | **0.265** | 0.22 / 0.27 / 0.32 / 0.19 | **0.320** | 0.16 / 0.19 / 0.24 / 0.26 / 0.14 |
+| bodega 3 | **0.231** | 0.24 / 0.27 / 0.30 / 0.19 | **0.291** | 0.18 / 0.21 / 0.24 / 0.23 / 0.14 |
+| bodega 9 | **0.241** | 0.24 / 0.25 / 0.31 / 0.19 | **0.385** | 0.18 / 0.20 / 0.24 / 0.26 / 0.12 |
+| bodega 12 | **0.232** | 0.23 / 0.26 / 0.31 / 0.20 | **0.350** | 0.17 / 0.19 / 0.25 / 0.26 / 0.13 |
+| resow can move | **0.218** | 0.23 / 0.26 / 0.30 / 0.20 | **0.340** | 0.16 / 0.20 / 0.25 / 0.26 / 0.13 |
+| 4 river hexes/segment | **0.300** | 0.24 / 0.28 / 0.30 / 0.17 | **0.264** | 0.17 / 0.19 / 0.24 / 0.25 / 0.15 |
+| 6 river hexes/segment | **0.208** | 0.25 / 0.27 / 0.28 / 0.20 | **0.363** | 0.18 / 0.21 / 0.23 / 0.25 / 0.13 |
+| bag 12/player | **0.156** | 0.24 / 0.26 / 0.29 / 0.21 | **0.317** | 0.17 / 0.19 / 0.23 / 0.26 / 0.14 |
+| bag 20/player | **0.185** | 0.24 / 0.27 / 0.29 / 0.20 | **0.291** | 0.18 / 0.20 / 0.24 / 0.25 / 0.14 |
+
+At 2p, 3p and Flash (500 games), every candidate stays near the base: 2p 0.02-0.12, 3p 0.04-0.23, Flash 0.02-0.15. Rounds -4 makes Flash too short (bodega rate 0.01) and drops the 5p bodega rate to 0.67.
+
+### Findings
+
+- Rules v3 plays well at 2p and 3p and in Flash: low advantage, almost no passes, frequent bodegas, and games of 20 (2p), 45 (3p) and 12-18 (Flash) turns.
+- At 4p and 5p the advantage is structural. Seat 2 leads at 4p and seat 3 at 5p, and the last seat trails (0.20 at 4p, 0.13 at 5p). No single value fixes it: die cost, varietal points, bodega points, resow moving a vineyard, river hexes and bag size leave the pattern in place.
+- Only the round count moves the pattern, and it does so non-monotonically (rounds -2 and +2 both favour seat 0), so a round count alone is not a fix. The cause needs a diagnosis (seat-to-segment layout, bag exhaustion near the end, or the final turns) before more tuning.
+- Verdict: no value change is proposed yet. The base (5 river hexes, bag 16, Rules v2 values) stays the reference for 2-3p and Flash; 4-5p wait for the diagnosis.
