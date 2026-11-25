@@ -51,8 +51,8 @@ The shipped Rules v2 game gives the rare ones 7. Areas are hectares of vines on
 
 ### Bonarda - violet, 9 (rare)
 
-- Comes from Savoy, in France next to Italy; the French call it Corbeau, and in the
-  United States it is Charbono ([INV Bonarda][inv-bonarda]).
+- Comes from Savoy, in France next to Italy; in the United States it is Charbono
+  ([INV Bonarda][inv-bonarda]).
 - Arrived in Argentina with the immigrants of the late 19th century
   ([INV Bonarda][inv-bonarda]).
 - Argentina's second red: 16,774 ha, 14,027 of them in Mendoza (about 84%), mostly in
