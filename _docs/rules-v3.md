@@ -56,7 +56,7 @@ Every turn starts with a roll. Resolve the face first:
 | --- | --- | --- |
 | **Floodgate** | Bribe: **1 debt (to be tuned)** | You **must** place a floodgate on an open canal opening, anyone's, if there is one |
 | **Release** | Bribe: **1 debt (to be tuned)** | You **must** remove one floodgate from the board, anyone's, if there is one. It leaves the game |
-| **Resow** | Free | You **may** spin the roulette again for any planted vineyard, yours or a rival's. It stays where it is and keeps its owner |
+| **Resow** | Free | You **may** spin the roulette again for any planted vineyard, yours or a rival's: first choose the vineyard, then spin. The new result stands, even if it is worse. It stays where it is and keeps its owner |
 | **Move** | Free | You **may** move one of **your** vineyards to another corner where you could plant a new one. It keeps its varietal |
 | **Good season** | Free | This turn you take **2 actions**: plant + plant, or canal + plant (in either order). Never 2 canals |
 | **Drought** | Free | You lose your action this turn |

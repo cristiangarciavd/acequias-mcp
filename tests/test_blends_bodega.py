@@ -325,12 +325,12 @@ def test_a_bodega_is_never_moved_or_resown():
 
 @pytest.mark.parametrize("bot", [greedy_bot, score_aware_bot])
 def test_bots_build_a_bodega_when_they_may(bot):
-    s = state(board(TWO_ONE, READY), BUILD)
+    s = replace(state(board(TWO_ONE, READY), BUILD), market=())  # no canal to weigh against
     assert isinstance(bot(s, "p1", random.Random(0)), BuildBodega)
 
 
 def test_lookahead_values_a_bodega_build():
-    s = state(board(TWO_ONE, READY), BUILD)
+    s = replace(state(board(TWO_ONE, READY), BUILD), market=())
     assert isinstance(lookahead_bot(s, "p1", random.Random(0), depth=1), BuildBodega)
     options = dict(bots._Lookahead(s, "p1", 3).options(s, {}, 2))
     builds = [v for a, v in options.items() if isinstance(a, BuildBodega)]
@@ -401,6 +401,26 @@ def test_fast_canal_and_plant_values_equal_a_full_scoring(monkeypatch, extra):
         assert built > 0
 
 
+def test_bots_resow_to_complete_a_close_requirement():
+    # Malbec, Cabernet Sauvignon, Torrontés and a second Torrontés: one white short.
+    b = board(ALL, planted(MA, CS, TO, TO))
+    dup = ResowVineyard(FREE[3])
+    with_req = state(b, BUILD, face=DieFace.RESOW)
+    without = replace(with_req, preset=with_overrides(V3, action_die=V3_DIE_FACES))
+    gain = _Evaluator(with_req, "p1").value(with_req, dup) - _Evaluator(without, "p1").value(without, dup)
+    assert gain == bots.REQUIREMENT_SHARE * 12 * Fraction(2, 14)  # a Chardonnay spin
+    # A met requirement is not risked: resowing a needed white loses.
+    met = state(board(ALL, planted(MA, CS, TO, CH)), BUILD, face=DieFace.RESOW)
+    plain = replace(met, preset=with_overrides(V3, action_die=V3_DIE_FACES))
+    needed = ResowVineyard(FREE[2])
+    assert _Evaluator(met, "p1").value(met, needed) < _Evaluator(plain, "p1").value(plain, needed)
+    # Greedy weighs the same potential (_requirement) in its face swing.
+    assert bots._requirement(BUILD, b, "p1", ()) == 0
+    assert bots._requirement(BUILD, b, "p1", (FREE[3],)) == bots.REQUIREMENT_SHARE * 12 * Fraction(2, 14)
+    built = board(ALL, READY[:1], (BodegaBuilding(V, "p1"),))  # kept once built
+    assert bots._requirement(BUILD, built, "p1", ()) == bots.REQUIREMENT_SHARE * 12
+
+
 # --- Sim and MCP ------------------------------------------------------------------
 
 
@@ -468,8 +488,9 @@ def test_tune_v3blends_sweep_covers_the_options():
     assert sweep.name == "v3blends" and "v3blends" in tune.SWEEP_NAMES
     for mode in Mode:
         labels = [label for label, _ in sweep.candidates[mode]]
-        assert len(labels) == 13
-        assert any("disjoint x0.5" in x for x in labels) and any("building 15 x1" in x for x in labels)
+        assert len(labels) == 17
+        assert any("disjoint x0.5" in x for x in labels) and any("building 15 x1," in x for x in labels)
+        assert sum("2 reds + 1 whites" in x for x in labels) == sum("2 reds + 2 whites" in x for x in labels) == 4
         for label, changes in sweep.candidates[mode]:
             job = tune.Job(label, mode, 2, "score_aware", {**sweep.base[mode], **changes}, 1, 1)
             p = with_overrides(tune.shipped_preset(mode), **dict(tune.rules_of(job).overrides))
@@ -481,12 +502,15 @@ def test_tune_v3blends_sweep_covers_the_options():
 def test_tune_blend_stats_and_row():
     tune = _tune()
     (sweep,) = tune.v3blends_sweeps()
-    label, changes = sweep.candidates[Mode.FLASH][7]
+    label, changes = next(
+        (x, c) for x, c in sweep.candidates[Mode.FLASH] if "building 12 x1, 2 reds + 1" in x)
     changes = {**changes, "bodega_min_reds": 1, "bodega_min_whites": 0}
     job = tune.Job(label, Mode.FLASH, 2, "greedy", {**sweep.base[Mode.FLASH], **changes}, 2, 1)
     outcome = tune.run_chunk(job, 0, 2)
     stats = tune.blend_stats(outcome.records)
     assert stats["built"] > 0 and set(stats["rates"]) <= {b.name for b in DEFAULT_BLENDS}
+    req = stats["requirement"]
+    assert 0 < req["builders"] <= req["met"] <= 1 and 1 <= req["first_round"]
     data = tune.summarize(tune.rules_of(job), job.seed, outcome.records).to_json()
     data["blend_stats"] = stats
     assert tune.is_v3blends(job.overrides)

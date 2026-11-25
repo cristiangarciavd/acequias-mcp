@@ -136,6 +136,16 @@ in the plan) counts for no blend, as for the bodega bonus. A
 ``BuildBodega`` is weighed like any other action (``score_aware`` and
 ``lookahead``); ``greedy_bot`` builds a bodega whenever it may, on the
 spot with the most of its own watered thirds (``rng.choice`` on a tie).
+Every bot adds a requirement potential to a player's total
+(``_requirement``): ``REQUIREMENT_SHARE`` of ``bodega_building_points``
+times the chance that their own planted
+vineyards meet the requirement, a blank vineyard (planted or resown in
+the plan) counted at the roulette's odds, never its result. So a resow of
+an own vineyard that may complete the requirement when it is close gains,
+and one that may break a met requirement loses. Once a player has built
+all their bodegas it is the full share, so building never loses it. ``score_aware`` and
+``lookahead`` add it to every player (not at the end of the game);
+``greedy`` to its own swing when it weighs a face.
 
 ``POLICIES`` maps policy names to bots, and ``policy(name)`` looks one up.
 Standard library only; no global randomness.
@@ -492,6 +502,9 @@ def _resolve_face(state: GameState, player: str, rng: random.Random) -> Action:
 
 
 SPOT_TARGET = 6
+REQUIREMENT_SHARE = Fraction(1, 4)
+"""The share of ``bodega_building_points`` a met bodega requirement is worth (#166); it stays
+once the bodega is built, so the building's split points are its whole gain."""
 """Plantable spots at which a player's planting potential is full: one canal's 6 vertices."""
 
 _OPPOSITE = {d: d.opposite() for d in Direction}
@@ -643,6 +656,55 @@ def _greedy_v3(state: GameState, player: str, rng: random.Random) -> Action:
     return _pick([c for c, g in zip(canals, gains) if g == best], rng)
 
 
+@lru_cache(maxsize=4096)
+def _requirement_chance(
+    roulette: tuple, reds: int, whites: int, count: int, known: frozenset, held: int, blanks: int
+) -> Fraction:
+    """The chance that ``held`` known vineyards of the varietals ``known`` and ``blanks``
+    spins of ``roulette`` give ``reds`` distinct red and ``whites`` distinct white
+    varietals and ``count`` vineyards in all."""
+    if held + blanks < count:
+        return Fraction(0)
+
+    def met(found: frozenset) -> bool:
+        white = sum(1 for v in found if v.is_white)
+        return len(found) - white >= reds and white >= whites
+
+    odds: dict = {}
+    for v in roulette:
+        odds[v] = odds.get(v, 0) + Fraction(1, len(roulette))
+    states = {known: Fraction(1)}
+    for _ in range(blanks):
+        after: dict = {}
+        for found, chance in states.items():
+            if met(found):
+                after[found] = after.get(found, Fraction(0)) + chance
+                continue
+            for v, p in odds.items():
+                key = found | {v}
+                after[key] = after.get(key, Fraction(0)) + chance * p
+        states = after
+    return sum((c for found, c in states.items() if met(found)), Fraction(0))
+
+
+def _requirement(preset: Preset, board: Board, player: str, blanks: Iterable[Vertex]) -> Fraction:
+    """The requirement potential of ``player`` on ``board`` (#166; see the module docstring)."""
+    if not preset.bodega_building:
+        return Fraction(0)
+    worth = REQUIREMENT_SHARE * preset.bodega_building_points
+    cap = preset.bodegas_per_player
+    if cap is not None and sum(1 for b in board.bodegas if b.owner == player) >= cap:
+        return worth  # kept once built, so building is never a loss
+    blanks = set(blanks)
+    mine = [v for v in board.planted if v.owner == player]
+    known = [v.varietal for v in mine if v.vertex not in blanks]
+    chance = _requirement_chance(
+        preset.roulette, preset.bodega_min_reds, preset.bodega_min_whites,
+        preset.bodega_min_vineyards, frozenset(known), len(known), len(mine) - len(known),
+    )
+    return worth * chance
+
+
 def _resolve_face_v3(
     state: GameState, player: str, actions: Sequence[Action], rng: random.Random
 ) -> Action:
@@ -659,6 +721,7 @@ def _resolve_face_v3(
 
         totals = _split_values(board, value_of, wet_canals(board))
         own = totals.pop(player, Fraction(0))
+        own += _requirement(preset, board, player, () if blank is None else (blank,))
         return own - sum(totals.values(), Fraction(0))
 
     before = swing(state.board, None)
@@ -849,6 +912,7 @@ class _Evaluator:
             _, spots = self._spots(board)
             for pid in totals:
                 totals[pid] += self._potential(board, pid, len(spots.get(pid, ())))
+                totals[pid] += _requirement(self.preset, board, pid, blanks)
         return self._less_extra(totals)
 
     def _plant(self, state: GameState, action: Plant) -> Fraction | None:
@@ -864,6 +928,8 @@ class _Evaluator:
         board = state.board
         if board is not self.state.board or state.pending_face is not None or not self.fast:
             return None
+        if self.potential and self.preset.bodega_building:
+            return None  # a new blank changes the requirement potential
         vertex = action.vertex
         owner_of = self.owner_of
         ends = [h for h in vertex.hexes if h in self.wet]

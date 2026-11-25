@@ -123,8 +123,11 @@ bodega building (2 distinct reds and 2 distinct whites, on a new spot),
 each with its points x0.5 / x1 / x1.5 (``V3BLENDS_FACTORS``; the building
 also at 15, ``V3BLENDS_BUILDING_POINTS``); score_aware seating, seed
 ``V3BLENDS_SWEEP_SEED``. Its rows add the blend and building points per
-player, bodegas built per game, and how often each blend scores (share
-of player-games). The ``score_target`` end condition (#163) is not in yet:
+player, bodegas built per game, the share of players who meet the
+bodega requirement, the mean round they first meet it and the share who
+build (a building row runs with 2 reds and 2 or 1 whites,
+``V3BLENDS_WHITES``), and how often each blend scores (share of
+player-games). The ``score_target`` end condition (#163) is not in yet:
 
     uv run python scripts/tune.py --sweep v3blends
 
@@ -186,7 +189,8 @@ from acequias.config import players_text
 from acequias.config import preset as shipped_preset
 from acequias.model import DieFace, Mode, PieceKind, Varietal
 from acequias.sim import GameRecord, SimRules, game_seed, play_one, summarize
-from acequias.turn import BuildBodega, PlaceFloodgate, Release
+from acequias.game import act, game_rngs
+from acequias.turn import BuildBodega, PlaceFloodgate, Release, can_build_bodega
 
 # --- Constants ---------------------------------------------------------------
 
@@ -850,6 +854,10 @@ V3BLENDS_FACTORS = ((1, 2), (1, 1), (3, 2))
 the bodega bonus and the building points times the factor, rounded half up, at least 1."""
 V3BLENDS_BUILDING_POINTS = (12, 15)
 """Sweep ``v3blends``'s bodega building points at x1 (owner, #166); x0.5 and x1.5 scale the first."""
+V3BLENDS_REDS = 2
+"""Sweep ``v3blends``'s distinct red varietals a bodega building needs."""
+V3BLENDS_WHITES = (2, 1)
+"""Sweep ``v3blends``'s distinct white varietals a bodega building needs (owner, #166)."""
 
 
 def _times(points: int, factor: tuple[int, int]) -> int:
@@ -892,11 +900,14 @@ def v3blends_sweeps() -> tuple[Sweep, ...]:
             buildings = V3BLENDS_BUILDING_POINTS if factor == (1, 1) else (
                 _times(V3BLENDS_BUILDING_POINTS[0], factor),)
             for building in buildings:
-                rows.append((f"blends each_once + bodega building {building} {x}", {
-                    "varietal_bodega": False, "blends": blends(factor),
-                    "blend_rule": BlendRule.EACH_ONCE, "bodega_building": True,
-                    "bodega_building_points": building,
-                }))
+                for whites in V3BLENDS_WHITES:
+                    rows.append((f"blends each_once + bodega building {building} {x}, "
+                                 f"{V3BLENDS_REDS} reds + {whites} whites", {
+                        "varietal_bodega": False, "blends": blends(factor),
+                        "blend_rule": BlendRule.EACH_ONCE, "bodega_building": True,
+                        "bodega_building_points": building,
+                        "bodega_min_reds": V3BLENDS_REDS, "bodega_min_whites": whites,
+                    }))
         return tuple(rows)
 
     return (
@@ -1393,13 +1404,44 @@ def floodgate_stats(records: list[GameRecord]) -> dict[str, float]:
     }
 
 
+def requirement_stats(records: list[GameRecord]) -> dict[str, float | None]:
+    """Bodega building requirement figures (#166), replaying each game: ``met`` (the share of
+    players who meet the requirement at some point), ``first_round`` (the mean round they
+    first meet it, None if nobody does) and ``builders`` (the share of players who build)."""
+    players = met = builders = 0
+    rounds: list[int] = []
+    for record in records:
+        p = record.start.preset
+        ids = [pl.id for pl in record.start.players]
+        players += len(ids)
+        builders += len({r.player for r in record.log if isinstance(r.action, BuildBodega)})
+        first: dict[str, int] = {}
+        state = record.start
+        dice = game_rngs(record.game_seed)[0]
+        for r in record.log:
+            state = act(state, r.player, r.action, dice)
+            for pid in ids:
+                if pid not in first and can_build_bodega(state.board, pid, p):
+                    first[pid] = r.round
+        met += len(first)
+        rounds += first.values()
+    return {
+        "met": met / players,
+        "first_round": sum(rounds) / len(rounds) if rounds else None,
+        "builders": builders / players,
+    }
+
+
 def blend_stats(records: list[GameRecord]) -> dict[str, object]:
     """Blend and bodega building figures (#166): ``blend`` and ``buildings`` (mean points per
-    player), ``built`` (bodegas built per game) and ``rates`` (per blend name, the share of
-    player-games where it scored)."""
+    player), ``built`` (bodegas built per game), ``rates`` (per blend name, the share of
+    player-games where it scored), and with ``bodega_building`` the ``requirement_stats``
+    (``met``, ``first_round``, ``builders``; None without)."""
     players = sum(len(r.scores) for r in records)
     counts: dict[str, int] = {}
     blend = buildings = built = 0
+    building = bool(records) and records[0].start.preset.bodega_building
+    requirement = requirement_stats(records) if building else None
     for record in records:
         built += sum(1 for r in record.log if isinstance(r.action, BuildBodega))
         for score in record.scores.values():
@@ -1412,6 +1454,7 @@ def blend_stats(records: list[GameRecord]) -> dict[str, object]:
         "buildings": buildings / players,
         "built": built / len(records),
         "rates": {name: n / players for name, n in sorted(counts.items())},
+        "requirement": requirement,
     }
 
 
@@ -1419,9 +1462,14 @@ def _blend_columns(data: Mapping[str, object]) -> str:
     """The #166 columns: blend points, building points, bodegas built per game, blend rates."""
     b = data.get("blend_stats")
     if b is None:
-        return " - | - | - | - |"
+        return " - |" * BLEND_COLUMNS
     rates = ", ".join(f"{name} {rate:.2f}" for name, rate in b["rates"].items()) or "-"
-    return f" {b['blend']:.2f} | {b['buildings']:.2f} | {b['built']:.2f} | {rates} |"
+    req = b.get("requirement")
+    if req is None:
+        met = " - | - | - |"
+    else:
+        met = f" {req['met']:.2f} | {_f(req['first_round'], 1)} | {req['builders']:.2f} |"
+    return f" {b['blend']:.2f} | {b['buildings']:.2f} | {b['built']:.2f} |{met} {rates} |"
 
 
 def _f(x: float | None, digits: int = 2) -> str:
@@ -1462,9 +1510,12 @@ V3_SWEEP_HEADER = (
     "| Rolls per face | Floodgate / release / resow / move uses | Die use rate | Floodgates |"
 )
 V3_SWEEP_COLUMNS = 20
-BLEND_HEADER = " Blend points | Building points | Bodegas built per game | Blend score rates |"
+BLEND_HEADER = (
+    " Blend points | Building points | Bodegas built per game | Requirement met (share of players) "
+    "| First round met (mean) | Builders (share of players) | Blend score rates |"
+)
 """The columns a #166 sweep (``v3blends``) adds to ``V3_SWEEP_HEADER``."""
-BLEND_COLUMNS = 4
+BLEND_COLUMNS = 7
 
 
 def is_v3blends(overrides: Mapping[str, object]) -> bool:
