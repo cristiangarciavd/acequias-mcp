@@ -258,6 +258,27 @@ class PlantedVineyard:
         _check_type("PlantedVineyard.varietal", self.varietal, Varietal)
 
 
+@dataclass(frozen=True, slots=True)
+class ActionsLeft:
+    """What the current player may still do this turn under Rules v3, after the die roll.
+
+    ``actions`` is the actions left (canal or plant), ``canals`` how many of
+    them may still be canals: 1 and 1 on a normal turn, 2 and 1 after a
+    good season (never 2 canals), 0 and 0 after a drought or a pass.
+    """
+
+    actions: int
+    canals: int
+
+    def __post_init__(self) -> None:
+        _check_int("ActionsLeft.actions", self.actions)
+        _check_int("ActionsLeft.canals", self.canals)
+        if not 0 <= self.canals <= self.actions:
+            raise ValueError(
+                f"ActionsLeft needs 0 <= canals <= actions, got {self.canals} and {self.actions}"
+            )
+
+
 # --- Board -----------------------------------------------------------------
 
 
@@ -633,6 +654,10 @@ class GameState:
     season die's holder (``current_player`` meanwhile) rolls it (no face pending), ``ROLLED`` while its personal
     face is pending, ``None`` otherwise. It is set only when the preset
     has a ``season_roll_every``.
+
+    ``actions_left`` is set only under vertex planting (Rules v3): ``None``
+    while ``current_player`` has not rolled the action die this turn,
+    otherwise what they may still do (``ActionsLeft``).
     """
 
     board: Board
@@ -646,6 +671,7 @@ class GameState:
     preset: Preset | None = field(default=None, hash=False)
     pending_face: DieFace | None = None
     season_roll: SeasonRoll | None = None
+    actions_left: ActionsLeft | None = None
 
     def __post_init__(self) -> None:
         _check_type("GameState.board", self.board, Board)
@@ -740,19 +766,29 @@ class GameState:
     def _check_planting(self) -> None:
         """The board's vineyards fit the preset's planting rules.
 
-        Hex planting: no planting spots and nothing planted on a vertex.
-        Vertex planting (Rules v3): no vineyard tiles, so no claims either.
+        Hex planting: no planting spots, nothing planted on a vertex, and no
+        ``actions_left``. Vertex planting (Rules v3): no vineyard tiles, so
+        no claims either, and a pending face only after a roll.
         """
         from acequias.config import PlantingRules  # local: config imports this module
         from acequias.config import preset as shipped_preset
 
         preset = self.preset if self.preset is not None else shipped_preset(self.mode)
         board = self.board
+        if self.actions_left is not None:
+            _check_type("GameState.actions_left", self.actions_left, ActionsLeft)
         if preset.planting is PlantingRules.VERTICES:
             if any(t.terrain is Terrain.VINEYARD for t in board.tiles):
                 raise ValueError("under vertex planting the board has no vineyard tiles")
-        elif board.spots or board.planted:
-            raise ValueError("under hex planting the board has no planting spots or vertex vineyards")
+            if self.pending_face is not None and self.actions_left is None:
+                raise ValueError("under vertex planting a pending face follows a roll")
+        else:
+            if board.spots or board.planted:
+                raise ValueError(
+                    "under hex planting the board has no planting spots or vertex vineyards"
+                )
+            if self.actions_left is not None:
+                raise ValueError("actions_left is set only under vertex planting (Rules v3)")
 
     def _check_clusters(self) -> None:
         """With a grape-cluster cap, no player holds more claims than the cap."""
