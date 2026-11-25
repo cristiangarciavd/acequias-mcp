@@ -78,7 +78,10 @@ apart from the above. Only ``current_player`` acts, and the turn is:
    most 1 canal after a good season, none after a drought, 1 otherwise. A
    floodgate, release, resow, or move face with a use is left pending:
    floodgate (``PlaceFloodgate`` from the die) and release (``Release``)
-   are mandatory, so ``DeclineFace`` is illegal for them; resow and move
+   are mandatory, so ``DeclineFace`` is illegal for them. With
+   ``Preset.bribe_optional`` (#168) the roll costs nothing: both faces may
+   be declined for free, and the bribe is added to the debt only when the
+   player places or removes the floodgate (``bribe_on_use``). Resow and move
    are optional: ``ResowVineyard`` (one ``rng.choice(preset.roulette)``)
    on any planted vineyard, or ``MoveVineyard`` of one's own vineyard to a
    spot they may plant on (the move face, #160; no draw), or
@@ -99,7 +102,8 @@ illegal, and ``Plant``, ``ResowVineyard``, and ``MoveVineyard`` are illegal
 under hex planting. ``legal_actions`` lists, for ``current_player`` only:
 ``RollActionDie()`` before the roll; a pending face's uses (floodgates and
 releases in edge order, then resows by vertex, then moves by vertex and
-target), then ``DeclineFace()`` for resow and move; otherwise canal placements,
+target), then ``DeclineFace()`` for resow and move (and, with
+``bribe_optional``, floodgate and release); otherwise canal placements,
 plants by vertex, bodega builds by vertex, then ``Pass()``. ``acequias.game`` ends the turn once no
 face is pending and no action is left. Nothing here depends on the board's
 bounds or ``Board.spots``, so the turn also fits an open board.
@@ -149,6 +153,7 @@ __all__ = [
     "DeclineFace",
     "BuildBodega",
     "can_build_bodega",
+    "bribe_on_use",
     "Plant",
     "ResowVineyard",
     "MoveVineyard",
@@ -725,7 +730,23 @@ def _face_uses(board: Board, face: DieFace) -> list[Action]:
 
 # --- Rules v3 turn -------------------------------------------------------------
 
-_BRIBE_FACES = (DieFace.FLOODGATE, DieFace.RELEASE)  # cost the bribe; also mandatory
+_BRIBE_FACES = (DieFace.FLOODGATE, DieFace.RELEASE)  # cost the bribe; mandatory unless bribe_optional
+
+
+def bribe_on_use(state: GameState, action: Action, preset: Preset) -> int:
+    """The bribe ``action`` pays as a use of the pending face (``Preset.bribe_optional``, #168).
+
+    ``action_die_cost`` for a ``PlaceFloodgate`` or ``Release`` that uses a
+    pending floodgate or release face when the bribe is optional, else 0
+    (mandatory mode pays it on the roll). No check that ``action`` is legal.
+    """
+    if (
+        preset.bribe_optional
+        and state.pending_face in _BRIBE_FACES
+        and isinstance(action, (PlaceFloodgate, Release))
+    ):
+        return preset.action_die_cost
+    return 0
 
 
 def _apply_v3(
@@ -778,7 +799,7 @@ def _roll_v3(state: GameState, player: str, rng: random.Random, preset: Preset) 
 
 def _v3_rolled(state: GameState, player: str, face: DieFace, preset: Preset) -> GameState:
     """The state after ``player``'s mandatory roll shows ``face``; no draw. The bots plan with it."""
-    cost = preset.action_die_cost if face in _BRIBE_FACES else 0
+    cost = preset.action_die_cost if face in _BRIBE_FACES and not preset.bribe_optional else 0
     players = tuple(
         replace(p, debt=p.debt + cost) if p.id == player else p for p in state.players
     )
@@ -797,16 +818,20 @@ def _v3_rolled(state: GameState, player: str, face: DieFace, preset: Preset) -> 
 def _resolve_v3_face(
     state: GameState, player: str, action: Action, rng: random.Random, preset: Preset
 ) -> GameState:
-    """The state after ``player`` uses (or, for resow, declines) the pending face."""
+    """The state after ``player`` uses (or, for an optional face, declines) the pending face."""
     face = state.pending_face
     if isinstance(action, DeclineFace):
-        if face in _BRIBE_FACES:
+        if face in _BRIBE_FACES and not preset.bribe_optional:
             raise IllegalAction(f"the {face.value} face is mandatory; it cannot be declined")
         return replace(state, pending_face=None)
     board = _v3_face_board(state, player, action, preset)
     if isinstance(action, ResowVineyard):
         board = _respun(board, action.vertex, rng.choice(preset.roulette))
-    return replace(state, board=board, pending_face=None)
+    cost = bribe_on_use(state, action, preset)
+    players = state.players
+    if cost:
+        players = tuple(replace(p, debt=p.debt + cost) if p.id == player else p for p in players)
+    return replace(state, board=board, players=players, pending_face=None)
 
 
 def _v3_face_board(state: GameState, player: str, action: Action, preset: Preset) -> Board:
@@ -962,7 +987,9 @@ def _legal_v3(state: GameState, player: str, preset: Preset) -> tuple[Action, ..
     face = state.pending_face
     if face is not None:
         uses = _v3_face_uses(state.board, player, face, preset)
-        return tuple(uses) if face in _BRIBE_FACES else (*uses, DeclineFace())
+        if face in _BRIBE_FACES and not preset.bribe_optional:
+            return tuple(uses)
+        return (*uses, DeclineFace())
     left = state.actions_left
     if left is None:
         return (RollActionDie(),)

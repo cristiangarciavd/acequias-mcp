@@ -131,6 +131,18 @@ player-games). The ``score_target`` end condition (#163) is not in yet:
 
     uv run python scripts/tune.py --sweep v3blends
 
+Sweep ``v3bribe`` (#168) plays ``bribe_optional`` off and on x the bribe
+(``action_die_cost``, ``V3BRIBE_COSTS``) around ``v3_best_base``, the best
+#160/#166 setup (5 river hexes per segment, bag 16 per player, split
+scoring, any-vertex planting, the move die, ``each_once`` blends with the
+old bodega bonus off, and the bodega building: a new spot, 12 points, 2
+reds + 2 whites); score_aware seating, seed ``V3BRIBE_SWEEP_SEED``. Its rows
+add the blend columns, then floodgates placed and released per game, the
+share of floodgate and release rolls used, the mean score swing of a
+floodgate use (user less best rival, before the bribe), and the mean debt:
+
+    uv run python scripts/tune.py --sweep v3bribe
+
 Turns and minutes count turns (rounds x P), not log records: under action
 die rules a die turn is 2 records, so ``turns_per_game`` would overcount. A candidate the preset or the board
 generator rejects is printed as infeasible with its error, and the run goes
@@ -171,6 +183,7 @@ from acequias.config import (
     DEFAULT_BLENDS,
     Blend,
     BlendRule,
+    BodegaPlacement,
     CONSTRUCTIVE_DIE_FACES,
     V3_DIE_FACES,
     V3_POINTS as V3_SPLIT_POINTS,
@@ -190,7 +203,8 @@ from acequias.config import preset as shipped_preset
 from acequias.model import DieFace, Mode, PieceKind, Varietal
 from acequias.sim import GameRecord, SimRules, game_seed, play_one, summarize
 from acequias.game import act, game_rngs
-from acequias.turn import BuildBodega, PlaceFloodgate, Release, can_build_bodega
+from acequias.scoring import calculate_score
+from acequias.turn import BuildBodega, PlaceFloodgate, Release, RollActionDie, can_build_bodega
 
 # --- Constants ---------------------------------------------------------------
 
@@ -918,9 +932,56 @@ def v3blends_sweeps() -> tuple[Sweep, ...]:
     )
 
 
+# --- Rules v3 optional bribe (#168) ------------------------------------------------
+
+V3BRIBE_SWEEP_SEED = 168_001
+"""The run seed of sweep ``v3bribe`` (#168); no earlier run used it."""
+V3BRIBE_COSTS = (1, 2, 3, 4, 6)
+"""Sweep ``v3bribe``'s bribes (``action_die_cost``)."""
+
+
+def v3_best_base(mode: Mode) -> dict[str, object]:
+    """The best #160/#166 setup, the base of sweep ``v3bribe`` (edit here to move it): the river
+    strip at ``V3SPLIT_RIVER_HEXES[0]`` river hexes per segment and bag ``V3SPLIT_BAG_PER_PLAYER[0]``
+    per player, split scoring, any-vertex planting, the move die, ``each_once`` blends
+    (``DEFAULT_BLENDS``) with the old bodega bonus off, and the bodega building (a new spot,
+    ``V3BLENDS_BUILDING_POINTS[0]`` points, ``V3BLENDS_REDS`` reds + ``V3BLENDS_WHITES[0]`` whites)."""
+    return {
+        **strip_overrides(mode, V3SPLIT_RIVER_HEXES[0], V3SPLIT_BAG_PER_PLAYER[0]),
+        "varietal_points": V3_SPLIT_POINTS,
+        "vertex_needs_three_canals": False,
+        "action_die": V3_DIE_FACES,
+        "varietal_bodega": False,
+        "blends": DEFAULT_BLENDS,
+        "blend_rule": BlendRule.EACH_ONCE,
+        "bodega_building": True,
+        "bodega_placement": BodegaPlacement.NEW_SPOT,
+        "bodega_building_points": V3BLENDS_BUILDING_POINTS[0],
+        "bodega_min_reds": V3BLENDS_REDS,
+        "bodega_min_whites": V3BLENDS_WHITES[0],
+    }
+
+
+def v3bribe_sweeps(costs=V3BRIBE_COSTS) -> tuple[Sweep, ...]:
+    """Sweep ``v3bribe`` (#168): ``bribe_optional`` off / on x the bribe, around ``v3_best_base``."""
+    candidates = tuple(
+        (f"{'optional' if optional else 'mandatory'} bribe {cost}",
+         {"bribe_optional": optional, "action_die_cost": cost})
+        for optional in (False, True)
+        for cost in costs
+    )
+    return (
+        Sweep("v3bribe", "Rules v3 optional floodgate faces (#168): bribe_optional off / on x bribe "
+                         f"{'/'.join(map(str, costs))}, around the best #160/#166 setup",
+              {mode: candidates for mode in Mode}, ("score_aware",),
+              {mode: v3_best_base(mode) for mode in Mode}, V3BRIBE_SWEEP_SEED),
+    )
+
+
 V1_SWEEPS = SWEEPS
 """The sweeps of #20 (Rules v1, greedy and mixed seatings)."""
-SWEEPS = V1_SWEEPS + v2_sweeps() + strip_sweeps() + v3_sweeps() + v3split_sweeps() + v3blends_sweeps()
+SWEEPS = (V1_SWEEPS + v2_sweeps() + strip_sweeps() + v3_sweeps() + v3split_sweeps() + v3blends_sweeps()
+          + v3bribe_sweeps())
 SWEEP_NAMES = tuple(s.name for s in SWEEPS)
 
 
@@ -1367,6 +1428,8 @@ def run_all(jobs: list[Job], workers: int, checkpoints: Checkpoints | None = Non
             data["floodgates"] = floodgate_stats(games)
             if is_v3blends(job.overrides):
                 data["blend_stats"] = blend_stats(games)
+            if is_v3bribe(job.overrides):
+                data["bribe_stats"] = bribe_stats(games)
             outcomes.append(Outcome("ok", data=data))
         except Exception as error:  # noqa: BLE001 - reported with its job, the run goes on
             outcomes.append(Outcome(FAILED, error=f"{type(error).__name__}: {error}"))
@@ -1458,6 +1521,49 @@ def blend_stats(records: list[GameRecord]) -> dict[str, object]:
     }
 
 
+def bribe_stats(records: list[GameRecord]) -> dict[str, float | None]:
+    """Optional bribe figures (#168), replaying each game: ``placed`` and ``released`` (per game),
+    ``used`` (the share of floodgate and release rolls whose face was used; None with no such
+    roll) and ``swing`` (the mean score swing of a floodgate placed or removed: the user's
+    total change less the best rival's, before the bribe; None with none)."""
+    rolls = used = placed = released = 0
+    swings: list[int] = []
+    for record in records:
+        state = record.start
+        dice = game_rngs(record.game_seed)[0]
+        for i, r in enumerate(record.log):
+            if isinstance(r.action, RollActionDie) and r.face in (DieFace.FLOODGATE, DieFace.RELEASE):
+                rolls += 1
+                nxt = record.log[i + 1] if i + 1 < len(record.log) else None
+                if nxt is not None and isinstance(nxt.action, (PlaceFloodgate, Release)):
+                    used += 1
+            after = act(state, r.player, r.action, dice)
+            if isinstance(r.action, (PlaceFloodgate, Release)):
+                placed += isinstance(r.action, PlaceFloodgate)
+                released += isinstance(r.action, Release)
+                before = calculate_score(state)
+                now = calculate_score(dataclasses.replace(after, players=state.players))
+                delta = {pid: now[pid].total - before[pid].total for pid in now}
+                swings.append(delta[r.player] - max(d for pid, d in delta.items() if pid != r.player))
+            state = after
+    games = len(records)
+    return {
+        "placed": placed / games,
+        "released": released / games,
+        "used": used / rolls if rolls else None,
+        "swing": sum(swings) / len(swings) if swings else None,
+    }
+
+
+def _bribe_columns(data: Mapping[str, object]) -> str:
+    """The #168 columns: floodgates placed / released per game, share of their rolls used, swing, debt."""
+    b = data.get("bribe_stats")
+    if b is None:
+        return " - |" * BRIBE_COLUMNS
+    return (f" {b['placed']:.2f} / {b['released']:.2f} | {_f(b['used'], 3)} | {_f(b['swing'])} "
+            f"| {data['score_terms']['debt']['mean']:.2f} |")
+
+
 def _blend_columns(data: Mapping[str, object]) -> str:
     """The #166 columns: blend points, building points, bodegas built per game, blend rates."""
     b = data.get("blend_stats")
@@ -1516,11 +1622,22 @@ BLEND_HEADER = (
 )
 """The columns a #166 sweep (``v3blends``) adds to ``V3_SWEEP_HEADER``."""
 BLEND_COLUMNS = 7
+BRIBE_HEADER = (
+    " Floodgates placed / released per game | Floodgate rolls used | Swing per floodgate use "
+    "| Mean debt |"
+)
+"""The columns a #168 sweep (``v3bribe``) adds after ``BLEND_HEADER``."""
+BRIBE_COLUMNS = 4
 
 
 def is_v3blends(overrides: Mapping[str, object]) -> bool:
     """Whether a job's overrides use a #166 scoring option (blends or bodega buildings)."""
     return bool(overrides.get("blends")) or bool(overrides.get("bodega_building"))
+
+
+def is_v3bribe(overrides: Mapping[str, object]) -> bool:
+    """Whether a job's overrides set ``bribe_optional`` (#168; off too, as sweep ``v3bribe`` does)."""
+    return "bribe_optional" in overrides
 
 
 def is_v3(overrides: Mapping[str, object]) -> bool:
@@ -1711,18 +1828,26 @@ def do_sweeps(sweeps: list[Sweep], run, modes, games: int, players_list=PLAYER_C
             print(f"Base: {describe(sweep.base[mode])}.\n")
             v3 = is_v3(rows[0][0].overrides)
             blended = v3 and any(is_v3blends(j.overrides) for j, _ in rows)
+            bribed = v3 and any(is_v3bribe(j.overrides) for j, _ in rows)
             if v3:
                 print(V3_NOTE + "\n")
-            print((V3_SWEEP_HEADER + (BLEND_HEADER if blended else "")) if v3 else SWEEP_HEADER)
-            columns = (V3_SWEEP_COLUMNS + (BLEND_COLUMNS if blended else 0)) if v3 else SWEEP_COLUMNS
+            header = V3_SWEEP_HEADER + (BLEND_HEADER if blended else "") + (BRIBE_HEADER if bribed else "")
+            print(header if v3 else SWEEP_HEADER)
+            columns = (
+                V3_SWEEP_COLUMNS + (BLEND_COLUMNS if blended else 0) + (BRIBE_COLUMNS if bribed else 0)
+            ) if v3 else SWEEP_COLUMNS
             print("|" + " --- |" * columns)
             for job, outcome in rows:
                 if not v3:
                     print(sweep_row(job, outcome))
-                elif blended and outcome.data is not None:
-                    print(v3_sweep_row(job, outcome) + _blend_columns(outcome.data))
-                else:
-                    print(v3_sweep_row(job, outcome) + (" |" * BLEND_COLUMNS if blended else ""))
+                    continue
+                row = v3_sweep_row(job, outcome)
+                data = outcome.data
+                if blended:
+                    row += _blend_columns(data) if data is not None else " |" * BLEND_COLUMNS
+                if bribed:
+                    row += _bribe_columns(data) if data is not None else " |" * BRIBE_COLUMNS
+                print(row)
             print()
     return outcomes
 

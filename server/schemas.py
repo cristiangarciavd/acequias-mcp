@@ -656,6 +656,12 @@ _BODEGA_WHITES_DESCRIPTION = (
 )
 _BODEGA_POINTS_DESCRIPTION = "Rules v3 (#166): a bodega building's points, split in thirds."
 _BODEGAS_PER_PLAYER_DESCRIPTION = "Rules v3 (#166): the most bodegas a player may build (null: no cap)."
+_BRIBE_OPTIONAL_DESCRIPTION = (
+    "Rules v3 (#168): whether the floodgate and release faces are optional, with the bribe "
+    "(action_die_cost) paid only when the player places or removes a floodgate; declining costs "
+    "nothing. false (the default): those faces are mandatory and the bribe is paid on the roll. "
+    'Needs planting "vertices".'
+)
 
 
 class BlendJSON(BaseModel):
@@ -761,6 +767,10 @@ class PresetJSON(BaseModel):
     bodegas_per_player: int | None = Field(
         default=1, exclude_if=_is_one,
         description=_BODEGAS_PER_PLAYER_DESCRIPTION + " Left out at 1.",
+    )
+    bribe_optional: bool | None = Field(
+        default=None, exclude_if=_is_none,
+        description=_BRIBE_OPTIONAL_DESCRIPTION + " Left out when false.",
     )
 
 
@@ -884,6 +894,7 @@ class PresetOverridesJSON(TypedDict, total=False):
         StrictInt | None,
         Field(description=_BODEGAS_PER_PLAYER_DESCRIPTION + " An int is 1 or more."),
     ]
+    bribe_optional: Annotated[StrictBool, Field(description=_BRIBE_OPTIONAL_DESCRIPTION)]
 
 
 def _blend_from_json(item: object) -> Blend:

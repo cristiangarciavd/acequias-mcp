@@ -445,10 +445,10 @@ _V3_SCORING_DEFAULTS = {
     if f.name in (
         "varietal_bodega", "blends", "blend_rule", "bodega_building", "bodega_placement",
         "bodega_min_vineyards", "bodega_min_reds", "bodega_min_whites",
-        "bodega_building_points", "bodegas_per_player",
+        "bodega_building_points", "bodegas_per_player", "bribe_optional",
     )
 }
-"""The Rules v3 scoring options (#166) and their defaults."""
+"""The Rules v3 scoring options (#166) and ``bribe_optional`` (#168), with their defaults."""
 
 
 def _preset_values(preset: Preset) -> Mapping[str, object]:

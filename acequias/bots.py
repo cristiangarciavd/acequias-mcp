@@ -123,6 +123,10 @@ plus a planting potential per player (``_Evaluator._potential_of``: half
 the roulette's mean, in full at ``SPOT_TARGET`` plantable spots, 0 at the
 cluster cap), so a canal that opens spots beats a pass and loses to a
 plant. A mandatory face is played even when no use is worth more than 0.
+With ``Preset.bribe_optional`` (#168) every bot takes the bribe a
+floodgate or release use pays off its value (``acequias.turn.bribe_on_use``;
+``lookahead_bot`` plans it as debt), so it places or removes a floodgate
+only when the score swing beats the bribe, and declines the face otherwise.
 Canals that link to one water source, and plants, are valued without a full
 scoring (equal to one; ``_Evaluator.fast``), which keeps a 4-player strip
 game near 1 s. ``lookahead_bot`` plans every turn after the root as a
@@ -183,6 +187,7 @@ from acequias.turn import (
     RollActionDie,
     _board_after,
     _v3_board_after,
+    bribe_on_use,
     legal_actions,
 )
 
@@ -301,7 +306,7 @@ def _score_aware_ties(
         uses = [a for a in actions if not isinstance(a, DeclineFace)]
         values = [evaluator.value(state, a) for a in uses]
         best = max(values, default=Fraction(0))
-        if best <= 0 and DeclineFace() in actions:  # a Rules v3 bribe face is mandatory
+        if best <= 0 and DeclineFace() in actions:  # a mandatory Rules v3 bribe face has none
             return [DeclineFace()]
         return [a for a, v in zip(uses, values) if v == best]
     values = [
@@ -708,7 +713,8 @@ def _requirement(preset: Preset, board: Board, player: str, blanks: Iterable[Ver
 def _resolve_face_v3(
     state: GameState, player: str, actions: Sequence[Action], rng: random.Random
 ) -> Action:
-    """Greedy's use of a Rules v3 face: the best vineyard swing, declining resow or move below 0."""
+    """Greedy's use of a Rules v3 face: the best vineyard swing (less an optional bribe),
+    declining an optional face at 0 or below."""
     preset = state.preset or shipped_preset(state.mode)
     points = preset.varietal_points
     mean = Fraction(sum(points[v] for v in preset.roulette), len(preset.roulette))
@@ -729,7 +735,7 @@ def _resolve_face_v3(
     values = []
     for action in uses:
         after, spin = _v3_board_after(state, player, action)
-        values.append(swing(after, spin) - before)
+        values.append(swing(after, spin) - before - bribe_on_use(state, action, preset))
     best = max(values)
     if best <= 0 and DeclineFace() in actions:
         return DeclineFace()
@@ -816,6 +822,7 @@ class _Evaluator:
                 value = (totals[self.player] - self.own_now) - (
                     max(totals[r] for r in self.rivals) - self.rival_now
                 )
+                value -= bribe_on_use(state, action, self.preset)  # bribe_optional, #168
             self._cache[action] = value
             return value
         after, watered = self._board_after(state, action)
@@ -1287,6 +1294,9 @@ class _Lookahead:
         if self.v3:
             board, spin = _v3_board_after(state, player, action)
             blanks = _blanks_after(blanks, action, spin)
+            bribe = bribe_on_use(state, action, self.preset)  # bribe_optional, #168
+            if bribe:
+                extra = _add(extra, player, Fraction(bribe))
             return replace(after, board=board, players=state.players), extra, blanks
         board, _ = _board_after(state, player, action)
         if isinstance(action, Resow):  # weighed blank: the respin's mean points

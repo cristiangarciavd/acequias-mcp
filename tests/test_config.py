@@ -113,6 +113,7 @@ V3_SCORING_DEFAULTS = dict(
     bodega_min_whites=2,
     bodega_building_points=12,
     bodegas_per_player=1,
+    bribe_optional=False,  # #168
 )
 
 # Rules v2, approved by the owner on #103 and shipped in #126.
