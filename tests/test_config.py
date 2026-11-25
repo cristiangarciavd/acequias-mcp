@@ -6,6 +6,7 @@ import pytest
 
 from acequias import config
 from acequias.config import (
+    PlantingRules,
     ACTION_DIE_FACES,
     CONSTRUCTIVE_DIE_FACES,
     FLASH,
@@ -124,6 +125,7 @@ README_VALUES = {
         multiple_bodegas=True,
         season_roll_personal_faces=False,
         seat_bonus={},
+        planting=PlantingRules.HEXES,
     ),
     Mode.FLASH: dict(
         rounds={2: 6, 3: 6},
@@ -150,6 +152,7 @@ README_VALUES = {
         multiple_bodegas=True,
         season_roll_personal_faces=False,
         seat_bonus={},
+        planting=PlantingRules.HEXES,
     ),
 }
 

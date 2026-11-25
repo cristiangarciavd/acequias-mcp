@@ -34,6 +34,12 @@ gives none for ``P``); round 1's start player is worked out from
 ``state.start_player`` and ``state.round``, like ``acequias.game.turn_order``.
 The drought clamp counts it like any other term.
 
+Vertex vineyards (Rules v3, ``Board.planted``) score the same way: a
+watered one scores its varietal's points for its owner, counts toward
+their bodegas, and pays the rights of its path (``acequias.flow.vertex_water``);
+a dry one scores 0. Their ``WateredVineyard`` has ``vertex`` set and no
+``hex``, and they follow the hex vineyards in vertex order.
+
 This module is pure: it reads a ``GameState``, changes nothing, and has no
 randomness.
 """
@@ -46,8 +52,8 @@ from dataclasses import dataclass
 from types import MappingProxyType
 
 from acequias.config import Preset, preset as preset_for
-from acequias.flow import WaterPath, water
-from acequias.hex import Hex
+from acequias.flow import WaterPath, vertex_water, water
+from acequias.hex import Hex, Vertex
 from acequias.model import GameState, Varietal
 
 
@@ -57,13 +63,15 @@ class WateredVineyard:
 
     ``pays`` holds the rivals the claimant pays ``water_right_points``
     each, once per rival: the path's owners minus the claimant, in seat
-    order.
+    order. ``hex`` is the vineyard's hex, or None for a vertex vineyard
+    (Rules v3), whose spot is ``vertex``.
     """
 
-    hex: Hex
+    hex: Hex | None
     varietal: Varietal
     path: WaterPath
     pays: tuple[str, ...]
+    vertex: Vertex | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -153,6 +161,17 @@ def calculate_score(state: GameState, preset: Preset | None = None) -> Mapping[s
         if varietal not in preset.varietal_points:
             raise ValueError(f"{varietal.display_name} on {hex} has no points in the preset")
         owned[claimant].append(WateredVineyard(hex, varietal, path, pays))
+    for vertex, path in vertex_water(board).items():
+        vineyard = board.planted_at(vertex)
+        owner = vineyard.owner
+        pays = tuple(sorted(path.owners - {owner}, key=seat_of.__getitem__))
+        for rival in pays:
+            collected[rival] += preset.water_right_points
+        if vineyard.varietal not in preset.varietal_points:
+            raise ValueError(
+                f"{vineyard.varietal.display_name} on {vertex} has no points in the preset"
+            )
+        owned[owner].append(WateredVineyard(None, vineyard.varietal, path, pays, vertex))
 
     points = preset.varietal_points
     scores: dict[str, Score] = {}

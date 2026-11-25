@@ -15,6 +15,17 @@ then fewest canals, then the smallest hex sequence (river end first,
 compared hex by hex in ``Hex`` order). On an unclaimed vineyard every
 owner is a rival.
 
+Rules v3 (vertex planting) adds vineyards on vertices
+(``Board.planted``). A vertex vineyard touches the canals on its (up to)
+3 hexes; it is watered when any of them carries water, whatever edges
+the canal opens, and its water takes the cheapest path, as above, to any
+of those watered canals (``vertex_water``). A player may plant on a free
+vertex that touches one of their own canals carrying water
+(``can_plant``, ``plantable_spots``). Such a vertex always touches the
+canal's own hex, so it is a planting spot; legality is worked out from
+the canals alone, not from ``Board.spots``, the board's bounds, or its
+stone and empty hexes, so it also fits a board without fixed bounds.
+
 This module is pure: it reads ``acequias.model`` and ``acequias.hex``,
 changes nothing, and has no randomness.
 """
@@ -27,7 +38,7 @@ from dataclasses import dataclass
 from itertools import combinations
 from types import MappingProxyType
 
-from acequias.hex import Direction, Hex
+from acequias.hex import Direction, Hex, Vertex
 from acequias.model import Board, PlacedCanal
 
 _OPPOSITE = {d: d.opposite() for d in Direction}
@@ -62,10 +73,75 @@ def water(board: Board) -> Mapping[Hex, WaterPath]:
         ends = {h for h in feeders[vineyard] if h in wet}
         if not ends:
             continue
-        path = _choose(board, vineyard, ends, sources, links, owner_of)
+        path = _choose(vineyard, board.claimant(vineyard), ends, sources, links, owner_of)
         canals = tuple(board.canal_at(h) for h in path)
         result[vineyard] = WaterPath(canals, frozenset(c.owner for c in canals))
     return MappingProxyType(result)
+
+
+def vertex_water(board: Board) -> Mapping[Vertex, WaterPath]:
+    """Every watered planted vertex vineyard on ``board``, mapped to the path its water takes.
+
+    The path ends at one of the watered canals the vertex touches; it is the
+    cheapest for the vineyard's owner (fewest rivals, then fewest canals,
+    then hex order). Dry vineyards are left out.
+    """
+    if not isinstance(board, Board):
+        raise TypeError(f"vertex_water needs a Board, got {board!r}")
+    if not board.planted:
+        return MappingProxyType({})
+    links, sources, _ = _graph(board)
+    wet = _reach(sources, links, allowed=None)
+    owner_of = {h: board.canal_at(h).owner for h in wet}
+    result: dict[Vertex, WaterPath] = {}
+    for vineyard in board.planted:
+        ends = {h for h in vineyard.vertex.hexes if h in wet}
+        if not ends:
+            continue
+        path = _choose(vineyard.vertex, vineyard.owner, ends, sources, links, owner_of)
+        canals = tuple(board.canal_at(h) for h in path)
+        result[vineyard.vertex] = WaterPath(canals, frozenset(c.owner for c in canals))
+    return MappingProxyType(result)
+
+
+def wet_canals(board: Board) -> frozenset[Hex]:
+    """The hexes of every canal on ``board`` that carries water right now."""
+    if not isinstance(board, Board):
+        raise TypeError(f"wet_canals needs a Board, got {board!r}")
+    links, sources, _ = _graph(board)
+    return frozenset(_reach(sources, links, allowed=None))
+
+
+def plantable_spots(board: Board, player: str) -> tuple[Vertex, ...]:
+    """The spots ``player`` may plant on now, in vertex order (Rules v3).
+
+    A vertex is plantable when nothing is planted on it and it touches a
+    canal of ``player``'s that carries water: the vertices of their wet
+    canals, minus the planted ones.
+    """
+    if not isinstance(board, Board):
+        raise TypeError(f"plantable_spots needs a Board, got {board!r}")
+    if not isinstance(player, str):
+        raise TypeError(f"player must be a str, got {player!r}")
+    own = [h for h in wet_canals(board) if board.canal_at(h).owner == player]
+    found = {v for h in own for v in h.vertices() if board.planted_at(v) is None}
+    return tuple(sorted(found))
+
+
+def can_plant(board: Board, player: str, vertex: Vertex) -> bool:
+    """Whether ``player`` may plant a vineyard on ``vertex`` now (see ``plantable_spots``)."""
+    if not isinstance(vertex, Vertex):
+        raise TypeError(f"vertex must be a Vertex, got {vertex!r}")
+    if not isinstance(player, str):
+        raise TypeError(f"player must be a str, got {player!r}")
+    if not isinstance(board, Board):
+        raise TypeError(f"can_plant needs a Board, got {board!r}")
+    if board.planted_at(vertex) is not None:
+        return False
+    wet = wet_canals(board)
+    return any(
+        h in wet and board.canal_at(h).owner == player for h in vertex.hexes
+    )
 
 
 def _watered(board: Board) -> list[Hex]:
@@ -158,8 +234,8 @@ def _reach(
 
 
 def _choose(
-    board: Board,
-    vineyard: Hex,
+    vineyard: Hex | Vertex,
+    claimant: str | None,
     ends: set[Hex],
     sources: frozenset[Hex],
     links: Mapping[Hex, tuple[Hex, ...]],
@@ -175,7 +251,6 @@ def _choose(
     a path is the fewest rivals possible, and among those subsets the
     shortest, then hex-smallest, path wins.
     """
-    claimant = board.claimant(vineyard)
     overall = _best_path(sources, ends, links, frozenset(owner_of))
     if overall is None:
         raise AssertionError(f"{vineyard} is watered but no path was found")

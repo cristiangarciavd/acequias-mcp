@@ -29,7 +29,13 @@ from dataclasses import dataclass, field
 from types import MappingProxyType
 
 from acequias.bots import policy
-from acequias.config import Preset, VarietalRules, preset as shipped_preset, with_overrides
+from acequias.config import (
+    PlantingRules,
+    Preset,
+    VarietalRules,
+    preset as shipped_preset,
+    with_overrides,
+)
 from acequias.game import Bot, TurnRecord, game_rngs, play_game, turn_order
 from acequias.model import MAX_PLAYERS, MIN_PLAYERS, DieFace, GameState, Mode, Varietal
 from acequias.scoring import Score, calculate_score, winners
@@ -407,6 +413,11 @@ def _preset_values(preset: Preset) -> Mapping[str, object]:
     values: dict[str, object] = {}
     for f in dataclasses.fields(Preset):
         value = getattr(preset, f.name)
+        if f.name == "planting":
+            # Written only when set (Rules v3), so Rules v1/v2 results are unchanged.
+            if value is not PlantingRules.HEXES:
+                values[f.name] = value.value
+            continue
         if f.name == "mode":
             value = _MODE_NAMES[value]
         elif f.name == "rounds":

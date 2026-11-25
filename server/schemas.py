@@ -49,6 +49,8 @@ by value, `varietal_points` keyed by varietal name, `roulette` as a list of
 varietal names, `grape_clusters_per_player` as an int or null (no cap),
 `bribe_rules` by value, `action_die` as a list of face values,
 `season_points`, `drought_points` and `season_roll_every` as an int or null,
+`planting` by value (`"hexes"` or `"vertices"`; left out of `simulate_game`'s
+JSON when `"hexes"`),
 `multiple_bodegas` and `season_roll_personal_faces` as bools, `seat_bonus`
 keyed by player count as a string with a list of ints each, the rest as ints. `overrides_from_json` turns those keys
 back into `int`, `PieceKind`, and `Varietal`, the names into `VarietalRules`,
@@ -86,9 +88,15 @@ from pydantic import (
 from typing_extensions import TypedDict
 
 from acequias.assembly import AssemblyStep
-from acequias.config import PLAYER_COUNTS, BribeRules, VarietalRules, players_text
+from acequias.config import (
+    PLAYER_COUNTS,
+    BribeRules,
+    PlantingRules,
+    VarietalRules,
+    players_text,
+)
 from acequias.config import preset as shipped_preset
-from acequias.hex import Direction, Hex
+from acequias.hex import Direction, Hex, Vertex
 from acequias.model import (
     ROTATIONS,
     Board,
@@ -97,6 +105,7 @@ from acequias.model import (
     Mode,
     PieceKind,
     PlacedCanal,
+    PlantedVineyard,
     Player,
     Terrain,
     Tile,
@@ -117,6 +126,7 @@ VarietalName = Literal[
 ]
 VarietalRulesName = Literal["fixed", "roulette"]
 BribeRulesName = Literal["d6", "action_die"]
+PlantingName = Literal["hexes", "vertices"]
 DieFaceName = Literal["floodgate", "release", "resow", "good_season", "drought"]
 ModeName = Literal["normal", "flash"]
 KindName = Literal["straight", "gentle_curve", "sharp_curve", "symmetric_y", "t_branch", "claw"]
@@ -132,6 +142,7 @@ _VARIETAL_BY_NAME = {varietal.name.lower(): varietal for varietal in Varietal}
 _MODE_BY_NAME = {mode.value: mode for mode in Mode}
 _RULES_BY_NAME = {rules.value: rules for rules in VarietalRules}
 _BRIBE_RULES_BY_NAME = {rules.value: rules for rules in BribeRules}
+_PLANTING_BY_NAME = {rules.value: rules for rules in PlantingRules}
 _FACE_BY_NAME = {face.value: face for face in DieFace}
 _KIND_BY_NAME = {kind.name.lower(): kind for kind in PieceKind if kind.is_canal}
 _DIRECTION_BY_NAME = {direction.name: direction for direction in Direction}
@@ -432,6 +443,13 @@ _SEASON_ROLL_DESCRIPTION = (
 )
 
 
+_PLANTING_DESCRIPTION = (
+    'Where vineyards grow: "hexes" (vineyard tiles, the shipped game) or "vertices" '
+    "(Rules v3, opt-in: no vineyard tiles; vineyards are planted on hex vertices next "
+    "to the planter's own watered canal). \"vertices\" needs varietal_rules \"roulette\"."
+)
+
+
 class PresetJSON(BaseModel):
     """Every value of a game preset (the numbers of one mode), after overrides."""
 
@@ -559,6 +577,7 @@ class PresetOverridesJSON(TypedDict, total=False):
         dict[PlayerCountName, list[StrictInt]],
         Field(description=_SEAT_BONUS_DESCRIPTION + " Each list has one int >= 0 per player."),
     ]
+    planting: Annotated[PlantingName, Field(description=_PLANTING_DESCRIPTION)]
 
 
 def overrides_from_json(overrides: Mapping[str, Any]) -> dict[str, Any]:
@@ -610,6 +629,8 @@ def overrides_from_json(overrides: Mapping[str, Any]) -> dict[str, Any]:
         changes["bribe_rules"] = _lookup(
             "bribe_rules", changes["bribe_rules"], _BRIBE_RULES_BY_NAME
         )
+    if "planting" in changes:
+        changes["planting"] = _lookup("planting", changes["planting"], _PLANTING_BY_NAME)
     if isinstance(changes.get("action_die"), (list, tuple)):
         changes["action_die"] = tuple(
             _lookup("action_die face", name, _FACE_BY_NAME) for name in changes["action_die"]
@@ -982,14 +1003,70 @@ def players_from_json(items: Iterable[Mapping[str, Any] | PlayerJSON]) -> tuple[
 
 
 def watered_vineyard_to_json(vineyard: WateredVineyard) -> dict[str, Any]:
-    """The JSON object for one `WateredVineyard`: hex, varietal, path, and pays."""
+    """The JSON object for one `WateredVineyard`: hex, varietal, path, and pays.
+
+    A vertex vineyard (Rules v3) has `hexes` (its vertex) instead of `q`, `r`.
+    """
+    where: dict[str, Any]
+    if vineyard.vertex is not None:
+        where = {"hexes": vertex_to_json(vineyard.vertex)}
+    else:
+        where = {"q": vineyard.hex.q, "r": vineyard.hex.r}
     return {
-        "q": vineyard.hex.q,
-        "r": vineyard.hex.r,
+        **where,
         "varietal": varietal_to_json(vineyard.varietal),
         "path": [canal_to_json(canal) for canal in vineyard.path.canals],
         "pays": list(vineyard.pays),
     }
+
+
+# --- Vertices (Rules v3) ------------------------------------------------------
+
+
+def vertex_to_json(vertex: Vertex) -> list[list[int]]:
+    """A vertex as its 3 hexes, `[[q, r], [q, r], [q, r]]`, in hex order."""
+    return [[h.q, h.r] for h in vertex.hexes]
+
+
+def vertex_from_json(item: object) -> Vertex:
+    """The `Vertex` for a list of 3 `[q, r]` pairs; `Vertex` checks they meet at a point."""
+    if isinstance(item, (str, bytes, Mapping)) or not isinstance(item, Iterable):
+        raise TypeError(f"a vertex must be a list of 3 [q, r] pairs, got {item!r}")
+    pairs = [tuple(pair) for pair in item]
+    if any(len(pair) != 2 for pair in pairs):
+        raise ValueError(f"a vertex must be a list of 3 [q, r] pairs, got {item!r}")
+    return Vertex(tuple(Hex(q, r) for q, r in pairs))
+
+
+def spots_to_json(board: Board) -> list[list[list[int]]]:
+    """The planting spots of `board` (Rules v3), in its order, each a vertex."""
+    return [vertex_to_json(spot) for spot in board.spots]
+
+
+def planted_to_json(board: Board) -> list[dict[str, Any]]:
+    """The vertex vineyards of `board`: `{"hexes", "player", "varietal"}` each, in its order."""
+    return [
+        {
+            "hexes": vertex_to_json(v.vertex),
+            "player": v.owner,
+            "varietal": varietal_to_json(v.varietal),
+        }
+        for v in board.planted
+    ]
+
+
+def planted_from_json(item: Mapping[str, Any]) -> PlantedVineyard:
+    """The `PlantedVineyard` for one object of `planted_to_json`."""
+    if not isinstance(item, Mapping):
+        raise TypeError(f"a planted vineyard must be an object, got {item!r}")
+    if set(item) != {"hexes", "player", "varietal"}:
+        raise ValueError(
+            f"a planted vineyard needs exactly the keys hexes, player, varietal; got {sorted(item)}"
+        )
+    varietal = varietal_from_json(item["varietal"])
+    if varietal is None:
+        raise ValueError("a planted vineyard needs a varietal")
+    return PlantedVineyard(vertex_from_json(item["hexes"]), item["player"], varietal)
 
 
 def score_to_json(score: Score) -> dict[str, Any]:

@@ -19,6 +19,9 @@ Every size, count, and distance comes from the preset (``acequias.config``).
 Under fixed varietal rules the vineyards get the varietals of
 ``preset.varietal_points``, dealt evenly; under roulette rules they are
 blank (no varietal), and are planted when claimed.
+Under vertex planting (Rules v3, ``PlantingRules.VERTICES``) no vineyard
+tiles are placed: the board's ``spots`` are every vertex that touches at
+least one non-river tile (``planting_spots``).
 All randomness comes from one ``random.Random(seed)``, and every choice is
 made over lists in a fixed order, so the result never depends on hash order.
 """
@@ -28,9 +31,9 @@ from __future__ import annotations
 import random
 from collections.abc import Sequence
 
-from acequias.config import Preset, VarietalRules, _ceil_share
+from acequias.config import PlantingRules, Preset, VarietalRules, _ceil_share
 from acequias.config import preset as shipped_preset
-from acequias.hex import Direction, Hex
+from acequias.hex import Direction, Hex, Vertex
 from acequias.model import Board, Mode, Terrain, Tile, Varietal
 
 # How many layouts the generator tries before it gives up on a preset.
@@ -62,12 +65,13 @@ def generate_board(
         )
 
     hexes = players * preset.hexes_per_player
-    vineyards = players * preset.vineyards_per_player
+    vineyards = players * preset.vineyard_tiles_per_player
     stones = _ceil_share(preset.stone_share, hexes)
     low, high = preset.vineyard_distance
     lengths = _even_lengths(hexes, high)
     candidates = sum(max(0, min(n, high) - low + 1) for n in lengths)
-    if candidates < vineyards:
+    vertices = preset.planting is PlantingRules.VERTICES
+    if not vertices and candidates < vineyards:
         raise ValueError(
             f"cannot place {vineyards} vineyards (vineyards_per_player="
             f"{preset.vineyards_per_player}) at vineyard_distance {preset.vineyard_distance} "
@@ -79,12 +83,24 @@ def generate_board(
     for _ in range(MAX_ATTEMPTS):
         tiles = _layout(rng, players, hexes, vineyards, stones, preset)
         if tiles is not None:
+            if vertices:
+                return Board(tiles=tiles, spots=planting_spots(tiles))
             return Board(tiles=tiles)
     raise ValueError(
         f"no layout in {MAX_ATTEMPTS} tries lets {players} vineyards be reached: "
         f"hexes_per_player={preset.hexes_per_player}, "
         f"vineyards_per_player={preset.vineyards_per_player}, "
         f"stone_share={preset.stone_share}, vineyard_distance={preset.vineyard_distance}"
+    )
+
+
+def planting_spots(tiles: Sequence[Tile]) -> tuple[Vertex, ...]:
+    """Every vertex of ``tiles`` that touches at least one non-river tile, in vertex order.
+
+    These are a Rules v3 board's planting spots; one vineyard fits on each.
+    """
+    return tuple(
+        sorted({v for t in tiles if t.terrain is not Terrain.RIVER for v in t.hex.vertices()})
     )
 
 
@@ -178,7 +194,7 @@ def _layout(
     tiles = [Tile(river, Terrain.RIVER) for river in _river(rows)]
     tiles += [Tile(h, Terrain.VINEYARD, g) for h, g in zip(vineyard_hexes, grapes)]
     tiles += [Tile(h, Terrain.STONE if h in stone_set else Terrain.EMPTY) for h in rest]
-    if len(_reachable(tiles)) < players:
+    if preset.planting is PlantingRules.HEXES and len(_reachable(tiles)) < players:
         return None
     return tiles
 
