@@ -238,7 +238,7 @@ def test_placements_follow_the_canals_far_east():
     assert {a.hex for a in legal} == brute
 
 
-def test_planting_and_water_rights_work_on_the_open_table():
+def test_planting_and_split_scoring_work_on_the_open_table():
     b = generate_board(3, 1, Mode.NORMAL, preset=STRIP)
     chain = _chain(b.strip, 4, 25, owners=("p2",) * 24 + ("p1",))
     board = Board(tiles=b.tiles, strip=b.strip, canals=chain)
@@ -251,8 +251,9 @@ def test_planting_and_water_rights_work_on_the_open_table():
     s = GameState(board=planted, players=(Player("p1", 1), Player("p2", 2)), mode=Mode.NORMAL,
                   round=1, start_player="p1", current_player="p1", market=(), preset=STRIP)
     scores = calculate_score(s)
-    assert scores["p1"].rights_paid == STRIP.water_right_points
-    assert scores["p2"].rights_collected == STRIP.water_right_points
+    # Split scoring (#160): p1's watered third of the Malbec; no water rights.
+    assert scores["p1"].vineyards == STRIP.varietal_points[Varietal.MALBEC] // 3
+    assert scores["p1"].rights_paid == scores["p2"].rights_collected == 0
 
 
 @pytest.mark.parametrize("players", [2, 5])

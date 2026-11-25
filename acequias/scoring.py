@@ -34,11 +34,19 @@ gives none for ``P``); round 1's start player is worked out from
 ``state.start_player`` and ``state.round``, like ``acequias.game.turn_order``.
 The drought clamp counts it like any other term.
 
-Vertex vineyards (Rules v3, ``Board.planted``) score the same way: a
-watered one scores its varietal's points for its owner, counts toward
-their bodegas, and pays the rights of its path (``acequias.flow.vertex_water``);
-a dry one scores 0. Their ``WateredVineyard`` has ``vertex`` set and no
-``hex``, and they follow the hex vineyards in vertex order.
+Vertex vineyards (Rules v3, ``Board.planted``) are scored split (#160):
+a vineyard's value is split in thirds among the 3 hexes of its vertex,
+and each watered third (``acequias.flow.vertex_thirds``: a canal that
+carries water, after floodgates) scores for that canal's owner, whoever
+planted the vineyard. A player with ``k`` watered thirds of a vineyard
+worth ``V`` scores ``V * k // 3`` (exact for the Rules v3 values,
+``acequias.config.V3_POINTS``; other values round each share down). A
+third on a river or empty hex, or on a dry canal, scores for nobody.
+Vertex vineyards cause no water rights. A player's bodegas count the
+varietals of every vineyard with at least one of their watered thirds,
+whoever planted it, and so does ``watered`` (the tie-break). Their
+``WateredVineyard`` has ``vertex`` set and no ``hex``, and they follow the
+hex vineyards in ``Board.planted`` order.
 
 This module is pure: it reads a ``GameState``, changes nothing, and has no
 randomness.
@@ -52,7 +60,7 @@ from dataclasses import dataclass
 from types import MappingProxyType
 
 from acequias.config import Preset, preset as preset_for
-from acequias.flow import WaterPath, vertex_water, water
+from acequias.flow import WaterPath, vertex_thirds, water, wet_canals
 from acequias.hex import Hex, Vertex
 from acequias.model import GameState, Varietal
 
@@ -65,6 +73,14 @@ class WateredVineyard:
     each, once per rival: the path's owners minus the claimant, in seat
     order. ``hex`` is the vineyard's hex, or None for a vertex vineyard
     (Rules v3), whose spot is ``vertex``.
+
+    A vertex vineyard is listed for every player with a watered third of
+    it (split scoring, #160): ``planter`` is who planted it, ``thirds``
+    the player's watered thirds (1 to 3), ``points`` what they score from
+    it, and ``path`` holds the player's watered canals on its vertex, one
+    per third, in hex order; ``pays`` is empty. For a hex vineyard
+    ``planter`` is None and ``thirds`` and ``points`` are 0 (it scores its
+    varietal's points).
     """
 
     hex: Hex | None
@@ -72,6 +88,9 @@ class WateredVineyard:
     path: WaterPath
     pays: tuple[str, ...]
     vertex: Vertex | None = None
+    planter: str | None = None
+    thirds: int = 0
+    points: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -125,6 +144,11 @@ def bodega_count(varietals: Iterable[Varietal], size: int) -> int:
     return groups
 
 
+def split_points(value: int, thirds: int) -> int:
+    """What ``thirds`` watered thirds (0 to 3) of a vineyard worth ``value`` score: ``value * thirds // 3``."""
+    return value * thirds // 3
+
+
 def calculate_score(state: GameState, preset: Preset | None = None) -> Mapping[str, Score]:
     """Every player's score on ``state``, keyed by player id, in seat order.
 
@@ -161,23 +185,36 @@ def calculate_score(state: GameState, preset: Preset | None = None) -> Mapping[s
         if varietal not in preset.varietal_points:
             raise ValueError(f"{varietal.display_name} on {hex} has no points in the preset")
         owned[claimant].append(WateredVineyard(hex, varietal, path, pays))
-    for vertex, path in vertex_water(board).items():
-        vineyard = board.planted_at(vertex)
-        owner = vineyard.owner
-        pays = tuple(sorted(path.owners - {owner}, key=seat_of.__getitem__))
-        for rival in pays:
-            collected[rival] += preset.water_right_points
-        if vineyard.varietal not in preset.varietal_points:
-            raise ValueError(
-                f"{vineyard.varietal.display_name} on {vertex} has no points in the preset"
-            )
-        owned[owner].append(WateredVineyard(None, vineyard.varietal, path, pays, vertex))
+    if board.planted:
+        wet = wet_canals(board)
+        thirds_at = vertex_thirds(board, wet)
+        for vineyard in board.planted:
+            vertex = vineyard.vertex
+            if vineyard.varietal not in preset.varietal_points:
+                raise ValueError(
+                    f"{vineyard.varietal.display_name} on {vertex} has no points in the preset"
+                )
+            value = preset.varietal_points[vineyard.varietal]
+            for pid, thirds in thirds_at[vertex].items():
+                if pid not in owned:
+                    continue  # a canal owner who is not in the game scores nothing
+                canals = tuple(
+                    board.canal_at(h) for h in vertex.hexes
+                    if h in wet and board.canal_at(h).owner == pid
+                )
+                owned[pid].append(
+                    WateredVineyard(
+                        None, vineyard.varietal, WaterPath(canals, frozenset({pid})), (), vertex,
+                        planter=vineyard.owner, thirds=thirds, points=split_points(value, thirds),
+                    )
+                )
 
-    points = preset.varietal_points
     scores: dict[str, Score] = {}
     for p in players:
         mine = tuple(owned[p.id])
-        vineyards = sum(points[v.varietal] for v in mine)
+        vineyards = sum(
+            v.points if v.vertex is not None else preset.varietal_points[v.varietal] for v in mine
+        )
         bodegas = bodega_count((v.varietal for v in mine), preset.bodega_varietals)
         if not preset.multiple_bodegas:
             bodegas = min(bodegas, 1)

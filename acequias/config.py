@@ -110,6 +110,18 @@ CONSTRUCTIVE_DIE_FACES: tuple[DieFace, ...] = (
 """The constructive action die (#130), in order: floodgate, release, two
 resows, good season, drought: the shipped ``action_die`` (#103)."""
 
+V3_DIE_FACES: tuple[DieFace, ...] = (
+    DieFace.FLOODGATE,
+    DieFace.RELEASE,
+    DieFace.RESOW,
+    DieFace.MOVE,
+    DieFace.GOOD_SEASON,
+    DieFace.DROUGHT,
+)
+"""The Rules v3 action die (owner, #160), in order: floodgate, release, resow,
+move, good season, drought: six distinct faces. ``MOVE`` needs vertex
+planting."""
+
 ACTION_DIE_COST = 1
 """The debt a roll of the action die costs (#103)."""
 
@@ -164,6 +176,13 @@ SHIPPED_POINTS: Mapping[Varietal, int] = MappingProxyType(
 """The shipped points of a watered vineyard (#103): ``ROULETTE_POINTS`` at
 scale 3 with a rare bonus of 1, so 6 for a common varietal and 7 for the
 rare Bonarda and Cabernet Franc."""
+
+V3_POINTS: Mapping[Varietal, int] = MappingProxyType(
+    {v: 9 if v in (Varietal.BONARDA, Varietal.CABERNET_FRANC) else 6 for v in SHIPPED_POINTS}
+)
+"""Rules v3 vineyard values (#160): 6 for a common varietal, 9 for the rare
+Bonarda and Cabernet Franc, so each third of a split vineyard is a whole
+number (``acequias.scoring``). Opt-in, like the rest of Rules v3."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -235,8 +254,12 @@ class Preset:
     mandatory die roll, then one action; ``action_die_cost`` is then the
     bribe the floodgate and release faces cost, and ``season_roll_every``
     is ignored (no season roll, ``is_season_round`` is always False).
-    ``resow_can_move`` (off by default; vertex planting only) lets the
-    resow face move one of the roller's vineyards instead of respinning.
+    ``vertex_needs_three_canals`` (off by default; vertex planting only,
+    #160) allows planting only on a vertex whose 3 hexes all hold a canal;
+    off, a vertex with a river or empty hex may be planted and that third
+    scores for nobody. Vertex vineyards are scored split in thirds
+    (``acequias.scoring``), with no water rights. The ``MOVE`` die face
+    (``V3_DIE_FACES``) needs vertex planting.
 
     ``board_shape`` (``FIELD`` by default and in the shipped presets) says
     what the board is; ``RIVER_STRIP`` (Rules v3, opt-in, #154) is the open
@@ -276,7 +299,7 @@ class Preset:
     season_roll_personal_faces: bool = True
     seat_bonus: Mapping[int, tuple[int, ...]] = field(default_factory=lambda: MappingProxyType({}))
     planting: PlantingRules = PlantingRules.HEXES
-    resow_can_move: bool = False
+    vertex_needs_three_canals: bool = False
     board_shape: BoardShape = BoardShape.FIELD
     river_hexes_per_segment: int = RIVER_HEXES_PER_SEGMENT
     bag_size: Mapping[int, int] = field(default_factory=lambda: MappingProxyType({}))
@@ -322,9 +345,11 @@ class Preset:
             raise ValueError("vertex planting needs roulette varietal rules")
         if self.planting is PlantingRules.VERTICES and self.bribe_rules is not BribeRules.ACTION_DIE:
             raise ValueError("vertex planting needs action_die bribe rules")
-        _check_type("resow_can_move", self.resow_can_move, bool)
-        if self.resow_can_move and self.planting is not PlantingRules.VERTICES:
-            raise ValueError("resow_can_move needs vertex planting")
+        _check_type("vertex_needs_three_canals", self.vertex_needs_three_canals, bool)
+        if self.vertex_needs_three_canals and self.planting is not PlantingRules.VERTICES:
+            raise ValueError("vertex_needs_three_canals needs vertex planting")
+        if DieFace.MOVE in self.action_die and self.planting is not PlantingRules.VERTICES:
+            raise ValueError("the action die's MOVE face needs vertex planting")
         _check_type("board_shape", self.board_shape, BoardShape)
         _check_count("river_hexes_per_segment", self.river_hexes_per_segment)
         _set(self, "bag_size", _bag_size(self.bag_size, self.player_counts))

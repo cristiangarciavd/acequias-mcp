@@ -7,7 +7,7 @@ from dataclasses import replace
 import pytest
 
 from acequias.board import planting_spots
-from acequias.config import NORMAL, PlantingRules, BribeRules, with_overrides
+from acequias.config import NORMAL, V3_DIE_FACES, PlantingRules, BribeRules, with_overrides
 from acequias.flow import plantable_spots
 from acequias.game import act, game_rngs, play_game, replay
 from acequias.hex import Direction, Hex
@@ -48,7 +48,7 @@ from acequias.turn import (
 )
 
 V3 = with_overrides(NORMAL, planting=PlantingRules.VERTICES)
-V3_MOVE = with_overrides(V3, resow_can_move=True)
+V3_MOVE = with_overrides(V3, action_die=V3_DIE_FACES)
 
 # River on (0, 0); a row of empty hexes east of it. Canals A (p1), B (p2),
 # C (p1) carry water in a straight E-W line; D is free.
@@ -214,7 +214,7 @@ def test_resow_face_is_free_and_respins_any_vineyard():
     with pytest.raises(IllegalAction):
         apply(s, "p1", ResowVineyard(EAST_OF_C), Rigged(Varietal.MALBEC))
     with pytest.raises(IllegalAction):
-        apply(s, "p1", MoveVineyard(NORTH_OF_A, EAST_OF_C), Rigged())  # option off
+        apply(s, "p1", MoveVineyard(NORTH_OF_A, EAST_OF_C), Rigged())  # resow only respins
 
 
 def test_resow_face_with_nothing_planted_has_nothing_pending():
@@ -223,13 +223,18 @@ def test_resow_face_with_nothing_planted_has_nothing_pending():
     assert s.actions_left == ActionsLeft(1, 1)
 
 
-def test_resow_can_move_moves_your_own_vineyard_to_a_legal_spot():
+def test_move_face_moves_your_own_vineyard_to_a_legal_spot():
     planted = (vineyard(NORTH_OF_A, "p1", Varietal.SYRAH), vineyard(NORTH_OF_B, "p2"))
-    s = rolled(state(board(planted=planted), preset=V3_MOVE), DieFace.RESOW)
+    s = rolled(state(board(planted=planted), preset=V3_MOVE), DieFace.MOVE)
+    assert debt(s) == 0 and s.pending_face is DieFace.MOVE
     uses = legal_actions(s, "p1")
     moves = [a for a in uses if isinstance(a, MoveVineyard)]
     assert moves == [MoveVineyard(NORTH_OF_A, to) for to in plantable_spots(s.board, "p1")]
-    assert ResowVineyard(NORTH_OF_B) in uses and uses[-1] == DeclineFace()
+    assert uses == (*moves, DeclineFace())  # no resow on the move face
+    with pytest.raises(IllegalAction):
+        apply(s, "p1", ResowVineyard(NORTH_OF_B), Rigged(Varietal.MALBEC))
+    declined = apply(s, "p1", DeclineFace(), Rigged())
+    assert declined.board == s.board and declined.pending_face is None
     after = apply(s, "p1", MoveVineyard(NORTH_OF_A, EAST_OF_C), Rigged())
     assert after.board.planted_at(NORTH_OF_A) is None
     assert after.board.planted_at(EAST_OF_C) == vineyard(EAST_OF_C, "p1", Varietal.SYRAH)
@@ -345,10 +350,14 @@ def test_v3_options_are_checked():
     with pytest.raises(ValueError, match="action_die bribe rules"):
         with_overrides(V3, bribe_rules=BribeRules.D6)
     with pytest.raises(ValueError, match="needs vertex planting"):
-        with_overrides(NORMAL, resow_can_move=True)
+        with_overrides(NORMAL, vertex_needs_three_canals=True)
+    with pytest.raises(ValueError, match="MOVE face needs vertex planting"):
+        with_overrides(NORMAL, action_die=V3_DIE_FACES)
     with pytest.raises(TypeError):
-        with_overrides(V3, resow_can_move=1)
-    assert NORMAL.resow_can_move is False
+        with_overrides(V3, vertex_needs_three_canals=1)
+    with pytest.raises(ValueError, match="unknown preset field"):
+        with_overrides(V3, resow_can_move=True)  # replaced by the move face (#160)
+    assert NORMAL.vertex_needs_three_canals is False
     assert NORMAL.is_season_round(3) and not V3.is_season_round(3)
 
 
@@ -364,10 +373,12 @@ def test_actions_left_is_checked():
         state(board(floodgates=(GATE,)), face=DieFace.RELEASE)
 
 
-def test_preset_values_write_resow_can_move_only_when_set():
-    assert "resow_can_move" not in _preset_values(NORMAL)
-    assert "resow_can_move" not in _preset_values(V3)
-    assert _preset_values(V3_MOVE)["resow_can_move"] is True
+def test_preset_values_write_vertex_needs_three_canals_only_when_set():
+    assert "vertex_needs_three_canals" not in _preset_values(NORMAL)
+    assert "vertex_needs_three_canals" not in _preset_values(V3)
+    three = with_overrides(V3, vertex_needs_three_canals=True)
+    assert _preset_values(three)["vertex_needs_three_canals"] is True
+    assert "move" in _preset_values(V3_MOVE)["action_die"]
 
 
 # --- Whole games ---------------------------------------------------------------

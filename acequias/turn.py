@@ -73,17 +73,20 @@ apart from the above. Only ``current_player`` acts, and the turn is:
 1. ``RollActionDie()``, mandatory (the only legal action while
    ``GameState.actions_left`` is None): one ``rng.choice(preset.action_die)``.
    Floodgate and release add ``Preset.action_die_cost`` (the bribe) to the
-   roller's debt, even when the face has no use; resow, good season, and
-   drought are free. The roll sets ``actions_left``: 2 actions with at most
-   1 canal after a good season, none after a drought, 1 otherwise. A
-   floodgate, release, or resow face with a use is left pending: floodgate
-   (``PlaceFloodgate`` from the die) and release (``Release``) are
-   mandatory, so ``DeclineFace`` is illegal for them; resow is optional:
-   ``ResowVineyard`` (one ``rng.choice(preset.roulette)``) on any planted
-   vineyard, ``MoveVineyard`` of one's own vineyard to a spot they may
-   plant on (with ``Preset.resow_can_move``; no draw), or ``DeclineFace``.
+   roller's debt, even when the face has no use; resow, move, good season,
+   and drought are free. The roll sets ``actions_left``: 2 actions with at
+   most 1 canal after a good season, none after a drought, 1 otherwise. A
+   floodgate, release, resow, or move face with a use is left pending:
+   floodgate (``PlaceFloodgate`` from the die) and release (``Release``)
+   are mandatory, so ``DeclineFace`` is illegal for them; resow and move
+   are optional: ``ResowVineyard`` (one ``rng.choice(preset.roulette)``)
+   on any planted vineyard, or ``MoveVineyard`` of one's own vineyard to a
+   spot they may plant on (the move face, #160; no draw), or
+   ``DeclineFace``.
 2. The actions: ``PlaceCanal`` (as above, from the market, no claims),
-   ``Plant`` on a spot of ``acequias.flow.plantable_spots`` (one
+   ``Plant`` on a spot of ``acequias.flow.plantable_spots`` (with
+   ``Preset.vertex_needs_three_canals``, only where all 3 hexes hold a
+   canal; one
    ``rng.choice(preset.roulette)``; under a ``grape_clusters_per_player``
    cap only while the player holds fewer vineyards), or ``Pass``, always
    legal, which ends the turn. A canal is illegal once ``canals`` is 0.
@@ -94,7 +97,7 @@ illegal, and ``Plant``, ``ResowVineyard``, and ``MoveVineyard`` are illegal
 under hex planting. ``legal_actions`` lists, for ``current_player`` only:
 ``RollActionDie()`` before the roll; a pending face's uses (floodgates and
 releases in edge order, then resows by vertex, then moves by vertex and
-target), then ``DeclineFace()`` for resow; otherwise canal placements,
+target), then ``DeclineFace()`` for resow and move; otherwise canal placements,
 plants by vertex, then ``Pass()``. ``acequias.game`` ends the turn once no
 face is pending and no action is left. Nothing here depends on the board's
 bounds or ``Board.spots``, so the turn also fits an open board.
@@ -265,7 +268,7 @@ class ResowVineyard:
 
 @dataclass(frozen=True)
 class MoveVineyard:
-    """Rules v3 resow face with ``resow_can_move``: move your vineyard on ``vertex`` to ``to``.
+    """Rules v3 move face: move your vineyard on ``vertex`` to ``to``.
 
     The vineyard keeps its varietal; ``to`` must be a spot you may plant on.
     """
@@ -788,11 +791,11 @@ def _v3_face_board(state: GameState, player: str, action: Action, preset: Preset
     elif face is DieFace.RESOW and isinstance(action, ResowVineyard):
         if board.planted_at(action.vertex) is None:
             raise IllegalAction(f"no vineyard is planted on {action.vertex}")
-    elif face is DieFace.RESOW and isinstance(action, MoveVineyard) and preset.resow_can_move:
+    elif face is DieFace.MOVE and isinstance(action, MoveVineyard):
         vineyard = board.planted_at(action.vertex)
         if vineyard is None or vineyard.owner != player:
             raise IllegalAction(f"{player} has no vineyard on {action.vertex} to move")
-        if not can_plant(board, player, action.to):
+        if not can_plant(board, player, action.to, preset.vertex_needs_three_canals):
             raise IllegalAction(f"{player} may not plant on {action.to}")
         rest = tuple(v for v in board.planted if v != vineyard)
         board = board._derive(planted=rest + (replace(vineyard, vertex=action.to),))
@@ -836,20 +839,20 @@ def _v3_board_after(state: GameState, player: str, action: Action) -> tuple[Boar
 def _v3_face_uses(board: Board, player: str, face: DieFace, preset: Preset) -> list[Action]:
     """Every use of a personal ``face`` for ``player`` under Rules v3, in ``legal_actions`` order."""
     if face is DieFace.RESOW:
-        uses: list[Action] = [ResowVineyard(v.vertex) for v in board.planted]
-        if preset.resow_can_move:
-            mine = [v.vertex for v in board.planted if v.owner == player]
-            spots = plantable_spots(board, player) if mine else ()
-            uses += [MoveVineyard(v, to) for v in mine for to in spots]
-        return uses
+        return [ResowVineyard(v.vertex) for v in board.planted]
+    if face is DieFace.MOVE:
+        mine = [v.vertex for v in board.planted if v.owner == player]
+        spots = plantable_spots(board, player, preset.vertex_needs_three_canals) if mine else ()
+        return [MoveVineyard(v, to) for v in mine for to in spots]
     return _face_uses(board, face)
 
 
 def _check_plant(state: GameState, player: str, vertex: Vertex, preset: Preset) -> None:
-    if not can_plant(state.board, player, vertex):
+    if not can_plant(state.board, player, vertex, preset.vertex_needs_three_canals):
+        extra = " and have a canal on each of its 3 hexes" if preset.vertex_needs_three_canals else ""
         raise IllegalAction(
             f"{player} may not plant on {vertex}: it must be free and touch one of "
-            "their own canals that carries water"
+            f"their own canals that carries water{extra}"
         )
     if not _below_cap(state, player, preset):
         raise IllegalAction(
@@ -878,7 +881,7 @@ def _legal_v3(state: GameState, player: str, preset: Preset) -> tuple[Action, ..
         return ()
     canals = _canal_placements(state) if left.canals else []
     plants = (
-        [Plant(v) for v in plantable_spots(state.board, player)]
+        [Plant(v) for v in plantable_spots(state.board, player, preset.vertex_needs_three_canals)]
         if _below_cap(state, player, preset)
         else []
     )

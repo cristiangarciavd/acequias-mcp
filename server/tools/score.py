@@ -142,9 +142,11 @@ def calculate_score(
     gets water_right_points (3 in the shipped presets). Every watered claimed
     vineyard is listed with the canal path its water takes and the rivals its
     claimant pays, so the water rights can be checked by hand. The state is scored as given, finished or not.
-    Rules v3 boards give their planted vineyards in planted (and a river strip in strip); a
-    vertex vineyard scores like a hex one, and a vertex touches a canal when the canal sits on
-    one of its 3 hexes, whatever its openings.
+    Rules v3 boards give their planted vineyards in planted (and a river strip in strip). A
+    vertex vineyard is scored split: its value is split in thirds among its 3 hexes, and each
+    third whose hex holds a canal carrying water scores for that canal's owner, whoever planted
+    it (value x thirds / 3, rounded down; no water rights). It is listed for every player with
+    a watered third, with planter, thirds and points; the bodega counts its varietal for them.
     """
     if strip is not None and hexes:
         raise ValueError("give hexes or strip, not both: a river strip board has no other hexes")

@@ -42,7 +42,7 @@ PolicyName = Literal[tuple(POLICIES)]  # type: ignore[valid-type]
 ActionName = Literal[
     "canal", "floodgate", "bribe", "pass", "die", "release", "resow", "decline", "plant", "move"
 ]
-DieFaceName = Literal["floodgate", "release", "resow", "good_season", "drought"]
+DieFaceName = Literal["floodgate", "release", "resow", "move", "good_season", "drought"]
 ScoreTermName = Literal[
     "vineyards", "bodega", "rights_paid", "rights_collected", "debt", "season", "drought", "total"
 ]

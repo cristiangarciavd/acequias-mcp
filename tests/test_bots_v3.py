@@ -24,6 +24,8 @@ from acequias import bots
 from acequias.bots import _Evaluator, greedy_bot, lookahead_bot, score_aware_bot
 from acequias.config import (
     NORMAL,
+    V3_DIE_FACES,
+    V3_POINTS,
     BoardShape,
     PlantingRules,
     with_overrides,
@@ -64,8 +66,8 @@ from server.schemas import WateredVineyardJSON, overrides_from_json
 
 pytestmark = pytest.mark.anyio
 
-V3 = with_overrides(NORMAL, planting=PlantingRules.VERTICES)
-V3_MOVE = with_overrides(V3, resow_can_move=True)
+V3 = with_overrides(NORMAL, planting=PlantingRules.VERTICES, varietal_points=V3_POINTS)
+V3_MOVE = with_overrides(V3, action_die=V3_DIE_FACES)
 STRIP = {
     "planting": PlantingRules.VERTICES,
     "board_shape": BoardShape.RIVER_STRIP,
@@ -136,11 +138,11 @@ def test_lookahead_plays_a_v3_strip_game_and_is_deterministic():
     assert any(isinstance(r.action, Plant) for r in first.log)
 
 
-def test_resow_can_move_is_handled_by_every_bot():
+def test_the_move_face_is_handled_by_every_bot():
     for policy in ("greedy", "score_aware", "lookahead"):
-        record = play_one(rules(policy, resow_can_move=True), 11)
-        assert any(isinstance(r.action, (ResowVineyard, MoveVineyard, DeclineFace))
-                   for r in record.log)
+        record = play_one(rules(policy, action_die=V3_DIE_FACES), 11)
+        assert any(r.face is DieFace.MOVE for r in record.log)
+        assert any(isinstance(r.action, (MoveVineyard, DeclineFace)) for r in record.log)
 
 
 def test_score_aware_beats_greedy_on_the_strip():
@@ -225,7 +227,12 @@ def _states(policy, extra, seed, every=1):
 
 
 @pytest.mark.parametrize("policy", ["random", "score_aware"])
-@pytest.mark.parametrize("extra", [STRIP, {**FIELD, "grape_clusters_per_player": 4}])
+@pytest.mark.parametrize("extra", [
+    STRIP,
+    {**FIELD, "grape_clusters_per_player": 4},
+    {**STRIP, "vertex_needs_three_canals": True, "varietal_points": V3_POINTS},
+    {**STRIP, "varietal_points": V3_POINTS, "action_die": V3_DIE_FACES},
+])
 def test_fast_canal_and_plant_values_equal_a_full_scoring(monkeypatch, extra, policy):
     checked = 0
     for s in _states(policy, extra, 2):
@@ -286,7 +293,7 @@ async def test_simulate_game_returns_v3_results_equal_to_the_library():
 async def test_simulate_game_v1_preset_json_has_no_v3_keys():
     async with Client(app) as client:
         result = await client.call_tool("simulate_game", {"mode": "flash", "players": 2, "games": 1, "seed": 1})
-    assert not {"planting", "board_shape", "bag_size", "resow_can_move", "river_hexes_per_segment"} & set(
+    assert not {"planting", "board_shape", "bag_size", "vertex_needs_three_canals", "river_hexes_per_segment"} & set(
         result.structured_content["preset"]
     )
 
@@ -365,7 +372,7 @@ def test_tune_v3_sweep_builds_valid_v3_presets():
     assert sweep.seatings == ("score_aware",)
     for mode in Mode:
         labels = [label for label, _ in sweep.candidates[mode]]
-        assert labels[0] == "base" and "resow can move" in labels
+        assert labels[0] == "base" and "move face" in labels
         for label, changes in sweep.candidates[mode]:
             job = tune.Job(label, mode, 2, "score_aware", {**sweep.base[mode], **changes}, 1, 1)
             p = with_overrides(shipped_preset(mode), **dict(tune.rules_of(job).overrides))
