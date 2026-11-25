@@ -100,6 +100,7 @@ from acequias.config import (
     PLAYER_COUNTS,
     Blend,
     BlendRule,
+    EndCondition,
     BodegaPlacement,
     BoardShape,
     BribeRules,
@@ -143,6 +144,7 @@ BribeRulesName = Literal["d6", "action_die"]
 PlantingName = Literal["hexes", "vertices"]
 BoardShapeName = Literal["field", "river_strip"]
 BlendRuleName = Literal["each_once", "disjoint"]
+EndConditionName = Literal["rounds", "bag_empty", "vineyards_out", "score_target"]
 BodegaPlacementName = Literal["new_spot", "replace"]
 DieFaceName = Literal["floodgate", "release", "resow", "move", "good_season", "drought"]
 ModeName = Literal["normal", "flash"]
@@ -162,6 +164,7 @@ _BRIBE_RULES_BY_NAME = {rules.value: rules for rules in BribeRules}
 _PLANTING_BY_NAME = {rules.value: rules for rules in PlantingRules}
 _BOARD_SHAPE_BY_NAME = {shape.value: shape for shape in BoardShape}
 _BLEND_RULE_BY_NAME = {rule.value: rule for rule in BlendRule}
+_END_CONDITION_BY_NAME = {end.value: end for end in EndCondition}
 _BODEGA_PLACEMENT_BY_NAME = {placement.value: placement for placement in BodegaPlacement}
 _FACE_BY_NAME = {face.value: face for face in DieFace}
 _KIND_BY_NAME = {kind.name.lower(): kind for kind in PieceKind if kind.is_canal}
@@ -663,6 +666,28 @@ _BRIBE_OPTIONAL_DESCRIPTION = (
     'Needs planting "vertices".'
 )
 
+_END_CONDITION_DESCRIPTION = (
+    'Rules v3 (#163): what ends the game: "rounds" (the round count, the default), "bag_empty" '
+    '(the bag and the market are empty), "vineyards_out" (a player has planted all their '
+    'vineyard_markers) or "score_target" (a player reaches score_target). A trigger that never '
+    'fires ends the game after twice the round count. Any but "rounds" needs planting "vertices".'
+)
+_FINISH_ROUND_DESCRIPTION = (
+    "Rules v3 (#163): true (the default) plays out the round in which the end condition fired, "
+    "so everyone has the same number of turns; false ends the game right after that turn."
+)
+_MARKERS_DESCRIPTION = (
+    'Rules v3 (#163): vineyard markers per player for "vineyards_out", keyed "2" to "5"; a '
+    "player count not given uses the default (Normal 6 / 9 / 7 / 6, Flash 3)."
+)
+_SCORE_TARGET_DESCRIPTION = (
+    'Rules v3 (#163): the target score for "score_target", keyed "2" to "5"; a player count not '
+    "given uses the default (Normal 30 / 51 / 43 / 37, Flash 14)."
+)
+_UNLIMITED_BAG_DESCRIPTION = (
+    "Rules v3 (#163): whether the bag never runs out (each piece drawn goes back to its bottom)."
+)
+
 
 class BlendJSON(BaseModel):
     """One blend (corte) of the Rules v3 blend table (#166)."""
@@ -771,6 +796,23 @@ class PresetJSON(BaseModel):
     bribe_optional: bool | None = Field(
         default=None, exclude_if=_is_none,
         description=_BRIBE_OPTIONAL_DESCRIPTION + " Left out when false.",
+    )
+    # End of game options (#163), left out of simulate_game's JSON at their defaults.
+    end_condition: EndConditionName | None = Field(
+        default=None, exclude_if=_is_none,
+        description=_END_CONDITION_DESCRIPTION + ' Left out when "rounds".',
+    )
+    finish_round: bool | None = Field(
+        default=None, exclude_if=_is_none, description=_FINISH_ROUND_DESCRIPTION + " Left out when true."
+    )
+    vineyard_markers: dict[PlayerCountName, int] | None = Field(
+        default=None, exclude_if=_is_none, description=_MARKERS_DESCRIPTION + " Left out when {}."
+    )
+    score_target: dict[PlayerCountName, int] | None = Field(
+        default=None, exclude_if=_is_none, description=_SCORE_TARGET_DESCRIPTION + " Left out when {}."
+    )
+    unlimited_bag: bool | None = Field(
+        default=None, exclude_if=_is_none, description=_UNLIMITED_BAG_DESCRIPTION + " Left out when false."
     )
 
 
@@ -895,6 +937,17 @@ class PresetOverridesJSON(TypedDict, total=False):
         Field(description=_BODEGAS_PER_PLAYER_DESCRIPTION + " An int is 1 or more."),
     ]
     bribe_optional: Annotated[StrictBool, Field(description=_BRIBE_OPTIONAL_DESCRIPTION)]
+    end_condition: Annotated[EndConditionName, Field(description=_END_CONDITION_DESCRIPTION)]
+    finish_round: Annotated[StrictBool, Field(description=_FINISH_ROUND_DESCRIPTION)]
+    vineyard_markers: Annotated[
+        dict[PlayerCountName, StrictInt],
+        Field(description=_MARKERS_DESCRIPTION + " Each value is 1 or more."),
+    ]
+    score_target: Annotated[
+        dict[PlayerCountName, StrictInt],
+        Field(description=_SCORE_TARGET_DESCRIPTION + " Each value is 1 or more."),
+    ]
+    unlimited_bag: Annotated[StrictBool, Field(description=_UNLIMITED_BAG_DESCRIPTION)]
 
 
 def _blend_from_json(item: object) -> Blend:
@@ -948,6 +1001,16 @@ def overrides_from_json(overrides: Mapping[str, Any]) -> dict[str, Any]:
             _lookup("bag_size key", key, _PLAYER_COUNT_BY_NAME): value
             for key, value in changes["bag_size"].items()
         }
+    for name in ("vineyard_markers", "score_target"):
+        if isinstance(changes.get(name), Mapping):
+            changes[name] = {
+                _lookup(f"{name} key", key, _PLAYER_COUNT_BY_NAME): value
+                for key, value in changes[name].items()
+            }
+    if "end_condition" in changes:
+        changes["end_condition"] = _lookup(
+            "end_condition", changes["end_condition"], _END_CONDITION_BY_NAME
+        )
     if "board_shape" in changes:
         changes["board_shape"] = _lookup(
             "board_shape", changes["board_shape"], _BOARD_SHAPE_BY_NAME

@@ -7,6 +7,7 @@ import pytest
 from acequias import config
 from acequias.config import (
     BlendRule,
+    EndCondition,
     BodegaPlacement,
     BoardShape,
     PlantingRules,
@@ -114,6 +115,11 @@ V3_SCORING_DEFAULTS = dict(
     bodega_building_points=12,
     bodegas_per_player=1,
     bribe_optional=False,  # #168
+    end_condition=EndCondition.ROUNDS,  # #163
+    finish_round=True,
+    vineyard_markers={},
+    score_target={},
+    unlimited_bag=False,
 )
 
 # Rules v2, approved by the owner on #103 and shipped in #126.

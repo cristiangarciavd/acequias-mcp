@@ -1273,3 +1273,13 @@ Flash (2p / 3p): any vertex 0.10-0.14 / 0.14-0.25, about 3.3 vineyards per playe
 - Bag size (16/20/24) and river hexes (5/6) change nothing measurable: keep bag 16 and 5 river hexes per segment.
 - Winning scores (any vertex) are about 30 / 51 / 43 / 37 in Normal 2-5p and 14 in Flash: the reference for a `score_target` end (#163), before blends and bodega buildings (#166) raise them.
 - Floodgates: about 3 placed per game at 2p and 8 at 3-5p; the most on the table at once averages 2-4, with a maximum of 9-19 in a game. A physical supply of 12-15 floodgates is enough for nearly all games; to recheck once floodgates become optional (#168).
+
+## Rules v3 seat bias and end conditions (#163)
+
+Sweep `v3end`, `score_aware`, 500 games per row, seed 163001, around `v3_best_base` (the best #160/#166/#168 setup in `scripts/tune.py`): `uv run python scripts/tune.py --sweep v3end`. Rows: the base; seats rotated and shuffled per game; an unlimited bag; `bag_empty`, `vineyards_out` (default markers 6 / 9 / 7 / 6, Flash 3) and `score_target` (#160's winning scores x1 / x1.5 / x2), each with `finish_round` on and off. Games whose trigger never fires end after twice the shipped rounds, and the table reports their share.
+
+Status: the full run is for an overnight run on request; the numbers and the verdict (which option removes the seat bias, which end condition keeps the length near today's) go here then. A 10-game smoke run (Flash 2p) only checks the runner, but it already shows three things that do not depend on the sample:
+
+- The river strip has no segment owned by a seat, and the bots are the same in every seat, so rotating or shuffling the seats plays the same games by position (identical rows by position, different by seat). The bias follows the turn position, not the seat; the seat rows are a control.
+- The bag rarely runs out: a 4p Normal game of the base left 41 of 64 pieces in the bag after 12 rounds, so `bag_empty` mostly ends by the cap and the unlimited bag is expected to change little.
+- Flash with 3 vineyard markers never builds a bodega (2 reds + 2 whites need 4 vineyards), so `vineyards_out` needs more Flash markers if the building stays.

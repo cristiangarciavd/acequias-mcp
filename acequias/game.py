@@ -20,6 +20,14 @@ then the round's start player takes their turn. ``next_season_roll``
 says when the next season roll is due and who makes it. The game ends after the preset's round
 count: the state after the last turn has ``round == rounds + 1``.
 
+End conditions (#163, opt-in, ``Preset.end_condition``): when a turn ends
+(``_next_turn``) and the preset's trigger holds (the bag and the market are
+empty, a player has planted all their vineyard markers, or a player's
+total reaches the target), ``GameState.end_triggered`` records the round.
+With ``Preset.finish_round`` the round is played out and the game ends
+after it; without, the game ends at once, after that turn. A game whose
+trigger never fires ends after ``Preset.round_cap`` rounds.
+
 Under Rules v3 (vertex planting) a turn is the mandatory roll, the
 face's use if one is pending, then the player's actions (one, two after a
 good season, none after a drought) or a pass; the turn moves on once no
@@ -41,7 +49,7 @@ import random
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, replace
 
-from acequias.config import PlantingRules
+from acequias.config import EndCondition, PlantingRules
 from acequias.config import preset as shipped_preset
 from acequias.model import DieFace, GameState, SeasonRoll
 from acequias.turn import Action, RollActionDie, apply, roll_face
@@ -52,6 +60,7 @@ __all__ = [
     "turn_order",
     "act",
     "game_over",
+    "end_fired",
     "play_game",
     "replay",
     "game_rngs",
@@ -79,10 +88,11 @@ class TurnRecord:
 
 
 def _round_count(state: GameState) -> int:
-    """The game's round count, from its preset (the shipped one when ``state.preset`` is None)."""
+    """The game's last possible round, from its preset (the shipped one when ``state.preset`` is
+    None): the round count, or the cap under an end condition (``Preset.round_cap``)."""
     _check_state(state)
     p = state.preset or shipped_preset(state.mode)
-    return p.rounds_for(len(state.players))
+    return p.round_cap(len(state.players))
 
 
 def turn_order(state: GameState, round: int) -> tuple[str, ...]:
@@ -103,8 +113,42 @@ def turn_order(state: GameState, round: int) -> tuple[str, ...]:
 
 
 def game_over(state: GameState) -> bool:
-    """Whether every round has been played: ``state.round`` is past the round count."""
-    return state.round > _round_count(state)
+    """Whether the game is over: ``state.round`` is past the round count (the cap under an end
+    condition), or the end condition fired (``GameState.end_triggered``) and, with
+    ``Preset.finish_round``, its round is over."""
+    if state.round > _round_count(state):
+        return True
+    fired = state.end_triggered
+    if fired is None:
+        return False
+    p = state.preset or shipped_preset(state.mode)
+    return not p.finish_round or state.round > fired
+
+
+def end_fired(state: GameState) -> bool:
+    """Whether the preset's end condition (#163) holds on ``state``; always False under ``ROUNDS``.
+
+    ``BAG_EMPTY``: the bag and the market are empty. ``VINEYARDS_OUT``: a player
+    holds ``Preset.markers_for`` vineyards. ``SCORE_TARGET``: a player's total
+    (``calculate_score``) is at least ``Preset.target_for``.
+    """
+    p = state.preset or shipped_preset(state.mode)
+    end = p.end_condition
+    if end is EndCondition.ROUNDS:
+        return False
+    players = len(state.players)
+    if end is EndCondition.BAG_EMPTY:
+        return not state.bag and not state.market
+    if end is EndCondition.VINEYARDS_OUT:
+        markers = p.markers_for(players)
+        held = {}
+        for v in state.board.planted:
+            held[v.owner] = held.get(v.owner, 0) + 1
+        return any(n >= markers for n in held.values())
+    from acequias.scoring import calculate_score  # local: scoring is heavy and only needed here
+
+    target = p.target_for(players)
+    return any(s.total >= target for s in calculate_score(state).values())
 
 
 def act(state: GameState, player: str, action: Action, rng: random.Random) -> GameState:
@@ -122,6 +166,8 @@ def act(state: GameState, player: str, action: Action, rng: random.Random) -> Ga
     the season die's holder (``season_holder``) as ``current_player``.
     """
     if game_over(state):
+        if state.end_triggered is not None:
+            raise ValueError(f"the game is over: its end condition fired in round {state.end_triggered}")
         raise ValueError(f"the game is over: all {_round_count(state)} rounds have been played")
     if player != state.current_player:
         raise ValueError(f"it is {state.current_player}'s turn, not {player!r}'s")
@@ -140,6 +186,10 @@ def _next_turn(state: GameState, after: GameState, player: str) -> GameState:
         if after.actions_left is None or after.actions_left.actions > 0:
             return after
         after = replace(after, actions_left=None)
+    if after.end_triggered is None and end_fired(after):
+        after = replace(after, end_triggered=state.round)
+        if not p.finish_round:
+            return after
     if state.season_roll is not None:  # the season roll is done: the start player's turn
         return replace(after, current_player=after.start_player)
 

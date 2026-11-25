@@ -850,6 +850,10 @@ class GameState:
     ``actions_left`` is set only under vertex planting (Rules v3): ``None``
     while ``current_player`` has not rolled the action die this turn,
     otherwise what they may still do (``ActionsLeft``).
+
+    ``end_triggered`` is the round in which the preset's end condition
+    fired (``Preset.end_condition``, #163), ``None`` until then and always
+    under the round count end; ``acequias.game.game_over`` reads it.
     """
 
     board: Board
@@ -864,9 +868,14 @@ class GameState:
     pending_face: DieFace | None = None
     season_roll: SeasonRoll | None = None
     actions_left: ActionsLeft | None = None
+    end_triggered: int | None = None
 
     def __post_init__(self) -> None:
         _check_type("GameState.board", self.board, Board)
+        if self.end_triggered is not None:
+            _check_int("GameState.end_triggered", self.end_triggered)
+            if self.end_triggered < 1:
+                raise ValueError(f"end_triggered must be at least 1, got {self.end_triggered}")
         players = _items("GameState.players", self.players, Player)
         _check_type("GameState.mode", self.mode, Mode)
         _check_int("GameState.round", self.round)
