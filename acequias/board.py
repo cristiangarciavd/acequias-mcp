@@ -22,6 +22,9 @@ blank (no varietal), and are planted when claimed.
 Under vertex planting (Rules v3, ``PlantingRules.VERTICES``) no vineyard
 tiles are placed: the board's ``spots`` are every vertex that touches at
 least one non-river tile (``planting_spots``).
+Under the river strip board (Rules v3, ``BoardShape.RIVER_STRIP``) the
+board is only the river (``river_strip``): no stones, no vineyards, and an
+open table to the east; it does not depend on the seed.
 All randomness comes from one ``random.Random(seed)``, and every choice is
 made over lists in a fixed order, so the result never depends on hash order.
 """
@@ -30,14 +33,20 @@ from __future__ import annotations
 
 import random
 from collections.abc import Sequence
+from fractions import Fraction
 
-from acequias.config import PlantingRules, Preset, VarietalRules, _ceil_share
+from acequias.config import BoardShape, PlantingRules, Preset, VarietalRules, _ceil_share
 from acequias.config import preset as shipped_preset
 from acequias.hex import Direction, Hex, Vertex
-from acequias.model import Board, Mode, Terrain, Tile, Varietal
+from acequias.model import Board, Mode, RiverStrip, Terrain, Tile, Varietal
 
 # How many layouts the generator tries before it gives up on a preset.
 MAX_ATTEMPTS = 200
+
+RIVER_BEND = Fraction(1)
+"""How far east, in hex widths, the river strip's two ends sit from its
+middle: a slight inward curve (toward the table), the same for every
+player count, so a longer strip is flatter (owner, #150)."""
 
 
 def generate_board(
@@ -79,6 +88,10 @@ def generate_board(
             f"only {candidates} hexes are at that distance from the river"
         )
 
+    if preset.board_shape is BoardShape.RIVER_STRIP:
+        strip = river_strip(players, preset.river_hexes_per_segment)
+        return Board(tiles=tuple(Tile(h, Terrain.RIVER) for h in strip.river), strip=strip)
+
     rng = random.Random(seed)
     for _ in range(MAX_ATTEMPTS):
         tiles = _layout(rng, players, hexes, vineyards, stones, preset)
@@ -92,6 +105,43 @@ def generate_board(
         f"vineyards_per_player={preset.vineyards_per_player}, "
         f"stone_share={preset.stone_share}, vineyard_distance={preset.vineyard_distance}"
     )
+
+
+def river_strip(players: int, hexes_per_segment: int) -> RiverStrip:
+    """The river strip for ``players`` players: one segment for 2, one more per extra player.
+
+    Each segment has ``hexes_per_segment`` river hexes, one per row from
+    row 0 southward. The river bends slightly inward: its column follows a
+    parabola whose ends are ``RIVER_BEND`` hex widths east of its middle,
+    so the bend flattens as the strip gets longer. Each row the river steps
+    half a hex east or west (south-east or south-west), whichever lands
+    nearer the curve (west on a tie), so it stays one chain of hexes and
+    its east side keeps the hex outline. Deterministic: no seed.
+    """
+    _check_int("players", players)
+    _check_int("hexes_per_segment", hexes_per_segment)
+    if players < 2:
+        raise ValueError(f"players must be at least 2, got {players}")
+    if hexes_per_segment < 1:
+        raise ValueError(f"hexes_per_segment must be at least 1, got {hexes_per_segment}")
+    rows = (players - 1) * hexes_per_segment
+    middle = Fraction(rows - 1, 2)
+
+    def curve(r: int) -> Fraction:
+        # x of the row's river hex, in hex widths (x = q + r / 2).
+        return RIVER_BEND * ((r - middle) / middle) ** 2 if middle else Fraction(0)
+
+    half = Fraction(1, 2)
+    x = Fraction(round(curve(0)))
+    river = [Hex(int(x), 0)]
+    for r in range(1, rows):
+        east, west = x + half, x - half
+        x = east if abs(east - curve(r)) < abs(west - curve(r)) else west
+        river.append(Hex(int(x - Fraction(r, 2)), r))
+    segments = tuple(
+        tuple(river[i : i + hexes_per_segment]) for i in range(0, rows, hexes_per_segment)
+    )
+    return RiverStrip(segments)
 
 
 def planting_spots(tiles: Sequence[Tile]) -> tuple[Vertex, ...]:
