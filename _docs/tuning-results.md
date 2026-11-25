@@ -1274,6 +1274,32 @@ Flash (2p / 3p): any vertex 0.10-0.14 / 0.14-0.25, about 3.3 vineyards per playe
 - Winning scores (any vertex) are about 30 / 51 / 43 / 37 in Normal 2-5p and 14 in Flash: the reference for a `score_target` end (#163), before blends and bodega buildings (#166) raise them.
 - Floodgates: about 3 placed per game at 2p and 8 at 3-5p; the most on the table at once averages 2-4, with a maximum of 9-19 in a game. A physical supply of 12-15 floodgates is enough for nearly all games; to recheck once floodgates become optional (#168).
 
+## Rules v3 cortes and bodega building (#166)
+
+Sweep `v3blends`, `score_aware`, 500 games per row, raw output `output/tuning-166/v3blends.md` (4.2 h at 4 workers). Base: the `v3split` best setup (any-vertex planting, move die, 5 river hexes, bag 16). Candidates: the old bodega bonus, cortes `each_once` or `disjoint`, and cortes `each_once` plus the bodega building (12 or 15 points, 2 reds + 2 or 1 whites), each at points x0.5 / x1 / x1.5.
+
+Normal, x1 (advantage at 2p / 3p / 4p / 5p; winning score at 4p):
+
+| Candidate | Advantage | Win 4p | Requirement met 3p / 4p | Builders 4p |
+| --- | --- | --- | --- | --- |
+| old bodega 6 | 0.012 / 0.211 / 0.292 / 0.403 | 44.0 | - | - |
+| cortes each_once | 0.026 / 0.160 / 0.444 / 0.525 | 36.9 | - | - |
+| cortes disjoint | 0.028 / 0.223 / 0.348 / 0.575 | 29.2 | - | - |
+| + building 12, 2R + 2W | 0.014 / 0.125 / 0.388 / 0.550 | 37.9 | 0.64 / 0.45 | 0.17 |
+| + building 12, 2R + 1W | 0.020 / 0.142 / 0.468 / 0.558 | 38.4 | 0.97 / 0.93 | 0.43 |
+| + building 15, 2R + 2W | 0.008 / 0.218 / 0.373 / 0.515 | 38.7 | 0.63 / 0.45 | 0.17 |
+| + building 15, 2R + 1W | 0.036 / 0.166 / 0.544 / 0.450 | 40.7 | 0.97 / 0.92 | 0.43 |
+
+Flash, x1, building 12: the requirement is met by 7% of players with 2 whites and 44% with 1 white (about a quarter build).
+
+- Seat bias: no candidate fixes 4-5p; every row is above 0.2 there, with a 95% margin of ±0.15 to ±0.18. Differences between candidates at 4-5p are within noise. 2p passes everywhere and 3p is near the line
+- Requirement: 2 reds + 2 whites is met too rarely (45% at 4p, 7% in Flash), so the requirement drops to 2 reds + 1 white, as the owner allowed. The bodega is then reachable for nearly every player in Normal
+- Cortes: `each_once` scores about twice `disjoint` (8.7 vs 4.6 points per player at 4p) and keeps the most common cortes alive; `each_once` stays
+- Building points: 12 and 15 are within noise; 12 keeps the building one of several goals rather than the main one
+- Points x1.5 inflates winning scores (49 at 4p) without changing bias; x1 stays
+
+Decision: `v3_best_base` moves to cortes `each_once` x1 plus the bodega building at 12 points with 2 reds + 1 white. The sweeps `v3bribe` (#168) and `v3end` (#163) run on it. The shipped presets are unchanged.
+
 ## Rules v3 seat bias and end conditions (#163)
 
 Sweep `v3end`, `score_aware`, 500 games per row, seed 163001, around `v3_best_base` (the best #160/#166/#168 setup in `scripts/tune.py`): `uv run python scripts/tune.py --sweep v3end`. Rows: the base; seats rotated and shuffled per game; an unlimited bag; `bag_empty`, `vineyards_out` (default markers 6 / 9 / 7 / 6, Flash 3) and `score_target` (#160's winning scores x1 / x1.5 / x2), each with `finish_round` on and off. Games whose trigger never fires end after twice the shipped rounds, and the table reports their share.

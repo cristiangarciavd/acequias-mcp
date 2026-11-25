@@ -968,7 +968,7 @@ def v3_best_base(mode: Mode) -> dict[str, object]:
     strip at ``V3SPLIT_RIVER_HEXES[0]`` river hexes per segment and bag ``V3SPLIT_BAG_PER_PLAYER[0]``
     per player, split scoring, any-vertex planting, the move die, ``each_once`` blends
     (``DEFAULT_BLENDS``) with the old bodega bonus off, and the bodega building (a new spot,
-    ``V3BLENDS_BUILDING_POINTS[0]`` points, ``V3BLENDS_REDS`` reds + ``V3BLENDS_WHITES[0]`` whites)."""
+    ``V3BLENDS_BUILDING_POINTS[0]`` points, ``V3BLENDS_REDS`` reds + ``V3BLENDS_WHITES[1]`` whites)."""
     return {
         **strip_overrides(mode, V3SPLIT_RIVER_HEXES[0], V3SPLIT_BAG_PER_PLAYER[0]),
         "varietal_points": V3_SPLIT_POINTS,
@@ -981,7 +981,7 @@ def v3_best_base(mode: Mode) -> dict[str, object]:
         "bodega_placement": BodegaPlacement.NEW_SPOT,
         "bodega_building_points": V3BLENDS_BUILDING_POINTS[0],
         "bodega_min_reds": V3BLENDS_REDS,
-        "bodega_min_whites": V3BLENDS_WHITES[0],
+        "bodega_min_whites": V3BLENDS_WHITES[1],  # 1 white: #166 tuning
     }
 
 
