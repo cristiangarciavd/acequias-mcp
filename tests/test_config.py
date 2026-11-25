@@ -1,4 +1,4 @@
-﻿import ast
+import ast
 import dataclasses
 from pathlib import Path
 
