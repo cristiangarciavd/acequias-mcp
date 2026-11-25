@@ -1249,3 +1249,27 @@ At 2p, 3p and Flash (500 games), every candidate stays near the base: 2p 0.02-0.
 - At 4p and 5p the advantage is structural. Seat 2 leads at 4p and seat 3 at 5p, and the last seat trails (0.20 at 4p, 0.13 at 5p). No single value fixes it: die cost, varietal points, bodega points, resow moving a vineyard, river hexes and bag size leave the pattern in place.
 - Only the round count moves the pattern, and it does so non-monotonically (rounds -2 and +2 both favour seat 0), so a round count alone is not a fix. The cause needs a diagnosis (seat-to-segment layout, bag exhaustion near the end, or the final turns) before more tuning.
 - Verdict: no value change is proposed yet. The base (5 river hexes, bag 16, Rules v2 values) stays the reference for 2-3p and Flash; 4-5p wait for the diagnosis.
+
+## Rules v3 split scoring (#160)
+
+Sweep `v3split`, `score_aware`, 500 games per row, raw output `output/tuning-160/v3split.md` (4.5 h at 4 workers). Four setups: planting on any vertex or only between three canals (`vertex_needs_three_canals`), x the new die with Move or the old die (two Resow faces). Each has a base (5 river hexes, bag 16, bodega 6 / 3 Flash, shipped rounds) and one value changed at a time.
+
+### Base rows
+
+| Setup | Advantage 2p / 3p / 4p / 5p (± 0.09 / 0.12 / 0.15 / 0.18) | Planted per player 2p / 3p / 4p / 5p | Winning score 2p / 3p / 4p / 5p | Bodega rate 2p / 3p / 4p / 5p |
+| --- | --- | --- | --- | --- |
+| any vertex, Move die | 0.102 / 0.193 / **0.392** / **0.525** | 6.2 / 9.5 / 7.1 / 5.8 | 30 / 51 / 43 / 37 | 0.87 / 0.98 / 0.98 / 0.97 |
+| any vertex, old die | 0.008 / 0.065 / **0.336** / **0.620** | 6.3 / 9.7 / 7.3 / 5.8 | 32 / 53 / 45 / 37 | 0.89 / 0.97 / 0.98 / 0.97 |
+| 3 canals, Move die | 0.044 / 0.038 / **0.267** / **0.265** | 2.4 / 4.6 / 4.0 / 3.2 | 16 / 34 / 34 / 29 | 0.52 / 0.84 / 0.91 / 0.87 |
+| 3 canals, old die | 0.058 / 0.145 / **0.202** / **0.320** | 2.4 / 4.6 / 4.0 / 3.2 | 16 / 33 / 33 / 29 | 0.52 / 0.82 / 0.91 / 0.84 |
+
+Flash (2p / 3p): any vertex 0.10-0.14 / 0.14-0.25, about 3.3 vineyards per player, winning score about 14, bodega rate 0.65-0.72. Three canals leaves Flash with about 1.1 vineyards per player and a bodega rate under 0.25.
+
+### Findings
+
+- Split scoring keeps 2-3p near the target and leaves the 4-5p seat bias in place (0.34-0.62 on any vertex). No single value fixes it: bag 20/24, 6 river hexes, bodega 3/9 and rounds -2/+2 all stay above 0.2 at 4-5p. The diagnosis moves to #163.
+- Three canals lowers the 4-5p advantage (0.20-0.32) but halves planting (about 4 vineyards per player in Normal, 1 in Flash) and halves winning scores. It makes Flash unplayable. Verdict: keep planting on any vertex.
+- The Move die and the old die are within the margin of each other. Keep the Move die (owner's choice).
+- Bag size (16/20/24) and river hexes (5/6) change nothing measurable: keep bag 16 and 5 river hexes per segment.
+- Winning scores (any vertex) are about 30 / 51 / 43 / 37 in Normal 2-5p and 14 in Flash: the reference for a `score_target` end (#163), before blends and bodega buildings (#166) raise them.
+- Floodgates: about 3 placed per game at 2p and 8 at 3-5p; the most on the table at once averages 2-4, with a maximum of 9-19 in a game. A physical supply of 12-15 floodgates is enough for nearly all games; to recheck once floodgates become optional (#168).
