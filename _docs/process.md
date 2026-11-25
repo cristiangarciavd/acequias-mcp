@@ -3,6 +3,10 @@
 ## Roles
 
 - PM - grooms a task before anyone implements it, follows `_docs/team/pm.md`
+- Engineer - implements one groomed task, follows `_docs/team/software-engineer.md`
+- QA - checks the result against the acceptance criteria, follows `_docs/team/qa-engineer.md`
+- Researcher - finds and checks facts and sources for docs and design, follows
+  `_docs/team/researcher.md`
 
 ## Tasks
 
@@ -38,3 +42,36 @@
 - A pull request is merged only when CI is green
 - Documentation changes not tied to the task go on their own branch and PR
   (step 6), never mixed into the task's PR
+
+## Orchestrator
+
+The main session is the orchestrator. It launches the PM, the engineer
+and QA as subagents. It does not groom, implement or test itself.
+
+## Lifecycle
+
+1. Pick the next open issue from the backlog
+2. PM grooms it
+3. Engineer implements it
+4. QA verifies it
+5. On FAIL, back to step 3 with the QA comment as input
+6. On PASS, close the issue
+7. Repeat until the backlog is empty
+
+## Rules
+
+- Do not skip step 2
+- The engineer does not close the issue
+- QA does not fix the code, only outputs PASS or FAIL
+- The orchestrator closes the issue only after QA outputs PASS
+
+## Keeping the PM fast
+
+- The PM grooms in one pass: it rewrites the issue and files follow-ups,
+  with no back-and-forth unless a decision is genuinely the owner's
+- The PM runs on a lighter, faster model than the engineer, with a short
+  prompt that points at the issue and the documents it needs
+- The orchestrator grooms the next issue while the current one is being
+  implemented or simulated, and may groom several issues in one PM run
+- A research task follows the same lifecycle with the Researcher in place
+  of the engineer
