@@ -282,3 +282,12 @@ def test_v3end_sweep_rows_and_base():
         assert labels[:4] == ["base", "seats rotated", "seats shuffled", "unlimited bag"]
         assert len(labels) == 4 + 2 * (2 + len(tune.V3END_TARGET_FACTORS))
         assert all(tune.is_v3end({**sweep.base[mode], **c}) for _, c in sweep.candidates[mode])
+
+
+def test_verdict_compares_the_displayed_advantage():
+    tune = _tune()
+    (sweep,) = tune.v3end_sweeps()
+    jobs = tune.sweep_jobs(sweep, [Mode.FLASH], 1, [2])[:2]
+    outcomes = [tune.Outcome("ok", data={"turn_order_advantage": x, "end_stats": {"trace": {}}}) for x in (0.19999999, 0.1994)]
+    line = tune.end_report(list(zip(jobs, outcomes)))[0]
+    assert f"`{jobs[1].label}`" in line and f"`{jobs[0].label}`" not in line

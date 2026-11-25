@@ -1830,7 +1830,8 @@ def end_report(rows: list[tuple[Job, Outcome]]) -> list[str]:
     counts = sorted({job.players for job, _ in rows})
     for players in counts:
         mine = [(j, o) for j, o in rows if j.players == players and o.data is not None]
-        under = [j.label for j, o in mine if o.data["turn_order_advantage"] < ADVANTAGE_BIAS_LIMIT]
+        # Compared as displayed (3 decimals), so a row shown as 0.200 is not listed.
+        under = [j.label for j, o in mine if round(o.data["turn_order_advantage"], 3) < ADVANTAGE_BIAS_LIMIT]
         lines.append(f"- {players}p: advantage under {ADVANTAGE_BIAS_LIMIT} with "
                      + (", ".join(f"`{label}`" for label in under) if under else "no option"))
     lines.append("")
