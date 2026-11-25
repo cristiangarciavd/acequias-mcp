@@ -50,7 +50,9 @@ varietal names, `grape_clusters_per_player` as an int or null (no cap),
 `bribe_rules` by value, `action_die` as a list of face values,
 `season_points`, `drought_points` and `season_roll_every` as an int or null,
 `planting` by value (`"hexes"` or `"vertices"`; left out of `simulate_game`'s
-JSON when `"hexes"`),
+JSON when `"hexes"`), `board_shape` by value (`"field"` or `"river_strip"`),
+`river_hexes_per_segment` as an int, and `bag_size` keyed by player count as a
+string (all three left out of `simulate_game`'s JSON at their defaults),
 `multiple_bodegas` and `season_roll_personal_faces` as bools, `seat_bonus`
 keyed by player count as a string with a list of ints each, the rest as ints. `overrides_from_json` turns those keys
 back into `int`, `PieceKind`, and `Varietal`, the names into `VarietalRules`,
@@ -90,6 +92,7 @@ from typing_extensions import TypedDict
 from acequias.assembly import AssemblyStep
 from acequias.config import (
     PLAYER_COUNTS,
+    BoardShape,
     BribeRules,
     PlantingRules,
     VarietalRules,
@@ -107,6 +110,7 @@ from acequias.model import (
     PlacedCanal,
     PlantedVineyard,
     Player,
+    RiverStrip,
     Terrain,
     Tile,
     Varietal,
@@ -127,6 +131,7 @@ VarietalName = Literal[
 VarietalRulesName = Literal["fixed", "roulette"]
 BribeRulesName = Literal["d6", "action_die"]
 PlantingName = Literal["hexes", "vertices"]
+BoardShapeName = Literal["field", "river_strip"]
 DieFaceName = Literal["floodgate", "release", "resow", "good_season", "drought"]
 ModeName = Literal["normal", "flash"]
 KindName = Literal["straight", "gentle_curve", "sharp_curve", "symmetric_y", "t_branch", "claw"]
@@ -143,6 +148,7 @@ _MODE_BY_NAME = {mode.value: mode for mode in Mode}
 _RULES_BY_NAME = {rules.value: rules for rules in VarietalRules}
 _BRIBE_RULES_BY_NAME = {rules.value: rules for rules in BribeRules}
 _PLANTING_BY_NAME = {rules.value: rules for rules in PlantingRules}
+_BOARD_SHAPE_BY_NAME = {shape.value: shape for shape in BoardShape}
 _FACE_BY_NAME = {face.value: face for face in DieFace}
 _KIND_BY_NAME = {kind.name.lower(): kind for kind in PieceKind if kind.is_canal}
 _DIRECTION_BY_NAME = {direction.name: direction for direction in Direction}
@@ -448,6 +454,17 @@ _PLANTING_DESCRIPTION = (
     "(Rules v3, opt-in: no vineyard tiles; vineyards are planted on hex vertices next "
     "to the planter's own watered canal). \"vertices\" needs varietal_rules \"roulette\"."
 )
+_BOARD_SHAPE_DESCRIPTION = (
+    'What the board is: "field" (the generated hex board, the shipped game) or "river_strip" '
+    "(Rules v3, opt-in: only a river strip, a base segment for 2 players plus one per extra "
+    'player, with an open table east of it; no stones). "river_strip" needs planting '
+    '"vertices" and a bag_size for every player count.'
+)
+_RIVER_HEXES_DESCRIPTION = "River hexes in each segment of the river strip board (default 5)."
+_BAG_SIZE_DESCRIPTION = (
+    'Pieces in the bag (market included) per player count, keyed "2" to "5". A player count '
+    "not given gets one piece per empty hex of the board; {} is off."
+)
 _RESOW_CAN_MOVE_DESCRIPTION = (
     'Rules v3 only (planting "vertices"): whether the resow face may instead move one of the '
     "roller's vineyards to another spot they may plant on. false by default; left out of "
@@ -584,6 +601,14 @@ class PresetOverridesJSON(TypedDict, total=False):
     ]
     planting: Annotated[PlantingName, Field(description=_PLANTING_DESCRIPTION)]
     resow_can_move: Annotated[StrictBool, Field(description=_RESOW_CAN_MOVE_DESCRIPTION)]
+    board_shape: Annotated[BoardShapeName, Field(description=_BOARD_SHAPE_DESCRIPTION)]
+    river_hexes_per_segment: Annotated[
+        StrictInt, Field(description=_RIVER_HEXES_DESCRIPTION + " 1 or more.")
+    ]
+    bag_size: Annotated[
+        dict[PlayerCountName, StrictInt],
+        Field(description=_BAG_SIZE_DESCRIPTION + " Each value is 1 or more."),
+    ]
 
 
 def overrides_from_json(overrides: Mapping[str, Any]) -> dict[str, Any]:
@@ -611,6 +636,15 @@ def overrides_from_json(overrides: Mapping[str, Any]) -> dict[str, Any]:
             )
             for key, value in changes["seat_bonus"].items()
         }
+    if isinstance(changes.get("bag_size"), Mapping):
+        changes["bag_size"] = {
+            _lookup("bag_size key", key, _PLAYER_COUNT_BY_NAME): value
+            for key, value in changes["bag_size"].items()
+        }
+    if "board_shape" in changes:
+        changes["board_shape"] = _lookup(
+            "board_shape", changes["board_shape"], _BOARD_SHAPE_BY_NAME
+        )
     if isinstance(changes.get("bag_mix"), Mapping):
         changes["bag_mix"] = {
             _lookup("bag_mix key", key, _PIECE_BY_NAME): value
@@ -1047,6 +1081,29 @@ def vertex_from_json(item: object) -> Vertex:
 def spots_to_json(board: Board) -> list[list[list[int]]]:
     """The planting spots of `board` (Rules v3), in its order, each a vertex."""
     return [vertex_to_json(spot) for spot in board.spots]
+
+
+def strip_to_json(board: Board) -> dict[str, Any] | None:
+    """The river strip of `board` (Rules v3 open board), or null on a fixed board.
+
+    `{"segments": [[[q, r], ...], ...]}`: the printed river pieces north to
+    south, each its river hexes north to south, one per row from `r` 0.
+    East of each row's river hex the table is open; there are no other hexes.
+    """
+    if board.strip is None:
+        return None
+    return {"segments": [[[h.q, h.r] for h in segment] for segment in board.strip.segments]}
+
+
+def strip_from_json(item: Mapping[str, Any]) -> Board:
+    """The river strip `Board` for one object of `strip_to_json`; `RiverStrip` checks it."""
+    if not isinstance(item, Mapping) or set(item) != {"segments"}:
+        raise ValueError(f"a river strip must be an object with exactly the key segments, got {item!r}")
+    segments = item["segments"]
+    if isinstance(segments, (str, bytes, Mapping)) or not isinstance(segments, Iterable):
+        raise TypeError(f"segments must be a list of lists of [q, r] pairs, got {segments!r}")
+    strip = RiverStrip(tuple(tuple(Hex(*pair) for pair in segment) for segment in segments))
+    return Board(tiles=tuple(Tile(h, Terrain.RIVER) for h in strip.river), strip=strip)
 
 
 def planted_to_json(board: Board) -> list[dict[str, Any]]:

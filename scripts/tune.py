@@ -77,6 +77,15 @@ uses; ``--candidate SWEEP LABEL`` validates one sweep candidate instead
     uv run python scripts/tune.py --sweep b3 b4 b5 --scale 2 --rare-bonus 1
     uv run python scripts/tune.py --candidate b1 "Rules v2 provisional"
 
+Sweep ``strip`` (#154) plays Rules v3 on the open river strip board (the
+shipped presets with vertex planting and ``board_shape`` ``river_strip``,
+score_aware seating, seed ``STRIP_SWEEP_SEED``): river hexes per segment
+(``--river-hexes``, default 4 5 6) x bag size in pieces per player
+(``--bag-per-player``, default ``STRIP_BAG_PER_PLAYER``):
+
+    uv run python scripts/tune.py --sweep strip
+    uv run python scripts/tune.py --sweep strip --river-hexes 5 --bag-per-player 10 14
+
 Turns and minutes count turns (rounds x P), not log records: under action
 die rules a die turn is 2 records, so ``turns_per_game`` would overcount. A candidate the preset or the board
 generator rejects is printed as infeasible with its error, and the run goes
@@ -115,6 +124,8 @@ from types import MappingProxyType
 import acequias
 from acequias.config import (
     CONSTRUCTIVE_DIE_FACES,
+    BoardShape,
+    PlantingRules,
     ROULETTE_POINTS,
     RULES_V1,
     BribeRules,
@@ -621,9 +632,47 @@ def parse_rounds(text: str) -> dict[int, int]:
     return rounds
 
 
+# --- Rules v3 river strip (#154) ---------------------------------------------
+
+STRIP_SWEEP_SEED = 154_001
+"""The run seed of the river strip sweep (#154); no earlier run used it."""
+STRIP_RIVER_HEXES = (4, 5, 6)
+"""Sweep ``strip``'s river hexes per segment by default (#154)."""
+STRIP_BAG_PER_PLAYER = (12, 16, 20)
+"""Sweep ``strip``'s bag sizes by default, in pieces per player (#154)."""
+
+
+def strip_overrides(mode: Mode, river_hexes: int, bag_per_player: int) -> dict[str, object]:
+    """The shipped preset of ``mode`` under Rules v3 on the river strip board,
+    as overrides of the Rules v1 preset: vertex planting, ``river_hexes``
+    per segment, and a bag of ``bag_per_player`` pieces per player for each
+    of the mode's player counts."""
+    counts = shipped_preset(mode).player_counts
+    return {
+        **SHIPPED_V2[mode],
+        "planting": PlantingRules.VERTICES,
+        "board_shape": BoardShape.RIVER_STRIP,
+        "river_hexes_per_segment": river_hexes,
+        "bag_size": {players: bag_per_player * players for players in counts},
+    }
+
+
+def strip_sweeps(river_hexes=STRIP_RIVER_HEXES, bag_per_player=STRIP_BAG_PER_PLAYER) -> tuple[Sweep, ...]:
+    """Sweep ``strip`` (#154): river hexes per segment x bag size per player, score_aware seating."""
+    return (
+        Sweep("strip", "Rules v3 river strip: river hexes per segment x bag size (pieces per player)",
+              {mode: tuple(
+                  (f"{hexes} river hexes/segment, bag {per}/player", strip_overrides(mode, hexes, per))
+                  for hexes in river_hexes
+                  for per in bag_per_player
+              ) for mode in Mode},
+              ("score_aware",), {mode: {} for mode in Mode}, STRIP_SWEEP_SEED),
+    )
+
+
 V1_SWEEPS = SWEEPS
 """The sweeps of #20 (Rules v1, greedy and mixed seatings)."""
-SWEEPS = V1_SWEEPS + v2_sweeps()
+SWEEPS = V1_SWEEPS + v2_sweeps() + strip_sweeps()
 SWEEP_NAMES = tuple(s.name for s in SWEEPS)
 
 
@@ -1206,6 +1255,8 @@ def describe(overrides: Mapping[str, object]) -> str:
             value = f"{value[0]}-{value[1]}"
         elif key == "seat_bonus":
             value = seat_bonus_label(value)
+        elif key == "bag_size":
+            value = "/".join(f"{p}p {n}" for p, n in sorted(value.items()))
         elif key == "varietal_points":
             value = "/".join(f"{v.name.lower()} {points}" for v, points in value.items())
         elif key == "action_die":
@@ -1335,6 +1386,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--rounds", type=parse_rounds, metavar="P=R,...",
                         help="set the round count of these player counts (#142) in every b5 candidate, "
                              "e.g. 4=5,5=5; the others keep the mode's shipped rounds")
+    parser.add_argument("--river-hexes", type=_workers, nargs="+", default=list(STRIP_RIVER_HEXES),
+                        metavar="N", help="sweep strip (#154): river hexes per segment (default 4 5 6)")
+    parser.add_argument("--bag-per-player", type=_workers, nargs="+", default=list(STRIP_BAG_PER_PLAYER),
+                        metavar="N", help="sweep strip (#154): bag sizes in pieces per player (default 12 16 20)")
     parser.add_argument("--games", type=int,
                         help=f"games per configuration (default: {SWEEP_GAMES} in a sweep, the final count otherwise)")
     parser.add_argument("--smoke", action="store_true",
@@ -1363,7 +1418,7 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("--games must be at least 1")
     modes = [Mode(args.mode)] if args.mode else list(Mode)
     sweeps = V1_SWEEPS + v2_sweeps(args.scale, args.rare_bonus, args.multiple_bodegas, args.season_global_only,
-                                   args.seat_bonus, args.rounds)
+                                   args.seat_bonus, args.rounds) + strip_sweeps(args.river_hexes, args.bag_per_player)
     flags = "" if (args.scale, args.rare_bonus) == (1, 1) else f" --scale {args.scale} --rare-bonus {args.rare_bonus}"
     if args.multiple_bodegas:
         flags += " --multiple-bodegas"
@@ -1373,6 +1428,10 @@ def main(argv: list[str] | None = None) -> int:
         flags += f' --seat-bonus "{seat_bonus_label(args.seat_bonus)}"'
     if args.rounds:
         flags += f" --rounds {rounds_label(args.rounds)}"
+    if tuple(args.river_hexes) != STRIP_RIVER_HEXES:
+        flags += " --river-hexes " + " ".join(map(str, args.river_hexes))
+    if tuple(args.bag_per_player) != STRIP_BAG_PER_PLAYER:
+        flags += " --bag-per-player " + " ".join(map(str, args.bag_per_player))
     players_list = [args.players] if args.players else list(PLAYER_COUNTS)
     candidate = None
     if args.candidate:

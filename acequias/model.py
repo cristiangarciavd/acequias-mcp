@@ -258,6 +258,67 @@ class PlantedVineyard:
         _check_type("PlantedVineyard.varietal", self.varietal, Varietal)
 
 
+@dataclass(frozen=True)
+class RiverStrip:
+    """The open board's river (Rules v3, #154): a strip of river hexes, one per row.
+
+    ``segments`` holds the printed pieces of the strip, north to south, each
+    its river hexes north to south: a base segment for 2 players and one
+    more per extra player. Together they cover the rows ``r = 0, 1, ...``
+    with one river hex each, and each river hex touches the next one.
+
+    The table east of the river is open: every hex of a strip row east of
+    its river hex is land (``is_land``), with no tile set to bound it. West
+    of the river is the mountain, and rows north or south of the strip are
+    off the board.
+    """
+
+    segments: tuple[tuple[Hex, ...], ...]
+
+    _west: Mapping[int, int] = field(init=False, repr=False, compare=False)
+    _river: frozenset[Hex] = field(init=False, repr=False, compare=False)
+
+    def __post_init__(self) -> None:
+        segments = self.segments
+        if isinstance(segments, (str, bytes, Mapping)) or not isinstance(segments, Iterable):
+            raise TypeError(f"RiverStrip.segments must be a tuple of hex tuples, got {segments!r}")
+        segments = tuple(_items("RiverStrip segment", seg, Hex) for seg in segments)
+        if not segments or not all(segments):
+            raise ValueError("a river strip needs at least one segment, each with a river hex")
+        river = [h for seg in segments for h in seg]
+        for row, hex in enumerate(river):
+            if hex.r != row:
+                raise ValueError(
+                    f"river hex {row} of the strip is on row {hex.r}; the strip has one "
+                    "river hex per row, from row 0 southward"
+                )
+            if row and hex.distance(river[row - 1]) != 1:
+                raise ValueError(f"river hex {hex} does not touch the one before it")
+        object.__setattr__(self, "segments", segments)
+        object.__setattr__(self, "_west", MappingProxyType({h.r: h.q for h in river}))
+        object.__setattr__(self, "_river", frozenset(river))
+
+    @property
+    def river(self) -> tuple[Hex, ...]:
+        """Every river hex of the strip, north to south."""
+        return tuple(h for seg in self.segments for h in seg)
+
+    def is_river(self, hex: Hex) -> bool:
+        """Whether ``hex`` is a river hex of the strip."""
+        return hex in self._river
+
+    def is_land(self, hex: Hex) -> bool:
+        """Whether ``hex`` is on the open table: on a strip row, east of its river hex."""
+        west = self._west.get(hex.r)
+        return west is not None and hex.q > west
+
+    def shore(self) -> tuple[Hex, ...]:
+        """The land hexes next to the river, in hex order: where a first canal can go."""
+        return tuple(
+            sorted({n for h in self._river for n in h.neighbors() if self.is_land(n)})
+        )
+
+
 @dataclass(frozen=True, slots=True)
 class ActionsLeft:
     """What the current player may still do this turn under Rules v3, after the die roll.
@@ -300,6 +361,12 @@ class Board:
     from the placed canals (``acequias.flow.can_plant``), never from
     ``spots``, so the same rules work on a board without fixed bounds. Both
     are empty on a board of hex vineyards.
+
+    ``strip`` (Rules v3 open board, #154) makes the board a river strip
+    with an open table to the east: its tiles are then exactly the strip's
+    river hexes, and every land hex of the strip (``RiverStrip.is_land``)
+    is an empty tile that ``tile_at`` makes on demand, with no fixed set of
+    hexes. A river strip board has no planting ``spots``.
     """
 
     tiles: tuple[Tile, ...] = ()
@@ -309,6 +376,7 @@ class Board:
     plantings: tuple[tuple[Hex, Varietal], ...] = ()
     spots: tuple[Vertex, ...] = ()
     planted: tuple[PlantedVineyard, ...] = ()
+    strip: RiverStrip | None = None
 
     _tile_index: Mapping[Hex, Tile] = field(init=False, repr=False, compare=False)
     _canal_index: Mapping[Hex, PlacedCanal] = field(init=False, repr=False, compare=False)
@@ -335,18 +403,32 @@ class Board:
         plantings = _planting_items(self.plantings)
         spots = _items("Board.spots", self.spots, Vertex)
         planted = _items("Board.planted", self.planted, PlantedVineyard)
+        strip = self.strip
+        if strip is not None:
+            _check_type("Board.strip", strip, RiverStrip)
 
         tile_index: dict[Hex, Tile] = {}
         for tile in tiles:
             if tile.hex in tile_index:
                 raise ValueError(f"two tiles on {tile.hex}")
             tile_index[tile.hex] = tile
+        if strip is not None:
+            if set(tile_index.values()) != {Tile(h, Terrain.RIVER) for h in strip.river}:
+                raise ValueError("a river strip board's tiles must be exactly its river hexes")
+            if spots:
+                raise ValueError("a river strip board has no planting spots")
+
+        def tile_of(hex: Hex) -> Tile | None:
+            tile = tile_index.get(hex)
+            if tile is None and strip is not None and strip.is_land(hex):
+                return Tile(hex, Terrain.EMPTY)
+            return tile
 
         canal_index: dict[Hex, PlacedCanal] = {}
         for canal in canals:
             if canal.hex in canal_index:
                 raise ValueError(f"two canals on {canal.hex}")
-            tile = tile_index.get(canal.hex)
+            tile = tile_of(canal.hex)
             if tile is None:
                 raise ValueError(f"canal on {canal.hex}, which has no tile")
             if tile.terrain is not Terrain.EMPTY:
@@ -397,13 +479,13 @@ class Board:
         for spot in spots:
             if spot in spot_set:
                 raise ValueError(f"two planting spots on {spot}")
-            if not _touches_land(spot, tile_index):
+            if not _touches_land(spot, tile_of):
                 raise ValueError(f"planting spot {spot} touches no non-river tile")
             spot_set.add(spot)
 
         planted_index: dict[Vertex, PlantedVineyard] = {}
         for vineyard in planted:
-            if not _touches_land(vineyard.vertex, tile_index):
+            if not _touches_land(vineyard.vertex, tile_of):
                 raise ValueError(
                     f"vineyard planted on {vineyard.vertex}, which touches no non-river tile"
                 )
@@ -427,8 +509,14 @@ class Board:
         _set(self, "_floodgate_index", MappingProxyType(floodgate_index))
 
     def tile_at(self, hex: Hex) -> Tile | None:
-        """The tile at ``hex``, or None if the hex is off the board."""
-        return self._tile_index.get(hex)
+        """The tile at ``hex``, or None if the hex is off the board.
+
+        On a river strip board every land hex is an empty tile.
+        """
+        tile = self._tile_index.get(hex)
+        if tile is None and self.strip is not None and self.strip.is_land(hex):
+            return Tile(hex, Terrain.EMPTY)
+        return tile
 
     def canal_at(self, hex: Hex) -> PlacedCanal | None:
         """The canal at ``hex``, or None if there is none."""
@@ -455,8 +543,8 @@ class Board:
 
     def vertex_tiles(self, vertex: Vertex) -> tuple[Tile, ...]:
         """The tiles ``vertex`` touches, in hex order: 3, or fewer on the edge of the board."""
-        index = self._tile_index
-        return tuple(index[h] for h in vertex.hexes if h in index)
+        tiles = (self.tile_at(h) for h in vertex.hexes)
+        return tuple(t for t in tiles if t is not None)
 
     def floodgate_at(self, hex: Hex, direction: Direction) -> Floodgate | None:
         """The floodgate on the edge of ``hex`` facing ``direction``, from either side, or None."""
@@ -472,7 +560,7 @@ class Board:
         """The lookups that depend only on the tiles, built once per tile set."""
         statics = self._statics
         if statics is None:
-            statics = _BoardStatics(self.tiles)
+            statics = _BoardStatics(self.tiles, self.strip)
             _set(self, "_statics", statics)
         return statics
 
@@ -493,6 +581,7 @@ class Board:
         """
         new = object.__new__(Board)
         _set(new, "tiles", self.tiles)
+        _set(new, "strip", self.strip)
         _set(new, "_tile_index", self._tile_index)
         _set(new, "_statics", self._static())
         if canals is None:
@@ -543,13 +632,20 @@ class _BoardStatics:
     vineyard hex). ``empty`` lists the ``EMPTY`` tile hexes in hex order.
     ``tile_varietals`` is the set of varietals on vineyard tiles, and
     ``blank_vineyards`` says whether any vineyard tile has none.
+
+    On a river strip board (``strip``) the land has no fixed hex set: the
+    three per-hex lookups are filled on first use for any hex asked, and
+    ``empty`` lists only the shore (``RiverStrip.shore``).
     """
 
     __slots__ = (
         "neighbors", "river_dirs", "vineyard_dirs", "empty", "tile_varietals", "blank_vineyards"
     )
 
-    def __init__(self, tiles: tuple[Tile, ...]) -> None:
+    def __init__(self, tiles: tuple[Tile, ...], strip: RiverStrip | None = None) -> None:
+        if strip is not None:
+            self._open(strip)
+            return
         terrain = {t.hex: t.terrain for t in tiles}
         self.neighbors: dict[Hex, dict[Direction, Hex]] = {}
         self.river_dirs: dict[Hex, frozenset[Direction]] = {}
@@ -572,6 +668,32 @@ class _BoardStatics:
         )
         self.blank_vineyards: bool = any(t.varietal is None for t in vineyards)
 
+    def _open(self, strip: RiverStrip) -> None:
+        is_river = strip.is_river
+        self.neighbors = _Lazy(lambda h: {d: h.neighbor(d) for d in Direction})
+        self.river_dirs = _Lazy(
+            lambda h: frozenset(d for d in Direction if is_river(h.neighbor(d)))
+        )
+        self.vineyard_dirs = _Lazy(lambda h: _NO_VINEYARDS)
+        self.empty = strip.shore()
+        self.tile_varietals = frozenset()
+        self.blank_vineyards = False
+
+
+class _Lazy(dict):
+    """A dict that fills a missing key with ``make(key)`` on first use."""
+
+    def __init__(self, make) -> None:
+        super().__init__()
+        self._make = make
+
+    def __missing__(self, key):
+        value = self[key] = self._make(key)
+        return value
+
+
+_NO_VINEYARDS: Mapping[Direction, Hex] = MappingProxyType({})
+
 
 _DIRECTION_INDEX = {d: i for i, d in enumerate(Direction)}
 
@@ -584,10 +706,10 @@ def _planting_order(planting: tuple[Hex, Varietal]) -> Hex:
     return planting[0]
 
 
-def _touches_land(vertex: Vertex, tile_index: Mapping[Hex, Tile]) -> bool:
-    """Whether ``vertex`` touches at least one non-river tile."""
+def _touches_land(vertex: Vertex, tile_of) -> bool:
+    """Whether ``vertex`` touches at least one non-river tile (``tile_of`` maps a hex to its tile)."""
     for h in vertex.hexes:
-        tile = tile_index.get(h)
+        tile = tile_of(h)
         if tile is not None and tile.terrain is not Terrain.RIVER:
             return True
     return False
@@ -783,6 +905,8 @@ class GameState:
             if self.pending_face is not None and self.actions_left is None:
                 raise ValueError("under vertex planting a pending face follows a roll")
         else:
+            if board.strip is not None:
+                raise ValueError("a river strip board needs vertex planting (Rules v3)")
             if board.spots or board.planted:
                 raise ValueError(
                     "under hex planting the board has no planting spots or vertex vineyards"

@@ -910,7 +910,7 @@ def _canal_placements(state: GameState) -> list[PlaceCanal]:
     has_canal = board._canal_index
     hexes = [
         (hex, _connecting_dirs(board, hex))
-        for hex in board._static().empty
+        for hex in _canal_candidates(board)
         if hex not in has_canal
     ]
     actions = []
@@ -921,6 +921,25 @@ def _canal_placements(state: GameState) -> list[PlaceCanal]:
                 if not edges.isdisjoint(connecting):
                     actions.append(PlaceCanal(kind, hex, rotation))
     return actions
+
+
+def _canal_candidates(board: Board) -> tuple[Hex, ...] | list[Hex]:
+    """The empty hexes a canal might go on, in hex order.
+
+    Every empty tile on a fixed board. On a river strip board (#154), whose
+    land has no fixed hex set, the land hexes next to the river or to a
+    canal: the only ones an opening can connect from.
+    """
+    statics = board._static()
+    strip = board.strip
+    if strip is None:
+        return statics.empty
+    found = set(statics.empty)
+    neighbors = statics.neighbors
+    for canal in board.canals:
+        around = neighbors[canal.hex]
+        found.update(n for d in canal.edges if strip.is_land(n := around[d]))
+    return sorted(found)
 
 
 def _open_gate_edges(board: Board) -> list[tuple[Hex, Direction]]:

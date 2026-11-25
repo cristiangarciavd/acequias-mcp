@@ -6,6 +6,7 @@ import pytest
 
 from acequias import config
 from acequias.config import (
+    BoardShape,
     PlantingRules,
     ACTION_DIE_FACES,
     CONSTRUCTIVE_DIE_FACES,
@@ -127,6 +128,9 @@ README_VALUES = {
         seat_bonus={},
         planting=PlantingRules.HEXES,
         resow_can_move=False,
+        board_shape=BoardShape.FIELD,
+        river_hexes_per_segment=5,
+        bag_size={},
     ),
     Mode.FLASH: dict(
         rounds={2: 6, 3: 6},
@@ -155,6 +159,9 @@ README_VALUES = {
         seat_bonus={},
         planting=PlantingRules.HEXES,
         resow_can_move=False,
+        board_shape=BoardShape.FIELD,
+        river_hexes_per_segment=5,
+        bag_size={},
     ),
 }
 

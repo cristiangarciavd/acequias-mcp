@@ -30,6 +30,8 @@ from types import MappingProxyType
 
 from acequias.bots import policy
 from acequias.config import (
+    RIVER_HEXES_PER_SEGMENT,
+    BoardShape,
     PlantingRules,
     Preset,
     VarietalRules,
@@ -437,6 +439,19 @@ def _preset_values(preset: Preset) -> Mapping[str, object]:
         if f.name == "resow_can_move":
             if value:  # Rules v3 only, written only when set, like ``planting``
                 values[f.name] = value
+            continue
+        if f.name == "board_shape":
+            # #154 options, written only when set, like ``planting``.
+            if value is not BoardShape.FIELD:
+                values[f.name] = value.value
+            continue
+        if f.name == "river_hexes_per_segment":
+            if value != RIVER_HEXES_PER_SEGMENT:
+                values[f.name] = value
+            continue
+        if f.name == "bag_size":
+            if value:
+                values[f.name] = MappingProxyType(dict(value))
             continue
         if f.name == "mode":
             value = _MODE_NAMES[value]

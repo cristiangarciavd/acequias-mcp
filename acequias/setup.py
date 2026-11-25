@@ -6,7 +6,9 @@ player. Every number comes from the preset (``acequias.config``): the board
 size, the bag mix, and the market size.
 
 The bag holds one piece per ``EMPTY`` hex on the board (its canalizable
-capacity), split by ``preset.bag_mix`` with the largest remainder method.
+capacity), or ``preset.bag_size`` pieces for the player count when it gives
+one (always on the river strip board, whose open table has no hex count),
+split by ``preset.bag_mix`` with the largest remainder method.
 The board comes from ``generate_board``, which keeps its own RNG; the bag
 shuffle and the start player come from one ``random.Random(seed)``, drawn
 in that order, so the same arguments always give an equal state.
@@ -54,7 +56,9 @@ def new_game(
         raise ValueError(f"preset is for mode {preset.mode.name}, but mode is {mode.name}")
 
     board = generate_board(players, seed, mode, preset=preset)
-    capacity = sum(1 for tile in board.tiles if tile.terrain is Terrain.EMPTY)
+    capacity = preset.bag_size.get(players)
+    if capacity is None:
+        capacity = sum(1 for tile in board.tiles if tile.terrain is Terrain.EMPTY)
 
     rng = random.Random(seed)
     pieces = [

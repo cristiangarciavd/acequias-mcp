@@ -71,6 +71,24 @@ class PlantingRules(Enum):
     VERTICES = "vertices"
 
 
+class BoardShape(Enum):
+    """What the board is.
+
+    ``FIELD``: the generated board of river, vineyard, stone and empty
+    hexes (``acequias.board.generate_board``; the shipped game). ``RIVER_STRIP``:
+    Rules v3's open board (#150, #154): only a strip of river hexes, with an
+    unbounded, obstacle-free table to the east; the bag limits the game.
+    Needs vertex planting and a ``bag_size`` for every player count.
+    """
+
+    FIELD = "field"
+    RIVER_STRIP = "river_strip"
+
+
+RIVER_HEXES_PER_SEGMENT = 5
+"""River hexes in each segment of the river strip, by default (owner, #150)."""
+
+
 ACTION_DIE_FACES: tuple[DieFace, ...] = (
     DieFace.FLOODGATE,
     DieFace.FLOODGATE,
@@ -219,6 +237,17 @@ class Preset:
     is ignored (no season roll, ``is_season_round`` is always False).
     ``resow_can_move`` (off by default; vertex planting only) lets the
     resow face move one of the roller's vineyards instead of respinning.
+
+    ``board_shape`` (``FIELD`` by default and in the shipped presets) says
+    what the board is; ``RIVER_STRIP`` (Rules v3, opt-in, #154) is the open
+    board: a base river segment for 2 players plus one per extra player,
+    each of ``river_hexes_per_segment`` river hexes, and no stones or
+    vineyard tiles, so ``hexes_per_player``, ``stone_share`` and
+    ``vineyard_distance`` place nothing. ``bag_size`` (empty by default)
+    maps a player count to the pieces in the bag (market included); a
+    player count it does not list gets one piece per empty hex of the
+    board. ``RIVER_STRIP`` needs vertex planting and a ``bag_size`` for
+    every player count, since its table has no fixed hexes to count.
     """
 
     mode: Mode
@@ -248,6 +277,9 @@ class Preset:
     seat_bonus: Mapping[int, tuple[int, ...]] = field(default_factory=lambda: MappingProxyType({}))
     planting: PlantingRules = PlantingRules.HEXES
     resow_can_move: bool = False
+    board_shape: BoardShape = BoardShape.FIELD
+    river_hexes_per_segment: int = RIVER_HEXES_PER_SEGMENT
+    bag_size: Mapping[int, int] = field(default_factory=lambda: MappingProxyType({}))
 
     def __post_init__(self) -> None:
         _check_type("mode", self.mode, Mode)
@@ -293,6 +325,18 @@ class Preset:
         _check_type("resow_can_move", self.resow_can_move, bool)
         if self.resow_can_move and self.planting is not PlantingRules.VERTICES:
             raise ValueError("resow_can_move needs vertex planting")
+        _check_type("board_shape", self.board_shape, BoardShape)
+        _check_count("river_hexes_per_segment", self.river_hexes_per_segment)
+        _set(self, "bag_size", _bag_size(self.bag_size, self.player_counts))
+        if self.board_shape is BoardShape.RIVER_STRIP:
+            if self.planting is not PlantingRules.VERTICES:
+                raise ValueError("the river strip board needs vertex planting")
+            missing = [n for n in self.player_counts if n not in self.bag_size]
+            if missing:
+                raise ValueError(
+                    f"the river strip board needs a bag_size for every player count; "
+                    f"none for {missing}"
+                )
         if self.season_roll_every is not None and self.bribe_rules is not BribeRules.ACTION_DIE:
             raise ValueError("season_roll_every needs action_die bribe rules")
         if self.bribe_rules is BribeRules.ACTION_DIE:
@@ -491,6 +535,19 @@ def _seat_bonus(value: object, counts: tuple[int, ...]) -> Mapping[int, tuple[in
             _check_non_negative(f"seat_bonus[{players}][{seat}]", bonus_points)
         bonus[players] = points
     return MappingProxyType(bonus)
+
+
+def _bag_size(value: object, counts: tuple[int, ...]) -> Mapping[int, int]:
+    _check_type("bag_size", value, Mapping)
+    extra = [n for n in value if n not in counts or isinstance(n, bool)]
+    if extra:
+        raise ValueError(
+            f"bag_size gives player counts {extra}; rounds has only {players_text(counts)}"
+        )
+    for players in counts:
+        if players in value:
+            _check_count(f"bag_size[{players}]", value[players])
+    return MappingProxyType({n: value[n] for n in counts if n in value})
 
 
 def _distance(value: object) -> tuple[int, int]:
