@@ -13,7 +13,7 @@ To record the file (only when the game rules change on purpose)::
 presets as they are (Rules v2: roulette, action die, season roll, multiple
 bodegas), Normal 2-5 players and Flash 2-3, with no overrides; its JSON adds
 the die actions and faces, plantings, season and drought points, and the
-bodega count. Re-record it only when the shipped rules or values change on
+bodega count. S7 (#147) is there for the action die's Release face. Re-record it only when the shipped rules or values change on
 purpose::
 
     uv run python tests/test_golden_games.py --record-shipped
@@ -241,6 +241,8 @@ SHIPPED_RUNS = (
     ("S4", Mode.NORMAL, 5, ("random", "score_aware", "greedy", "random", "saboteur"), {}, 12604, 1),
     ("S5", Mode.FLASH, 2, ("score_aware", "score_aware"), {}, 12605, 3),
     ("S6", Mode.FLASH, 3, ("random", "greedy", "score_aware"), {}, 12606, 3),
+    # #147: seed chosen so the die lands on Release and a floodgate is removed.
+    ("S7", Mode.FLASH, 2, ("random", "random"), {}, 14715, 1),
 )
 SHIPPED_IDS = [run[0] for run in SHIPPED_RUNS]
 
@@ -400,7 +402,19 @@ def test_shipped_golden_data_covers_the_rules_v2_paths(golden_shipped):
     turns = [turn for game in games for turn in game["log"]]
     types = {turn["action"]["type"] for turn in turns}
     assert {"PlaceCanal", "RollActionDie", "DeclineFace", "PlaceFloodgate"} <= types
-    assert types & {"Release", "Resow"}
+    assert {"Release", "Resow"} <= types
+    # A die roll that lands on Release, then that roller removes a floodgate
+    # (#147); S7 has one that stays removed to the end of the game.
+    released = []
+    for game in games:
+        log = game["log"]
+        for before, turn in zip(log, log[1:]):
+            if turn["action"]["type"] == "Release":
+                assert before["action"]["type"] == "RollActionDie" and before["face"] == "RELEASE"
+                assert before["player"] == turn["player"]
+                gate = {"hex": turn["action"]["hex"], "direction": turn["action"]["direction"]}
+                released.append(gate not in game["final"]["floodgates"])
+    assert any(released)
     assert "Bribe" not in types
     faces = {turn["face"] for turn in turns if turn["face"]}
     assert {"GOOD_SEASON", "DROUGHT"} <= faces
