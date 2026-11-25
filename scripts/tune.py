@@ -114,6 +114,23 @@ physical floodgate supply):
     uv run python scripts/tune.py --sweep v3 --v3-river-hexes 6 --v3-bag-per-player 12
     uv run python scripts/tune.py --sweep v3split
 
+Sweep ``v3blends`` (#166) compares the scoring options around the
+``v3split`` base (5 river hexes per segment, bag 16 per player, split
+scoring, the move die): the current 3-varietal bodega bonus, blends
+(``acequias.config.DEFAULT_BLENDS``, #165's cortes, the bodega bonus off)
+scored ``each_once`` or ``disjoint``, and ``each_once`` blends plus the
+bodega building (2 distinct reds and 2 distinct whites, on a new spot),
+each with its points x0.5 / x1 / x1.5 (``V3BLENDS_FACTORS``; the building
+also at 15, ``V3BLENDS_BUILDING_POINTS``); score_aware seating, seed
+``V3BLENDS_SWEEP_SEED``. Its rows add the blend and building points per
+player, bodegas built per game, the share of players who meet the
+bodega requirement, the mean round they first meet it and the share who
+build (a building row runs with 2 reds and 2 or 1 whites,
+``V3BLENDS_WHITES``), and how often each blend scores (share of
+player-games). The ``score_target`` end condition (#163) is not in yet:
+
+    uv run python scripts/tune.py --sweep v3blends
+
 Turns and minutes count turns (rounds x P), not log records: under action
 die rules a die turn is 2 records, so ``turns_per_game`` would overcount. A candidate the preset or the board
 generator rejects is printed as infeasible with its error, and the run goes
@@ -151,6 +168,9 @@ from types import MappingProxyType
 
 import acequias
 from acequias.config import (
+    DEFAULT_BLENDS,
+    Blend,
+    BlendRule,
     CONSTRUCTIVE_DIE_FACES,
     V3_DIE_FACES,
     V3_POINTS as V3_SPLIT_POINTS,
@@ -169,7 +189,8 @@ from acequias.config import players_text
 from acequias.config import preset as shipped_preset
 from acequias.model import DieFace, Mode, PieceKind, Varietal
 from acequias.sim import GameRecord, SimRules, game_seed, play_one, summarize
-from acequias.turn import PlaceFloodgate, Release
+from acequias.game import act, game_rngs
+from acequias.turn import BuildBodega, PlaceFloodgate, Release, can_build_bodega
 
 # --- Constants ---------------------------------------------------------------
 
@@ -824,9 +845,82 @@ def v3split_sweeps() -> tuple[Sweep, ...]:
     )
 
 
+# --- Rules v3 blends and bodega buildings (#166) -----------------------------------
+
+V3BLENDS_SWEEP_SEED = 166_001
+"""The run seed of sweep ``v3blends`` (#166); no earlier run used it."""
+V3BLENDS_FACTORS = ((1, 2), (1, 1), (3, 2))
+"""Sweep ``v3blends``'s point factors (x0.5, x1, x1.5) as fractions: each blend's points,
+the bodega bonus and the building points times the factor, rounded half up, at least 1."""
+V3BLENDS_BUILDING_POINTS = (12, 15)
+"""Sweep ``v3blends``'s bodega building points at x1 (owner, #166); x0.5 and x1.5 scale the first."""
+V3BLENDS_REDS = 2
+"""Sweep ``v3blends``'s distinct red varietals a bodega building needs."""
+V3BLENDS_WHITES = (2, 1)
+"""Sweep ``v3blends``'s distinct white varietals a bodega building needs (owner, #166)."""
+
+
+def _times(points: int, factor: tuple[int, int]) -> int:
+    """``points`` x ``factor`` (a fraction), rounded half up, at least 1."""
+    num, den = factor
+    return max(1, (2 * points * num + den) // (2 * den))
+
+
+def _factor_label(factor: tuple[int, int]) -> str:
+    num, den = factor
+    return f"x{num / den:g}"
+
+
+def v3blends_sweeps() -> tuple[Sweep, ...]:
+    """Sweep ``v3blends`` (#166): current bodega vs blends (each_once / disjoint) vs blends +
+    bodega building, each at points x0.5 / x1 / x1.5, around the ``v3split`` base."""
+    base = {
+        mode: {
+            **strip_overrides(mode, V3SPLIT_RIVER_HEXES[0], V3SPLIT_BAG_PER_PLAYER[0]),
+            "varietal_points": V3_SPLIT_POINTS,
+            "action_die": V3_DIE_FACES,
+        }
+        for mode in Mode
+    }
+
+    def blends(factor) -> tuple[Blend, ...]:
+        return tuple(Blend(b.varietals, _times(b.points, factor)) for b in DEFAULT_BLENDS)
+
+    def candidates(mode: Mode) -> tuple[tuple[str, dict], ...]:
+        bodega = shipped_preset(mode).bodega_points
+        rows: list[tuple[str, dict]] = []
+        for factor in V3BLENDS_FACTORS:
+            x = _factor_label(factor)
+            points = _times(bodega, factor)
+            rows.append((f"current bodega {x} ({points})", {"bodega_points": points}))
+            for rule in BlendRule:
+                rows.append((f"blends {rule.value} {x}", {
+                    "varietal_bodega": False, "blends": blends(factor), "blend_rule": rule,
+                }))
+            buildings = V3BLENDS_BUILDING_POINTS if factor == (1, 1) else (
+                _times(V3BLENDS_BUILDING_POINTS[0], factor),)
+            for building in buildings:
+                for whites in V3BLENDS_WHITES:
+                    rows.append((f"blends each_once + bodega building {building} {x}, "
+                                 f"{V3BLENDS_REDS} reds + {whites} whites", {
+                        "varietal_bodega": False, "blends": blends(factor),
+                        "blend_rule": BlendRule.EACH_ONCE, "bodega_building": True,
+                        "bodega_building_points": building,
+                        "bodega_min_reds": V3BLENDS_REDS, "bodega_min_whites": whites,
+                    }))
+        return tuple(rows)
+
+    return (
+        Sweep("v3blends", "Rules v3 scoring options (#166): current bodega vs blends (each_once / "
+                          "disjoint) vs blends + bodega building, points x0.5 / x1 / x1.5, around the "
+                          "v3split base with the move die",
+              {mode: candidates(mode) for mode in Mode}, ("score_aware",), base, V3BLENDS_SWEEP_SEED),
+    )
+
+
 V1_SWEEPS = SWEEPS
 """The sweeps of #20 (Rules v1, greedy and mixed seatings)."""
-SWEEPS = V1_SWEEPS + v2_sweeps() + strip_sweeps() + v3_sweeps() + v3split_sweeps()
+SWEEPS = V1_SWEEPS + v2_sweeps() + strip_sweeps() + v3_sweeps() + v3split_sweeps() + v3blends_sweeps()
 SWEEP_NAMES = tuple(s.name for s in SWEEPS)
 
 
@@ -1271,6 +1365,8 @@ def run_all(jobs: list[Job], workers: int, checkpoints: Checkpoints | None = Non
             games = [record for part in records[j] for record in part]
             data = summarize(rules_of(job), job.seed, games).to_json()
             data["floodgates"] = floodgate_stats(games)
+            if is_v3blends(job.overrides):
+                data["blend_stats"] = blend_stats(games)
             outcomes.append(Outcome("ok", data=data))
         except Exception as error:  # noqa: BLE001 - reported with its job, the run goes on
             outcomes.append(Outcome(FAILED, error=f"{type(error).__name__}: {error}"))
@@ -1306,6 +1402,74 @@ def floodgate_stats(records: list[GameRecord]) -> dict[str, float]:
         "peak": sum(peaks) / len(peaks),
         "peak_max": float(max(peaks)),
     }
+
+
+def requirement_stats(records: list[GameRecord]) -> dict[str, float | None]:
+    """Bodega building requirement figures (#166), replaying each game: ``met`` (the share of
+    players who meet the requirement at some point), ``first_round`` (the mean round they
+    first meet it, None if nobody does) and ``builders`` (the share of players who build)."""
+    players = met = builders = 0
+    rounds: list[int] = []
+    for record in records:
+        p = record.start.preset
+        ids = [pl.id for pl in record.start.players]
+        players += len(ids)
+        builders += len({r.player for r in record.log if isinstance(r.action, BuildBodega)})
+        first: dict[str, int] = {}
+        state = record.start
+        dice = game_rngs(record.game_seed)[0]
+        for r in record.log:
+            state = act(state, r.player, r.action, dice)
+            for pid in ids:
+                if pid not in first and can_build_bodega(state.board, pid, p):
+                    first[pid] = r.round
+        met += len(first)
+        rounds += first.values()
+    return {
+        "met": met / players,
+        "first_round": sum(rounds) / len(rounds) if rounds else None,
+        "builders": builders / players,
+    }
+
+
+def blend_stats(records: list[GameRecord]) -> dict[str, object]:
+    """Blend and bodega building figures (#166): ``blend`` and ``buildings`` (mean points per
+    player), ``built`` (bodegas built per game), ``rates`` (per blend name, the share of
+    player-games where it scored), and with ``bodega_building`` the ``requirement_stats``
+    (``met``, ``first_round``, ``builders``; None without)."""
+    players = sum(len(r.scores) for r in records)
+    counts: dict[str, int] = {}
+    blend = buildings = built = 0
+    building = bool(records) and records[0].start.preset.bodega_building
+    requirement = requirement_stats(records) if building else None
+    for record in records:
+        built += sum(1 for r in record.log if isinstance(r.action, BuildBodega))
+        for score in record.scores.values():
+            blend += score.blend
+            buildings += score.buildings
+            for name in score.blends:
+                counts[name] = counts.get(name, 0) + 1
+    return {
+        "blend": blend / players,
+        "buildings": buildings / players,
+        "built": built / len(records),
+        "rates": {name: n / players for name, n in sorted(counts.items())},
+        "requirement": requirement,
+    }
+
+
+def _blend_columns(data: Mapping[str, object]) -> str:
+    """The #166 columns: blend points, building points, bodegas built per game, blend rates."""
+    b = data.get("blend_stats")
+    if b is None:
+        return " - |" * BLEND_COLUMNS
+    rates = ", ".join(f"{name} {rate:.2f}" for name, rate in b["rates"].items()) or "-"
+    req = b.get("requirement")
+    if req is None:
+        met = " - | - | - |"
+    else:
+        met = f" {req['met']:.2f} | {_f(req['first_round'], 1)} | {req['builders']:.2f} |"
+    return f" {b['blend']:.2f} | {b['buildings']:.2f} | {b['built']:.2f} |{met} {rates} |"
 
 
 def _f(x: float | None, digits: int = 2) -> str:
@@ -1346,6 +1510,17 @@ V3_SWEEP_HEADER = (
     "| Rolls per face | Floodgate / release / resow / move uses | Die use rate | Floodgates |"
 )
 V3_SWEEP_COLUMNS = 20
+BLEND_HEADER = (
+    " Blend points | Building points | Bodegas built per game | Requirement met (share of players) "
+    "| First round met (mean) | Builders (share of players) | Blend score rates |"
+)
+"""The columns a #166 sweep (``v3blends``) adds to ``V3_SWEEP_HEADER``."""
+BLEND_COLUMNS = 7
+
+
+def is_v3blends(overrides: Mapping[str, object]) -> bool:
+    """Whether a job's overrides use a #166 scoring option (blends or bodega buildings)."""
+    return bool(overrides.get("blends")) or bool(overrides.get("bodega_building"))
 
 
 def is_v3(overrides: Mapping[str, object]) -> bool:
@@ -1492,6 +1667,8 @@ def describe(overrides: Mapping[str, object]) -> str:
             value = "/".join(f"{v.name.lower()} {points}" for v, points in value.items())
         elif key == "action_die":
             value = "/".join(str(value.count(f)) for f in DieFace)
+        elif key == "blends":
+            value = "/".join(f"{b.name} {b.points}" for b in value)
         elif isinstance(value, Enum):
             value = value.value
         parts.append(f"{key}={value}")
@@ -1533,12 +1710,19 @@ def do_sweeps(sweeps: list[Sweep], run, modes, games: int, players_list=PLAYER_C
             print(f"### {mode.value.capitalize()}\n")
             print(f"Base: {describe(sweep.base[mode])}.\n")
             v3 = is_v3(rows[0][0].overrides)
+            blended = v3 and any(is_v3blends(j.overrides) for j, _ in rows)
             if v3:
                 print(V3_NOTE + "\n")
-            print(V3_SWEEP_HEADER if v3 else SWEEP_HEADER)
-            print("|" + " --- |" * (V3_SWEEP_COLUMNS if v3 else SWEEP_COLUMNS))
+            print((V3_SWEEP_HEADER + (BLEND_HEADER if blended else "")) if v3 else SWEEP_HEADER)
+            columns = (V3_SWEEP_COLUMNS + (BLEND_COLUMNS if blended else 0)) if v3 else SWEEP_COLUMNS
+            print("|" + " --- |" * columns)
             for job, outcome in rows:
-                print(v3_sweep_row(job, outcome) if v3 else sweep_row(job, outcome))
+                if not v3:
+                    print(sweep_row(job, outcome))
+                elif blended and outcome.data is not None:
+                    print(v3_sweep_row(job, outcome) + _blend_columns(outcome.data))
+                else:
+                    print(v3_sweep_row(job, outcome) + (" |" * BLEND_COLUMNS if blended else ""))
             print()
     return outcomes
 
@@ -1657,7 +1841,7 @@ def main(argv: list[str] | None = None) -> int:
     modes = [Mode(args.mode)] if args.mode else list(Mode)
     sweeps = V1_SWEEPS + v2_sweeps(args.scale, args.rare_bonus, args.multiple_bodegas, args.season_global_only,
                                    args.seat_bonus, args.rounds) + strip_sweeps(args.river_hexes, args.bag_per_player) \
-        + v3_sweeps(args.v3_river_hexes, args.v3_bag_per_player) + v3split_sweeps()
+        + v3_sweeps(args.v3_river_hexes, args.v3_bag_per_player) + v3split_sweeps() + v3blends_sweeps()
     flags = "" if (args.scale, args.rare_bonus) == (1, 1) else f" --scale {args.scale} --rare-bonus {args.rare_bonus}"
     if args.multiple_bodegas:
         flags += " --multiple-bodegas"

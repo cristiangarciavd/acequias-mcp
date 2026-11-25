@@ -62,6 +62,11 @@ class Varietal(Enum):
         """The name as written in the rules, accents included."""
         return self.value
 
+    @property
+    def is_white(self) -> bool:
+        """Whether it is a white grape (Torrontés, Chardonnay); every other varietal is red."""
+        return self in (Varietal.TORRONTES, Varietal.CHARDONNAY)
+
 
 class PieceKind(Enum):
     """A piece in the bag or market: one of six canal shapes, or a floodgate."""
@@ -261,6 +266,23 @@ class PlantedVineyard:
         _check_type("PlantedVineyard.varietal", self.varietal, Varietal)
 
 
+@dataclass(frozen=True, slots=True)
+class BodegaBuilding:
+    """A bodega built on a vertex (Rules v3 ``bodega_building``, #166): its spot and its builder.
+
+    It replaced one of the builder's planted vineyards there. It has no
+    varietal; its points are split in thirds like a vineyard's
+    (``acequias.scoring``).
+    """
+
+    vertex: Vertex
+    owner: str
+
+    def __post_init__(self) -> None:
+        _check_type("BodegaBuilding.vertex", self.vertex, Vertex)
+        _check_type("BodegaBuilding.owner", self.owner, str)
+
+
 @dataclass(frozen=True)
 class RiverStrip:
     """The open board's river (Rules v3, #154): a strip of river hexes, one per row.
@@ -365,6 +387,10 @@ class Board:
     ``spots``, so the same rules work on a board without fixed bounds. Both
     are empty on a board of hex vineyards.
 
+    ``bodegas`` (Rules v3 ``bodega_building``, #166) holds the bodegas
+    built on vertices, at most one per vertex and never on a vertex with a
+    planted vineyard; a bodega's vertex cannot be planted.
+
     ``strip`` (Rules v3 open board, #154) makes the board a river strip
     with an open table to the east: its tiles are then exactly the strip's
     river hexes, and every land hex of the strip (``RiverStrip.is_land``)
@@ -380,6 +406,7 @@ class Board:
     spots: tuple[Vertex, ...] = ()
     planted: tuple[PlantedVineyard, ...] = ()
     strip: RiverStrip | None = None
+    bodegas: tuple[BodegaBuilding, ...] = ()
 
     _tile_index: Mapping[Hex, Tile] = field(init=False, repr=False, compare=False)
     _canal_index: Mapping[Hex, PlacedCanal] = field(init=False, repr=False, compare=False)
@@ -390,6 +417,9 @@ class Board:
         init=False, repr=False, compare=False
     )
     _floodgate_index: Mapping[frozenset, Floodgate] = field(
+        init=False, repr=False, compare=False
+    )
+    _bodega_index: Mapping[Vertex, BodegaBuilding] = field(
         init=False, repr=False, compare=False
     )
     # Lookups that depend on the tiles only, built on first use (``_static``)
@@ -406,6 +436,7 @@ class Board:
         plantings = _planting_items(self.plantings)
         spots = _items("Board.spots", self.spots, Vertex)
         planted = _items("Board.planted", self.planted, PlantedVineyard)
+        bodegas = _items("Board.bodegas", self.bodegas, BodegaBuilding)
         strip = self.strip
         if strip is not None:
             _check_type("Board.strip", strip, RiverStrip)
@@ -496,6 +527,16 @@ class Board:
                 raise ValueError(f"two vineyards planted on {vineyard.vertex}")
             planted_index[vineyard.vertex] = vineyard
 
+        bodega_index: dict[Vertex, BodegaBuilding] = {}
+        for bodega in bodegas:
+            if not _touches_land(bodega.vertex, tile_of):
+                raise ValueError(f"bodega built on {bodega.vertex}, which touches no non-river tile")
+            if bodega.vertex in bodega_index:
+                raise ValueError(f"two bodegas built on {bodega.vertex}")
+            if bodega.vertex in planted_index:
+                raise ValueError(f"a bodega and a vineyard both on {bodega.vertex}")
+            bodega_index[bodega.vertex] = bodega
+
         _set(self, "tiles", tuple(sorted(tiles, key=lambda t: t.hex)))
         _set(self, "canals", tuple(sorted(canals, key=lambda c: c.hex)))
         _set(self, "floodgates", tuple(sorted(floodgates, key=_floodgate_key)))
@@ -505,6 +546,8 @@ class Board:
         _set(self, "planted", tuple(sorted(planted, key=_planted_order)))
         _set(self, "_spot_set", frozenset(spot_set))
         _set(self, "_planted_index", MappingProxyType(planted_index))
+        _set(self, "bodegas", tuple(sorted(bodegas, key=_planted_order)))
+        _set(self, "_bodega_index", MappingProxyType(bodega_index))
         _set(self, "_tile_index", MappingProxyType(tile_index))
         _set(self, "_canal_index", MappingProxyType(canal_index))
         _set(self, "_claim_index", MappingProxyType(claim_index))
@@ -543,6 +586,14 @@ class Board:
     def planted_at(self, vertex: Vertex) -> PlantedVineyard | None:
         """The vineyard planted on ``vertex``, or None."""
         return self._planted_index.get(vertex)
+
+    def bodega_at(self, vertex: Vertex) -> BodegaBuilding | None:
+        """The bodega built on ``vertex``, or None."""
+        return self._bodega_index.get(vertex)
+
+    def is_occupied(self, vertex: Vertex) -> bool:
+        """Whether a vineyard or a bodega stands on ``vertex``."""
+        return vertex in self._planted_index or vertex in self._bodega_index
 
     def vertex_tiles(self, vertex: Vertex) -> tuple[Tile, ...]:
         """The tiles ``vertex`` touches, in hex order: 3, or fewer on the edge of the board."""
@@ -583,6 +634,7 @@ class Board:
         claims: tuple[tuple[Hex, str], ...] | None = None,
         plantings: tuple[tuple[Hex, Varietal], ...] | None = None,
         planted: tuple[PlantedVineyard, ...] | None = None,
+        bodegas: tuple[BodegaBuilding, ...] | None = None,
     ) -> Board:
         """This board with some collections replaced, for callers that checked every piece.
 
@@ -632,6 +684,13 @@ class Board:
             planted = tuple(sorted(planted, key=_planted_order))
             _set(new, "planted", planted)
             _set(new, "_planted_index", MappingProxyType({v.vertex: v for v in planted}))
+        if bodegas is None:
+            _set(new, "bodegas", self.bodegas)
+            _set(new, "_bodega_index", self._bodega_index)
+        else:
+            bodegas = tuple(sorted(bodegas, key=_planted_order))
+            _set(new, "bodegas", bodegas)
+            _set(new, "_bodega_index", MappingProxyType({b.vertex: b for b in bodegas}))
         return new
 
 
@@ -726,7 +785,7 @@ def _touches_land(vertex: Vertex, tile_of) -> bool:
     return False
 
 
-def _planted_order(vineyard: PlantedVineyard) -> Vertex:
+def _planted_order(vineyard: PlantedVineyard | BodegaBuilding) -> Vertex:
     return vineyard.vertex
 
 
@@ -855,6 +914,11 @@ class GameState:
                 raise ValueError(
                     f"vineyard on {vineyard.vertex} planted by unknown player {vineyard.owner!r}"
                 )
+        for bodega in self.board.bodegas:
+            if bodega.owner not in known:
+                raise ValueError(
+                    f"bodega on {bodega.vertex} built by unknown player {bodega.owner!r}"
+                )
         self._check_planting()
         self._check_varietals()
         self._check_clusters()
@@ -918,9 +982,10 @@ class GameState:
         else:
             if board.strip is not None:
                 raise ValueError("a river strip board needs vertex planting (Rules v3)")
-            if board.spots or board.planted:
+            if board.spots or board.planted or board.bodegas:
                 raise ValueError(
-                    "under hex planting the board has no planting spots or vertex vineyards"
+                    "under hex planting the board has no planting spots, vertex vineyards "
+                    "or bodegas"
                 )
             if self.actions_left is not None:
                 raise ValueError("actions_left is set only under vertex planting (Rules v3)")

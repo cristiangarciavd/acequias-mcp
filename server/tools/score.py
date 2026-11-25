@@ -24,12 +24,14 @@ from server.schemas import (
     ClaimJSON,
     FloodgateJSON,
     HexJSON,
+    BodegaBuildingJSON,
     ModeName,
     PlantedVineyardJSON,
     PlayerJSON,
     PresetOverridesJSON,
     RiverStripJSON,
     ScoreJSON,
+    bodega_from_json,
     canal_from_json,
     claim_from_json,
     floodgate_from_json,
@@ -112,6 +114,15 @@ def calculate_score(
             )
         ),
     ] = [],
+    bodegas: Annotated[
+        list[BodegaBuildingJSON],
+        Field(
+            description=(
+                "Rules v3 bodega buildings (overrides bodega_building, #166): the bodegas "
+                "built on hex vertices, at most one per vertex and none on a planted one; any order."
+            )
+        ),
+    ] = [],
     strip: Annotated[
         RiverStripJSON | None,
         Field(
@@ -147,6 +158,10 @@ def calculate_score(
     third whose hex holds a canal carrying water scores for that canal's owner, whoever planted
     it (value x thirds / 3, rounded down; no water rights). It is listed for every player with
     a watered third, with planter, thirds and points; the bodega counts its varietal for them.
+    Rules v3 scoring options (#166): blend is the blend (corte) bonus of the preset's blends,
+    and blends names the blends scored; buildings is the points of the bodega buildings
+    (given in bodegas), split in thirds like a vineyard, each listed in watered_bodegas. The
+    total adds blend + buildings. Each is left out when 0 or empty.
     """
     if strip is not None and hexes:
         raise ValueError("give hexes or strip, not both: a river strip board has no other hexes")
@@ -155,6 +170,7 @@ def calculate_score(
         tiles=base.tiles,
         strip=base.strip,
         planted=tuple(planted_from_json(item) for item in planted),
+        bodegas=tuple(bodega_from_json(item) for item in bodegas),
         canals=tuple(canal_from_json(item) for item in canals),
         floodgates=tuple(floodgate_from_json(item) for item in floodgates),
         claims=tuple(claim_from_json(item) for item in claims),

@@ -26,6 +26,7 @@ import random
 import statistics
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
+from enum import Enum
 from types import MappingProxyType
 
 from acequias.bots import policy
@@ -44,6 +45,7 @@ from acequias.scoring import Score, calculate_score, winners
 from acequias.setup import new_game
 from acequias.turn import (
     Bribe,
+    BuildBodega,
     DeclineFace,
     MoveVineyard,
     Pass,
@@ -333,6 +335,8 @@ def summarize(rules: SimRules, seed: int, records: Iterable[GameRecord]) -> SimR
     names = ACTION_NAMES
     if preset.planting is PlantingRules.VERTICES:
         names += V3_ACTION_NAMES
+    if preset.bodega_building:
+        names += ((BuildBodega, "bodega"),)
     actions = {name: 0 for _, name in names}
     shared = with_bribe = with_floodgate = bodegas = 0
     briber_credit: list[float] = []
@@ -435,6 +439,18 @@ _MODE_NAMES = {mode: mode.value for mode in Mode}
 _VARIETAL_NAMES = {varietal: varietal.name.lower() for varietal in Varietal}
 
 
+_V3_SCORING_DEFAULTS = {
+    f.name: f.default
+    for f in dataclasses.fields(Preset)
+    if f.name in (
+        "varietal_bodega", "blends", "blend_rule", "bodega_building", "bodega_placement",
+        "bodega_min_vineyards", "bodega_min_reds", "bodega_min_whites",
+        "bodega_building_points", "bodegas_per_player",
+    )
+}
+"""The Rules v3 scoring options (#166) and their defaults."""
+
+
 def _preset_values(preset: Preset) -> Mapping[str, object]:
     values: dict[str, object] = {}
     for f in dataclasses.fields(Preset):
@@ -460,6 +476,21 @@ def _preset_values(preset: Preset) -> Mapping[str, object]:
         if f.name == "bag_size":
             if value:
                 values[f.name] = MappingProxyType(dict(value))
+            continue
+        if f.name in _V3_SCORING_DEFAULTS:
+            # #166 options, written only when not at their default, like ``planting``.
+            if value != _V3_SCORING_DEFAULTS[f.name]:
+                if f.name == "blends":
+                    value = tuple(
+                        MappingProxyType({
+                            "varietals": tuple(_VARIETAL_NAMES[v] for v in Varietal if v in b.varietals),
+                            "points": b.points,
+                        })
+                        for b in value
+                    )
+                elif isinstance(value, Enum):
+                    value = value.value
+                values[f.name] = value
             continue
         if f.name == "mode":
             value = _MODE_NAMES[value]

@@ -116,7 +116,9 @@ def wet_canals(board: Board) -> frozenset[Hex]:
     return frozenset(_reach(sources, links, allowed=None))
 
 
-def vertex_thirds(board: Board, wet: frozenset[Hex] | None = None) -> Mapping[Vertex, Mapping[str, int]]:
+def vertex_thirds(
+    board: Board, wet: frozenset[Hex] | None = None, vertices: Iterable[Vertex] | None = None
+) -> Mapping[Vertex, Mapping[str, int]]:
     """Each planted vertex's watered thirds by canal owner (Rules v3 split scoring, #160).
 
     A vertex has 3 hexes, one third each; a third is watered, and belongs to
@@ -124,7 +126,8 @@ def vertex_thirds(board: Board, wet: frozenset[Hex] | None = None) -> Mapping[Ve
     river or empty hex, or a dry canal, gives a third to nobody. Every
     planted vertex is a key, in ``Board.planted`` order; a vertex with no
     watered third maps to an empty mapping. ``wet`` is ``wet_canals(board)``
-    when known.
+    when known. ``vertices`` gives other vertices to split instead, such as
+    the bodegas' (``Board.bodegas``, #166).
     """
     if not isinstance(board, Board):
         raise TypeError(f"vertex_thirds needs a Board, got {board!r}")
@@ -132,20 +135,22 @@ def vertex_thirds(board: Board, wet: frozenset[Hex] | None = None) -> Mapping[Ve
         wet = wet_canals(board)
     canal_at = board._canal_index.get
     result: dict[Vertex, Mapping[str, int]] = {}
-    for vineyard in board.planted:
+    if vertices is None:
+        vertices = [v.vertex for v in board.planted]
+    for vertex in vertices:
         thirds: dict[str, int] = {}
-        for h in vineyard.vertex.hexes:
+        for h in vertex.hexes:
             if h in wet:
                 owner = canal_at(h).owner
                 thirds[owner] = thirds.get(owner, 0) + 1
-        result[vineyard.vertex] = MappingProxyType(thirds)
+        result[vertex] = MappingProxyType(thirds)
     return MappingProxyType(result)
 
 
 def plantable_spots(board: Board, player: str, three_canals: bool = False) -> tuple[Vertex, ...]:
     """The spots ``player`` may plant on now, in vertex order (Rules v3).
 
-    A vertex is plantable when nothing is planted on it and it touches a
+    A vertex is plantable when nothing is planted or built on it and it touches a
     canal of ``player``'s that carries water: the vertices of their wet
     canals, minus the planted ones. With ``three_canals`` each of its 3
     hexes must also hold a canal.
@@ -155,7 +160,7 @@ def plantable_spots(board: Board, player: str, three_canals: bool = False) -> tu
     if not isinstance(player, str):
         raise TypeError(f"player must be a str, got {player!r}")
     own = [h for h in wet_canals(board) if board.canal_at(h).owner == player]
-    found = {v for h in own for v in h.vertices() if board.planted_at(v) is None}
+    found = {v for h in own for v in h.vertices() if not board.is_occupied(v)}
     if three_canals:
         canals = board._canal_index
         found = {v for v in found if all(h in canals for h in v.hexes)}
@@ -170,7 +175,7 @@ def can_plant(board: Board, player: str, vertex: Vertex, three_canals: bool = Fa
         raise TypeError(f"player must be a str, got {player!r}")
     if not isinstance(board, Board):
         raise TypeError(f"can_plant needs a Board, got {board!r}")
-    if board.planted_at(vertex) is not None:
+    if board.is_occupied(vertex):
         return False
     if three_canals and not all(h in board._canal_index for h in vertex.hexes):
         return False

@@ -85,6 +85,66 @@ class BoardShape(Enum):
     RIVER_STRIP = "river_strip"
 
 
+class BlendRule(Enum):
+    """How blend (*corte*) bonuses score (Rules v3, #166; ``Preset.blends``).
+
+    ``EACH_ONCE``: every blend whose varietals a player holds scores once; one
+    vineyard may count for several blends. ``DISJOINT``: the best-scoring set
+    of distinct blends that uses no vineyard twice.
+    """
+
+    EACH_ONCE = "each_once"
+    DISJOINT = "disjoint"
+
+
+class BodegaPlacement(Enum):
+    """Where a bodega building goes (Rules v3, #166; ``Preset.bodega_placement``).
+
+    ``NEW_SPOT``: on a free vertex the player may plant on (next to their own
+    watered canal). ``REPLACE``: in place of one of the player's planted
+    vineyards, which leaves the board.
+    """
+
+    NEW_SPOT = "new_spot"
+    REPLACE = "replace"
+
+
+@dataclass(frozen=True, slots=True)
+class Blend:
+    """A blend (*corte*): a set of at least 2 varietals, and its bonus points (#166).
+
+    Any varietals may blend: red, white (``Varietal.is_white``) or mixed.
+    """
+
+    varietals: frozenset[Varietal]
+    points: int
+
+    def __post_init__(self) -> None:
+        value = self.varietals
+        if isinstance(value, (str, bytes, Mapping)) or not hasattr(value, "__iter__"):
+            raise TypeError(f"a blend's varietals must be a set of varietals, got {value!r}")
+        items = tuple(value)
+        for v in items:
+            _check_type("blend varietal", v, Varietal)
+        varietals = frozenset(items)
+        if len(varietals) != len(items):
+            raise ValueError(f"a blend lists a varietal twice: {items!r}")
+        if len(varietals) < 2:
+            raise ValueError(f"a blend needs at least 2 varietals, got {len(varietals)}")
+        _set(self, "varietals", varietals)
+        _check_count("blend points", self.points)
+
+    def __repr__(self) -> str:
+        """Stable across processes: the varietals in ``Varietal`` order, not set order."""
+        names = ", ".join(f"Varietal.{v.name}" for v in Varietal if v in self.varietals)
+        return f"Blend(frozenset({{{names}}}), {self.points})"
+
+    @property
+    def name(self) -> str:
+        """The varietals' names in ``Varietal`` order, joined by " + "."""
+        return " + ".join(v.display_name for v in Varietal if v in self.varietals)
+
+
 RIVER_HEXES_PER_SEGMENT = 5
 """River hexes in each segment of the river strip, by default (owner, #150)."""
 
@@ -271,6 +331,25 @@ class Preset:
     player count it does not list gets one piece per empty hex of the
     board. ``RIVER_STRIP`` needs vertex planting and a ``bag_size`` for
     every player count, since its table has no fixed hexes to count.
+
+    Rules v3 scoring options (#166, opt-in): ``varietal_bodega`` (on by
+    default) turns the ``bodega_varietals`` bodega bonus on or off.
+    ``blends`` is the blend (*corte*) table, one ``Blend`` each (empty by
+    default: no blends; ``DEFAULT_BLENDS`` is #165's table); a player holds a
+    varietal when they own a watered third of a vineyard of it, and
+    ``blend_rule`` says how the held blends score (``BlendRule``).
+    ``bodega_building`` (off by default) adds the "build a bodega" action
+    (one action, any turn the requirement holds): a bodega worth
+    ``bodega_building_points``, split in thirds like a vineyard, with no
+    varietal, never moved. ``bodega_placement`` says where it goes
+    (``BodegaPlacement``: by default on a new free spot the player may
+    plant on, or replacing one of their vineyards). It needs
+    ``bodega_min_reds`` distinct red and ``bodega_min_whites`` distinct
+    white varietals (``Varietal.is_white``) and at least
+    ``bodega_min_vineyards`` vineyards, among the vineyards the player
+    planted (owner, #166), counted before the build; 0 turns a condition off. ``bodegas_per_player`` caps
+    a player's bodegas (``None``: no cap). Blends and bodega buildings
+    need vertex planting.
     """
 
     mode: Mode
@@ -303,6 +382,16 @@ class Preset:
     board_shape: BoardShape = BoardShape.FIELD
     river_hexes_per_segment: int = RIVER_HEXES_PER_SEGMENT
     bag_size: Mapping[int, int] = field(default_factory=lambda: MappingProxyType({}))
+    varietal_bodega: bool = True
+    blends: tuple[Blend, ...] = ()
+    blend_rule: BlendRule = BlendRule.EACH_ONCE
+    bodega_building: bool = False
+    bodega_placement: BodegaPlacement = BodegaPlacement.NEW_SPOT
+    bodega_min_vineyards: int = 0
+    bodega_min_reds: int = 2
+    bodega_min_whites: int = 2
+    bodega_building_points: int = 12
+    bodegas_per_player: int | None = 1
 
     def __post_init__(self) -> None:
         _check_type("mode", self.mode, Mode)
@@ -362,6 +451,7 @@ class Preset:
                     f"the river strip board needs a bag_size for every player count; "
                     f"none for {missing}"
                 )
+        self._check_v3_scoring()
         if self.season_roll_every is not None and self.bribe_rules is not BribeRules.ACTION_DIE:
             raise ValueError("season_roll_every needs action_die bribe rules")
         if self.bribe_rules is BribeRules.ACTION_DIE:
@@ -400,6 +490,39 @@ class Preset:
                     f"with {players} players, {vineyards} vineyards and {stones} stone hexes "
                     f"leave no empty hex out of {hexes}"
                 )
+
+    def _check_v3_scoring(self) -> None:
+        """Check and normalize the #166 options: blends and bodega buildings."""
+        _check_type("varietal_bodega", self.varietal_bodega, bool)
+        _set(self, "blends", _blends(self.blends))
+        _check_type("blend_rule", self.blend_rule, BlendRule)
+        _check_type("bodega_building", self.bodega_building, bool)
+        _check_type("bodega_placement", self.bodega_placement, BodegaPlacement)
+        _check_count("bodega_building_points", self.bodega_building_points)
+        for name in ("bodega_min_vineyards", "bodega_min_reds", "bodega_min_whites"):
+            _check_non_negative(name, getattr(self, name))
+        whites = len({v for v in self.roulette if v.is_white})
+        reds = len({v for v in self.roulette if not v.is_white})
+        if self.bodega_building and (
+            self.bodega_min_whites > whites or self.bodega_min_reds > reds
+        ):
+            raise ValueError(
+                f"bodega_min_reds and bodega_min_whites must be at most the roulette's "
+                f"{reds} reds and {whites} whites, got {self.bodega_min_reds} and "
+                f"{self.bodega_min_whites}"
+            )
+        if self.bodegas_per_player is not None:
+            _check_count("bodegas_per_player", self.bodegas_per_player)
+        vertices = self.planting is PlantingRules.VERTICES
+        if self.blends and not vertices:
+            raise ValueError("blends need vertex planting")
+        if self.bodega_building and not vertices:
+            raise ValueError("bodega_building needs vertex planting")
+        missing = sorted(
+            {v.name for b in self.blends for v in b.varietals if v not in self.roulette}
+        )
+        if missing:
+            raise ValueError(f"blend varietals {missing} are not on the roulette")
 
     @property
     def vineyard_tiles_per_player(self) -> int:
@@ -633,6 +756,27 @@ def _roulette(value: object) -> tuple[Varietal, ...]:
     return sectors
 
 
+def _blends(value: object) -> tuple[Blend, ...]:
+    """The blend table as a tuple of ``Blend``: each a ``Blend`` or a (varietals, points) pair."""
+    if isinstance(value, Mapping):
+        value = tuple(value.items())
+    if isinstance(value, (str, bytes)) or not hasattr(value, "__iter__"):
+        raise TypeError(f"blends must be a sequence of blends, got {value!r}")
+    blends = []
+    for item in value:
+        if not isinstance(item, Blend):
+            if isinstance(item, (str, bytes)) or not hasattr(item, "__len__") or len(item) != 2:
+                raise TypeError(
+                    f"a blend must be a Blend or a (varietals, points) pair, got {item!r}"
+                )
+            item = Blend(item[0], item[1])
+        blends.append(item)
+    sets = [b.varietals for b in blends]
+    if len(set(sets)) != len(sets):
+        raise ValueError("blends lists the same set of varietals twice")
+    return tuple(blends)
+
+
 def _action_die(value: object) -> tuple[DieFace, ...]:
     if isinstance(value, (str, bytes, Mapping)) or not hasattr(value, "__iter__"):
         raise TypeError(f"action_die must be a sequence of die faces, got {value!r}")
@@ -642,6 +786,29 @@ def _action_die(value: object) -> tuple[DieFace, ...]:
     for face in faces:
         _check_type("action_die face", face, DieFace)
     return faces
+
+
+def _blend(points: int, *varietals: Varietal) -> Blend:
+    return Blend(frozenset(varietals), points)
+
+
+_MA, _CS, _CF = Varietal.MALBEC, Varietal.CABERNET_SAUVIGNON, Varietal.CABERNET_FRANC
+DEFAULT_BLENDS: tuple[Blend, ...] = (
+    _blend(2, _MA, _CS),
+    _blend(2, _MA, Varietal.BONARDA),
+    _blend(2, _MA, Varietal.SYRAH),
+    _blend(3, _MA, _CF),
+    _blend(3, Varietal.CHARDONNAY, Varietal.TORRONTES),
+    _blend(3, _MA, Varietal.TORRONTES),
+    _blend(4, _MA, _CS, Varietal.MERLOT),
+    _blend(4, _MA, _CS, _CF),
+    _blend(4, _MA, _CS, Varietal.BONARDA),
+    _blend(5, _MA, _CS, Varietal.MERLOT, _CF),
+)
+"""The default corte (blend) table (#165, ``_docs/blends.md``'s 10 main blends), in its
+order, with starting points to be tuned (#166): a common 2-varietal blend 2, an
+uncommon one 3, Chardonnay + Torrontés and Malbec + Torrontés 3, a 3-varietal
+blend 4, the 4-varietal one 5. Opt-in: ``Preset.blends`` is empty by default."""
 
 
 # --- Presets and access ----------------------------------------------------

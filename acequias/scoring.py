@@ -48,6 +48,17 @@ whoever planted it, and so does ``watered`` (the tie-break). Their
 ``WateredVineyard`` has ``vertex`` set and no ``hex``, and they follow the
 hex vineyards in ``Board.planted`` order.
 
+Rules v3 scoring options (#166). With ``preset.varietal_bodega`` off the
+bodega term is 0. ``blend`` is the blend (*corte*) bonus: a player holds
+a varietal when they have a watered third of a vineyard of it (the
+vineyards ``watered_vineyards`` lists), and ``blend_points`` scores the
+preset's ``blends`` under its ``blend_rule``: each held blend once, or
+the best set of distinct blends that uses no vineyard twice. ``buildings``
+is the bodega buildings' points (``Board.bodegas``): each is worth
+``preset.bodega_building_points``, split in thirds like a vertex
+vineyard; it has no varietal, so it counts for no bodega, blend, or
+``watered``. ``total`` adds ``blend + buildings``.
+
 This module is pure: it reads a ``GameState``, changes nothing, and has no
 randomness.
 """
@@ -55,11 +66,11 @@ randomness.
 from __future__ import annotations
 
 from collections import Counter
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from types import MappingProxyType
 
-from acequias.config import Preset, preset as preset_for
+from acequias.config import Blend, BlendRule, Preset, preset as preset_for
 from acequias.flow import WaterPath, vertex_thirds, water, wet_canals
 from acequias.hex import Hex, Vertex
 from acequias.model import GameState, Varietal
@@ -94,11 +105,25 @@ class WateredVineyard:
 
 
 @dataclass(frozen=True, slots=True)
+class WateredBodega:
+    """A bodega building (#166) with at least one of a player's watered thirds.
+
+    ``builder`` built it, ``thirds`` are the player's watered thirds (1 to
+    3), and ``points`` what they score from it.
+    """
+
+    vertex: Vertex
+    builder: str
+    thirds: int
+    points: int
+
+
+@dataclass(frozen=True, slots=True)
 class Score:
     """A player's final score, by term.
 
-    ``total == vineyards + bodega - rights_paid + rights_collected - debt
-    + season + seat_bonus - drought``, where ``drought`` is the drought loss actually
+    ``total == vineyards + bodega + blend + buildings - rights_paid
+    + rights_collected - debt + season + seat_bonus - drought``, where ``drought`` is the drought loss actually
     taken (clamped so a drought never takes the total below 0).
     Every term is in points: ``rights_paid`` and ``rights_collected`` are
     the rival-vineyard pairs times the preset's ``water_right_points``.
@@ -106,7 +131,11 @@ class Score:
     watered (the tie-break), and ``watered_vineyards`` lists them in hex
     order. ``bodegas`` is the number of bodega bonuses earned, so
     ``bodega == bodegas * bodega_points``. ``seat_bonus`` is the
-    preset's seat bonus for the player's round 1 position.
+    preset's seat bonus for the player's round 1 position. ``blend`` is
+    the blend bonus and ``blends`` the names (``Blend.name``) of the blends
+    scored, in the preset's order; ``buildings`` the bodega buildings'
+    points and ``watered_bodegas`` the buildings they come from, in vertex
+    order (#166). The total adds ``blend + buildings``.
     """
 
     player: str
@@ -123,6 +152,73 @@ class Score:
     drought: int = 0
     bodegas: int = 0
     seat_bonus: int = 0
+    blend: int = 0
+    blends: tuple[str, ...] = ()
+    buildings: int = 0
+    watered_bodegas: tuple[WateredBodega, ...] = ()
+
+
+def blend_points(
+    varietals: Iterable[Varietal], blends: Sequence[Blend], rule: BlendRule
+) -> tuple[int, tuple[Blend, ...]]:
+    """The blend bonus of a player's held vineyards, and the blends that score, in table order.
+
+    ``varietals`` holds one item per vineyard the player holds (repeats
+    allowed). ``EACH_ONCE``: every blend whose varietals are all held
+    scores once. ``DISJOINT``: the set of distinct blends with the most
+    points such that no vineyard counts twice (each varietal is used by at
+    most as many chosen blends as the player holds vineyards of it); on a
+    tie, the set that comes first when the blends are taken in table order.
+    """
+    counts = Counter(varietals)
+    key = tuple(sorted((v.name, n) for v, n in counts.items()))
+    return _blend_points(key, tuple(blends), rule)
+
+
+_BLEND_CACHE: dict[tuple, tuple[int, tuple[Blend, ...]]] = {}
+"""``blend_points`` by held counts, blend table and rule: the bots score the same holdings often."""
+
+
+def _blend_points(
+    counts: tuple[tuple[str, int], ...], blends: tuple[Blend, ...], rule: BlendRule
+) -> tuple[int, tuple[Blend, ...]]:
+    key = (counts, blends, rule)
+    found = _BLEND_CACHE.get(key)
+    if found is None:
+        if len(_BLEND_CACHE) > 8192:
+            _BLEND_CACHE.clear()
+        found = _BLEND_CACHE[key] = _search_blends(counts, blends, rule)
+    return found
+
+
+def _search_blends(
+    counts: tuple[tuple[str, int], ...], blends: tuple[Blend, ...], rule: BlendRule
+) -> tuple[int, tuple[Blend, ...]]:
+    held = {Varietal[name]: n for name, n in counts}
+    usable = [b for b in blends if all(held.get(v, 0) > 0 for v in b.varietals)]
+    if rule is BlendRule.EACH_ONCE:
+        return sum(b.points for b in usable), tuple(usable)
+    best: tuple[int, tuple[Blend, ...]] = (0, ())
+
+    def search(i: int, left: dict[Varietal, int], chosen: list[Blend], points: int) -> None:
+        nonlocal best
+        if points > best[0]:
+            best = (points, tuple(chosen))
+        if i == len(usable):
+            return
+        blend = usable[i]
+        if all(left[v] > 0 for v in blend.varietals):
+            for v in blend.varietals:
+                left[v] -= 1
+            chosen.append(blend)
+            search(i + 1, left, chosen, points + blend.points)
+            chosen.pop()
+            for v in blend.varietals:
+                left[v] += 1
+        search(i + 1, left, chosen, points)
+
+    search(0, dict(held), [], 0)
+    return best
 
 
 def bodega_count(varietals: Iterable[Varietal], size: int) -> int:
@@ -208,6 +304,17 @@ def calculate_score(state: GameState, preset: Preset | None = None) -> Mapping[s
                         planter=vineyard.owner, thirds=thirds, points=split_points(value, thirds),
                     )
                 )
+    built: dict[str, list[WateredBodega]] = {p.id: [] for p in players}
+    if board.bodegas:
+        wet = wet_canals(board)
+        worth = preset.bodega_building_points
+        thirds_at = vertex_thirds(board, wet, [b.vertex for b in board.bodegas])
+        for bodega in board.bodegas:
+            for pid, thirds in thirds_at[bodega.vertex].items():
+                if pid in built:
+                    built[pid].append(
+                        WateredBodega(bodega.vertex, bodega.owner, thirds, split_points(worth, thirds))
+                    )
 
     scores: dict[str, Score] = {}
     for p in players:
@@ -215,12 +322,23 @@ def calculate_score(state: GameState, preset: Preset | None = None) -> Mapping[s
         vineyards = sum(
             v.points if v.vertex is not None else preset.varietal_points[v.varietal] for v in mine
         )
-        bodegas = bodega_count((v.varietal for v in mine), preset.bodega_varietals)
-        if not preset.multiple_bodegas:
-            bodegas = min(bodegas, 1)
+        if preset.varietal_bodega:
+            bodegas = bodega_count((v.varietal for v in mine), preset.bodega_varietals)
+            if not preset.multiple_bodegas:
+                bodegas = min(bodegas, 1)
+        else:
+            bodegas = 0
         bodega = preset.bodega_points * bodegas
+        blend, scored = (
+            blend_points((v.varietal for v in mine), preset.blends, preset.blend_rule)
+            if preset.blends else (0, ())
+        )
+        buildings = sum(b.points for b in built[p.id])
         paid = sum(len(v.pays) for v in mine) * preset.water_right_points
-        before = vineyards + bodega - paid + collected[p.id] - p.debt + p.season + bonus_of[p.id]
+        before = (
+            vineyards + bodega + blend + buildings - paid + collected[p.id] - p.debt + p.season
+            + bonus_of[p.id]
+        )
         drought = min(p.drought, max(0, before))
         total = before - drought
         scores[p.id] = Score(
@@ -238,6 +356,10 @@ def calculate_score(state: GameState, preset: Preset | None = None) -> Mapping[s
             drought=drought,
             bodegas=bodegas,
             seat_bonus=bonus_of[p.id],
+            blend=blend,
+            blends=tuple(b.name for b in scored),
+            buildings=buildings,
+            watered_bodegas=tuple(built[p.id]),
         )
     return MappingProxyType(scores)
 
