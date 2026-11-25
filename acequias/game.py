@@ -20,6 +20,13 @@ then the round's start player takes their turn. ``next_season_roll``
 says when the next season roll is due and who makes it. The game ends after the preset's round
 count: the state after the last turn has ``round == rounds + 1``.
 
+Under Rules v3 (vertex planting) a turn is the mandatory roll, the
+face's use if one is pending, then the player's actions (one, two after a
+good season, none after a drought) or a pass; the turn moves on once no
+face is pending and ``GameState.actions_left`` has no action left, and
+``actions_left`` goes back to None for the next player. There is no
+season roll.
+
 ``act`` checks the turn and applies one action through
 ``acequias.turn.apply``; ``play_game`` asks bots for actions until the game
 is over and logs every action (a die turn is two records); ``replay`` plays a log again. Dice and bots use
@@ -34,6 +41,7 @@ import random
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, replace
 
+from acequias.config import PlantingRules
 from acequias.config import preset as shipped_preset
 from acequias.model import DieFace, GameState, SeasonRoll
 from acequias.turn import Action, RollActionDie, apply, roll_face
@@ -127,6 +135,11 @@ def _next_turn(state: GameState, after: GameState, player: str) -> GameState:
     """
     if after.pending_face is not None:
         return after
+    p = state.preset or shipped_preset(state.mode)
+    if p.planting is PlantingRules.VERTICES:  # Rules v3: the turn lasts until no action is left
+        if after.actions_left is None or after.actions_left.actions > 0:
+            return after
+        after = replace(after, actions_left=None)
     if state.season_roll is not None:  # the season roll is done: the start player's turn
         return replace(after, current_player=after.start_player)
 
@@ -137,7 +150,6 @@ def _next_turn(state: GameState, after: GameState, player: str) -> GameState:
     seats = _seat_order(state)
     start = seats[(seats.index(state.start_player) + 1) % len(seats)]
     round = state.round + 1
-    p = state.preset or shipped_preset(state.mode)
     if round <= _round_count(state) and p.is_season_round(round):
         return replace(
             after, round=round, start_player=start,

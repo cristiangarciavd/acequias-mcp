@@ -43,11 +43,14 @@ from acequias.setup import new_game
 from acequias.turn import (
     Bribe,
     DeclineFace,
+    MoveVineyard,
     Pass,
     PlaceCanal,
     PlaceFloodgate,
+    Plant,
     Release,
     Resow,
+    ResowVineyard,
     RollActionDie,
 )
 
@@ -76,6 +79,15 @@ ACTION_NAMES = (
 )
 """Each action type and its key in ``SimResult.actions_per_game``; the die's
 floodgate face counts as ``"floodgate"``."""
+
+V3_ACTION_NAMES = (
+    (Plant, "plant"),
+    (ResowVineyard, "resow"),
+    (MoveVineyard, "move"),
+)
+"""The Rules v3 actions and their keys, added to ``ACTION_NAMES`` under vertex
+planting only (so Rules v1/v2 results keep their keys); a v3 resow counts
+as ``"resow"``."""
 
 DIE_FACE_NAMES = tuple(face.value for face in DieFace)
 """The keys of ``SimResult.die_faces_per_game``."""
@@ -232,7 +244,8 @@ class SimResult:
     actions_per_game: Mapping[str, float] = field(hash=False)
     """The mean number of each action per game, keyed ``"canal"``,
     ``"floodgate"``, ``"bribe"``, ``"pass"``, ``"die"``, ``"release"``,
-    ``"resow"``, ``"decline"``; they add up to ``turns_per_game``."""
+    ``"resow"``, ``"decline"``, and under vertex planting (Rules v3) also
+    ``"plant"`` and ``"move"``; they add up to ``turns_per_game``."""
     games_with_bribe: float
     """Share of games whose log has at least one ``Bribe``."""
     games_with_floodgate: float
@@ -309,7 +322,10 @@ def summarize(rules: SimRules, seed: int, records: Iterable[GameRecord]) -> SimR
     terms: dict[str, list[int]] = {term: [] for term in SCORE_TERMS}
     best_totals: list[int] = []
     turns: list[int] = []
-    actions = {name: 0 for _, name in ACTION_NAMES}
+    names = ACTION_NAMES
+    if preset.planting is PlantingRules.VERTICES:
+        names += V3_ACTION_NAMES
+    actions = {name: 0 for _, name in names}
     shared = with_bribe = with_floodgate = bodegas = 0
     briber_credit: list[float] = []
     other_credit: list[float] = []
@@ -343,7 +359,7 @@ def summarize(rules: SimRules, seed: int, records: Iterable[GameRecord]) -> SimR
             with_die += 1
             rolls += game_rolls
         for r in record.log:
-            for kind, name in ACTION_NAMES:
+            for kind, name in names:
                 if isinstance(r.action, kind):
                     actions[name] += 1
 
@@ -417,6 +433,10 @@ def _preset_values(preset: Preset) -> Mapping[str, object]:
             # Written only when set (Rules v3), so Rules v1/v2 results are unchanged.
             if value is not PlantingRules.HEXES:
                 values[f.name] = value.value
+            continue
+        if f.name == "resow_can_move":
+            if value:  # Rules v3 only, written only when set, like ``planting``
+                values[f.name] = value
             continue
         if f.name == "mode":
             value = _MODE_NAMES[value]

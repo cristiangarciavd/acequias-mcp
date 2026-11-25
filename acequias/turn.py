@@ -67,6 +67,38 @@ smallest rotation that opens the same edges; a floodgate edge named from
 the canal side with the smaller hex), and ``apply`` accepts any spelling
 of them and gives the same state.
 
+Rules v3 (``Preset.planting`` ``VERTICES``, #149) has its own turn, kept
+apart from the above. Only ``current_player`` acts, and the turn is:
+
+1. ``RollActionDie()``, mandatory (the only legal action while
+   ``GameState.actions_left`` is None): one ``rng.choice(preset.action_die)``.
+   Floodgate and release add ``Preset.action_die_cost`` (the bribe) to the
+   roller's debt, even when the face has no use; resow, good season, and
+   drought are free. The roll sets ``actions_left``: 2 actions with at most
+   1 canal after a good season, none after a drought, 1 otherwise. A
+   floodgate, release, or resow face with a use is left pending: floodgate
+   (``PlaceFloodgate`` from the die) and release (``Release``) are
+   mandatory, so ``DeclineFace`` is illegal for them; resow is optional:
+   ``ResowVineyard`` (one ``rng.choice(preset.roulette)``) on any planted
+   vineyard, ``MoveVineyard`` of one's own vineyard to a spot they may
+   plant on (with ``Preset.resow_can_move``; no draw), or ``DeclineFace``.
+2. The actions: ``PlaceCanal`` (as above, from the market, no claims),
+   ``Plant`` on a spot of ``acequias.flow.plantable_spots`` (one
+   ``rng.choice(preset.roulette)``; under a ``grape_clusters_per_player``
+   cap only while the player holds fewer vineyards), or ``Pass``, always
+   legal, which ends the turn. A canal is illegal once ``canals`` is 0.
+
+There are no claims, bribes, season rolls, or season points under Rules v3;
+the d6 ``Bribe``, the market ``PlaceFloodgate``, and the hex ``Resow`` are
+illegal, and ``Plant``, ``ResowVineyard``, and ``MoveVineyard`` are illegal
+under hex planting. ``legal_actions`` lists, for ``current_player`` only:
+``RollActionDie()`` before the roll; a pending face's uses (floodgates and
+releases in edge order, then resows by vertex, then moves by vertex and
+target), then ``DeclineFace()`` for resow; otherwise canal placements,
+plants by vertex, then ``Pass()``. ``acequias.game`` ends the turn once no
+face is pending and no action is left. Nothing here depends on the board's
+bounds or ``Board.spots``, so the turn also fits an open board.
+
 Watering comes from ``acequias.flow.water``; the die size from the game's
 preset. Standard library only; no global randomness.
 """
@@ -76,18 +108,20 @@ from __future__ import annotations
 import random
 from dataclasses import dataclass, replace
 
-from acequias.config import BribeRules, Preset, VarietalRules
+from acequias.config import BribeRules, PlantingRules, Preset, VarietalRules
 from acequias.config import preset as shipped_preset
-from acequias.flow import _watered
-from acequias.hex import Direction, Hex
+from acequias.flow import _watered, can_plant, plantable_spots
+from acequias.hex import Direction, Hex, Vertex
 from acequias.model import (
     ROTATIONS,
+    ActionsLeft,
     Board,
     DieFace,
     Floodgate,
     GameState,
     PieceKind,
     PlacedCanal,
+    PlantedVineyard,
     SeasonRoll,
     Terrain,
 )
@@ -101,6 +135,9 @@ __all__ = [
     "Release",
     "Resow",
     "DeclineFace",
+    "Plant",
+    "ResowVineyard",
+    "MoveVineyard",
     "Action",
     "IllegalAction",
     "apply",
@@ -206,12 +243,59 @@ class DeclineFace:
     """Leave the rolled die face unused; its cost stays paid."""
 
 
+@dataclass(frozen=True)
+class Plant:
+    """Rules v3: plant a vineyard on ``vertex``; the roulette picks its varietal."""
+
+    vertex: Vertex
+
+    def __post_init__(self) -> None:
+        _check_type("Plant.vertex", self.vertex, Vertex)
+
+
+@dataclass(frozen=True)
+class ResowVineyard:
+    """Rules v3 resow face: spin the roulette again for the vineyard planted on ``vertex``."""
+
+    vertex: Vertex
+
+    def __post_init__(self) -> None:
+        _check_type("ResowVineyard.vertex", self.vertex, Vertex)
+
+
+@dataclass(frozen=True)
+class MoveVineyard:
+    """Rules v3 resow face with ``resow_can_move``: move your vineyard on ``vertex`` to ``to``.
+
+    The vineyard keeps its varietal; ``to`` must be a spot you may plant on.
+    """
+
+    vertex: Vertex
+    to: Vertex
+
+    def __post_init__(self) -> None:
+        _check_type("MoveVineyard.vertex", self.vertex, Vertex)
+        _check_type("MoveVineyard.to", self.to, Vertex)
+
+
 Action = (
-    PlaceCanal | PlaceFloodgate | Bribe | Pass | RollActionDie | Release | Resow | DeclineFace
+    PlaceCanal
+    | PlaceFloodgate
+    | Bribe
+    | Pass
+    | RollActionDie
+    | Release
+    | Resow
+    | DeclineFace
+    | Plant
+    | ResowVineyard
+    | MoveVineyard
 )
 _ACTION_TYPES = (
-    PlaceCanal, PlaceFloodgate, Bribe, Pass, RollActionDie, Release, Resow, DeclineFace
+    PlaceCanal, PlaceFloodgate, Bribe, Pass, RollActionDie, Release, Resow, DeclineFace,
+    Plant, ResowVineyard, MoveVineyard,
 )
+_V3_ACTIONS = (Plant, ResowVineyard, MoveVineyard)
 _FACE_ACTIONS = {
     DieFace.FLOODGATE: PlaceFloodgate,
     DieFace.RELEASE: Release,
@@ -239,10 +323,16 @@ def apply(state: GameState, player: str, action: Action, rng: random.Random) -> 
     if not isinstance(action, _ACTION_TYPES):
         raise TypeError(
             "action must be PlaceCanal, PlaceFloodgate, Bribe, Pass, RollActionDie, "
-            f"Release, Resow, or DeclineFace, got {action!r}"
+            f"Release, Resow, DeclineFace, Plant, ResowVineyard, or MoveVineyard, got {action!r}"
         )
     _check_player(state, player)
     preset = _preset(state)
+    if preset.planting is PlantingRules.VERTICES:
+        return _apply_v3(state, player, action, rng, preset)
+    if isinstance(action, _V3_ACTIONS):
+        raise IllegalAction(
+            f"{type(action).__name__} is only legal under vertex planting (Rules v3)"
+        )
 
     if state.pending_face is not None:
         return _resolve_face(state, player, action, rng)
@@ -297,10 +387,14 @@ def legal_actions(state: GameState, player: str) -> tuple[Action, ...]:
     ``DeclineFace()``: floodgate edges or releases in the bribe edge order,
     or resows by hex. It is empty for any player but ``current_player``.
     With a season roll ``DUE`` it is ``(RollActionDie(),)`` for
-    ``current_player`` and empty for everyone else.
+    ``current_player`` and empty for everyone else. Under Rules v3 the
+    order is the one in the module docstring.
     """
     _check_type("state", state, GameState)
     _check_player(state, player)
+    preset = _preset(state)
+    if preset.planting is PlantingRules.VERTICES:
+        return _legal_v3(state, player, preset)
     face = state.pending_face
     if face is not None:
         if player != state.current_player:
@@ -308,7 +402,7 @@ def legal_actions(state: GameState, player: str) -> tuple[Action, ...]:
         return (*_face_uses(state.board, face), DeclineFace())
     if state.season_roll is SeasonRoll.DUE:
         return (RollActionDie(),) if player == state.current_player else ()
-    action_die = _preset(state).bribe_rules is BribeRules.ACTION_DIE
+    action_die = preset.bribe_rules is BribeRules.ACTION_DIE
     canals = _canal_placements(state)
     gates = _floodgate_placements(state)
     bribes: list[Bribe] = [] if action_die else _bribes(state.board)
@@ -597,6 +691,155 @@ def _face_uses(board: Board, face: DieFace) -> list[Action]:
         )
         return [Release(h, d) for h, d in gates]
     return [Resow(hex) for hex, _ in board.claims]  # claims are stored by hex
+
+
+# --- Rules v3 turn -------------------------------------------------------------
+
+_BRIBE_FACES = (DieFace.FLOODGATE, DieFace.RELEASE)  # cost the bribe; also mandatory
+
+
+def _apply_v3(
+    state: GameState, player: str, action: Action, rng: random.Random, preset: Preset
+) -> GameState:
+    """``apply`` under Rules v3 (vertex planting); see the module docstring."""
+    name = type(action).__name__
+    if player != state.current_player:
+        raise IllegalAction(f"it is {state.current_player}'s turn; {player} cannot act")
+    if state.pending_face is not None:
+        return _resolve_v3_face(state, player, action, rng, preset)
+    left = state.actions_left
+    if left is None:
+        if not isinstance(action, RollActionDie):
+            raise IllegalAction(f"{player} must roll the action die first, not {name}")
+        return _roll_v3(state, player, rng, preset)
+    if left.actions == 0:
+        raise IllegalAction(f"{player} has no action left this turn")
+    if isinstance(action, Pass):
+        return replace(state, actions_left=ActionsLeft(0, 0))
+    if isinstance(action, PlaceCanal):
+        if left.canals == 0:
+            raise IllegalAction("only one canal per turn; plant or pass")
+        board = _canal_board(state, player, action)
+        state = _take_from_market(state, board, action.kind)
+        return replace(state, actions_left=ActionsLeft(left.actions - 1, left.canals - 1))
+    if isinstance(action, Plant):
+        _check_plant(state, player, action.vertex, preset)
+        varietal = rng.choice(preset.roulette)
+        planted = state.board.planted + (PlantedVineyard(action.vertex, player, varietal),)
+        actions = left.actions - 1
+        return replace(
+            state,
+            board=state.board._derive(planted=planted),  # checked by _check_plant
+            actions_left=ActionsLeft(actions, min(left.canals, actions)),
+        )
+    raise IllegalAction(f"{name} is not a Rules v3 action here; place a canal, plant, or pass")
+
+
+def _roll_v3(state: GameState, player: str, rng: random.Random, preset: Preset) -> GameState:
+    """The state after ``player``'s mandatory roll: the bribe paid, the face pending or applied."""
+    face = roll_face(preset, rng)
+    cost = preset.action_die_cost if face in _BRIBE_FACES else 0
+    players = tuple(
+        replace(p, debt=p.debt + cost) if p.id == player else p for p in state.players
+    )
+    if face is DieFace.GOOD_SEASON:
+        left = ActionsLeft(2, 1)
+    elif face is DieFace.DROUGHT:
+        left = ActionsLeft(0, 0)
+    else:
+        left = ActionsLeft(1, 1)
+    state = replace(state, players=players, actions_left=left)
+    if face.is_season or not _v3_face_uses(state.board, player, face, preset):
+        return state
+    return replace(state, pending_face=face)
+
+
+def _resolve_v3_face(
+    state: GameState, player: str, action: Action, rng: random.Random, preset: Preset
+) -> GameState:
+    """The state after ``player`` uses (or, for resow, declines) the pending face."""
+    face = state.pending_face
+    if isinstance(action, DeclineFace):
+        if face in _BRIBE_FACES:
+            raise IllegalAction(f"the {face.value} face is mandatory; it cannot be declined")
+        return replace(state, pending_face=None)
+    board = state.board
+    if face is DieFace.FLOODGATE and isinstance(action, PlaceFloodgate):
+        board = _floodgate_board(state, action)
+    elif face is DieFace.RELEASE and isinstance(action, Release):
+        board = _release_board(state, action)
+    elif face is DieFace.RESOW and isinstance(action, ResowVineyard):
+        vineyard = board.planted_at(action.vertex)
+        if vineyard is None:
+            raise IllegalAction(f"no vineyard is planted on {action.vertex}")
+        varietal = rng.choice(preset.roulette)
+        rest = tuple(v for v in board.planted if v != vineyard)
+        board = board._derive(planted=rest + (replace(vineyard, varietal=varietal),))
+    elif face is DieFace.RESOW and isinstance(action, MoveVineyard) and preset.resow_can_move:
+        vineyard = board.planted_at(action.vertex)
+        if vineyard is None or vineyard.owner != player:
+            raise IllegalAction(f"{player} has no vineyard on {action.vertex} to move")
+        if not can_plant(board, player, action.to):
+            raise IllegalAction(f"{player} may not plant on {action.to}")
+        rest = tuple(v for v in board.planted if v != vineyard)
+        board = board._derive(planted=rest + (replace(vineyard, vertex=action.to),))
+    else:
+        raise IllegalAction(
+            f"the pending {face.value} face does not allow {type(action).__name__}"
+        )
+    return replace(state, board=board, pending_face=None)
+
+
+def _v3_face_uses(board: Board, player: str, face: DieFace, preset: Preset) -> list[Action]:
+    """Every use of a personal ``face`` for ``player`` under Rules v3, in ``legal_actions`` order."""
+    if face is DieFace.RESOW:
+        uses: list[Action] = [ResowVineyard(v.vertex) for v in board.planted]
+        if preset.resow_can_move:
+            mine = [v.vertex for v in board.planted if v.owner == player]
+            spots = plantable_spots(board, player) if mine else ()
+            uses += [MoveVineyard(v, to) for v in mine for to in spots]
+        return uses
+    return _face_uses(board, face)
+
+
+def _check_plant(state: GameState, player: str, vertex: Vertex, preset: Preset) -> None:
+    if not can_plant(state.board, player, vertex):
+        raise IllegalAction(
+            f"{player} may not plant on {vertex}: it must be free and touch one of "
+            "their own canals that carries water"
+        )
+    if not _below_cap(state, player, preset):
+        raise IllegalAction(
+            f"{player} already holds grape_clusters_per_player "
+            f"({preset.grape_clusters_per_player}) vineyards"
+        )
+
+
+def _below_cap(state: GameState, player: str, preset: Preset) -> bool:
+    cap = preset.grape_clusters_per_player
+    return cap is None or sum(1 for v in state.board.planted if v.owner == player) < cap
+
+
+def _legal_v3(state: GameState, player: str, preset: Preset) -> tuple[Action, ...]:
+    """``legal_actions`` under Rules v3; see the module docstring."""
+    if player != state.current_player:
+        return ()
+    face = state.pending_face
+    if face is not None:
+        uses = _v3_face_uses(state.board, player, face, preset)
+        return tuple(uses) if face in _BRIBE_FACES else (*uses, DeclineFace())
+    left = state.actions_left
+    if left is None:
+        return (RollActionDie(),)
+    if left.actions == 0:
+        return ()
+    canals = _canal_placements(state) if left.canals else []
+    plants = (
+        [Plant(v) for v in plantable_spots(state.board, player)]
+        if _below_cap(state, player, preset)
+        else []
+    )
+    return (*canals, *plants, Pass())
 
 
 # --- Shared ------------------------------------------------------------------

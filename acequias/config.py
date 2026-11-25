@@ -212,7 +212,13 @@ class Preset:
     where vineyards grow: on vineyard tiles, or on vertices (Rules v3,
     opt-in). Under ``VERTICES`` the board has no vineyard tiles, so
     ``vineyards_per_player`` and ``vineyard_distance`` place nothing, and
-    roulette varietal rules are required.
+    roulette varietal rules and action die bribe rules are required. Vertex
+    planting also turns on the Rules v3 turn (``acequias.turn``): a
+    mandatory die roll, then one action; ``action_die_cost`` is then the
+    bribe the floodgate and release faces cost, and ``season_roll_every``
+    is ignored (no season roll, ``is_season_round`` is always False).
+    ``resow_can_move`` (off by default; vertex planting only) lets the
+    resow face move one of the roller's vineyards instead of respinning.
     """
 
     mode: Mode
@@ -241,6 +247,7 @@ class Preset:
     season_roll_personal_faces: bool = True
     seat_bonus: Mapping[int, tuple[int, ...]] = field(default_factory=lambda: MappingProxyType({}))
     planting: PlantingRules = PlantingRules.HEXES
+    resow_can_move: bool = False
 
     def __post_init__(self) -> None:
         _check_type("mode", self.mode, Mode)
@@ -281,6 +288,11 @@ class Preset:
             and self.varietal_rules is not VarietalRules.ROULETTE
         ):
             raise ValueError("vertex planting needs roulette varietal rules")
+        if self.planting is PlantingRules.VERTICES and self.bribe_rules is not BribeRules.ACTION_DIE:
+            raise ValueError("vertex planting needs action_die bribe rules")
+        _check_type("resow_can_move", self.resow_can_move, bool)
+        if self.resow_can_move and self.planting is not PlantingRules.VERTICES:
+            raise ValueError("resow_can_move needs vertex planting")
         if self.season_roll_every is not None and self.bribe_rules is not BribeRules.ACTION_DIE:
             raise ValueError("season_roll_every needs action_die bribe rules")
         if self.bribe_rules is BribeRules.ACTION_DIE:
@@ -342,7 +354,12 @@ class Preset:
         return max(1, self.season_gain // 2)
 
     def is_season_round(self, round: int) -> bool:
-        """Whether ``round`` starts with a free season roll: every ``season_roll_every``-th round."""
+        """Whether ``round`` starts with a free season roll: every ``season_roll_every``-th round.
+
+        Never under vertex planting (Rules v3 has no season roll).
+        """
+        if self.planting is PlantingRules.VERTICES:
+            return False
         return self.season_roll_every is not None and round % self.season_roll_every == 0
 
     @property

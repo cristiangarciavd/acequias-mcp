@@ -448,6 +448,11 @@ _PLANTING_DESCRIPTION = (
     "(Rules v3, opt-in: no vineyard tiles; vineyards are planted on hex vertices next "
     "to the planter's own watered canal). \"vertices\" needs varietal_rules \"roulette\"."
 )
+_RESOW_CAN_MOVE_DESCRIPTION = (
+    'Rules v3 only (planting "vertices"): whether the resow face may instead move one of the '
+    "roller's vineyards to another spot they may plant on. false by default; left out of "
+    "simulate_game's JSON when false."
+)
 
 
 class PresetJSON(BaseModel):
@@ -578,6 +583,7 @@ class PresetOverridesJSON(TypedDict, total=False):
         Field(description=_SEAT_BONUS_DESCRIPTION + " Each list has one int >= 0 per player."),
     ]
     planting: Annotated[PlantingName, Field(description=_PLANTING_DESCRIPTION)]
+    resow_can_move: Annotated[StrictBool, Field(description=_RESOW_CAN_MOVE_DESCRIPTION)]
 
 
 def overrides_from_json(overrides: Mapping[str, Any]) -> dict[str, Any]:

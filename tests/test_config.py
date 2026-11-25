@@ -126,6 +126,7 @@ README_VALUES = {
         season_roll_personal_faces=False,
         seat_bonus={},
         planting=PlantingRules.HEXES,
+        resow_can_move=False,
     ),
     Mode.FLASH: dict(
         rounds={2: 6, 3: 6},
@@ -153,6 +154,7 @@ README_VALUES = {
         season_roll_personal_faces=False,
         seat_bonus={},
         planting=PlantingRules.HEXES,
+        resow_can_move=False,
     ),
 }
 
