@@ -38,7 +38,12 @@ The other shapes, read and written by `calculate_score`:
 - player: `{"id", "debt", "season", "drought"}` (`season` and `drought` optional,
   default 0); the list order is the seat order (seats 1 to N)
 - score: one `Score`, its `watered_vineyards` each with the canal path in the
-  canal shape
+  canal shape; a vertex vineyard (Rules v3) has `hexes` (its vertex) in place
+  of `q` and `r`
+- planted vineyard (Rules v3): `{"hexes", "player", "varietal"}`, one
+  `PlantedVineyard`; a vertex is its 3 hexes `[[q, r], [q, r], [q, r]]` in
+  hex order
+- river strip (Rules v3 open board): `{"segments": [[[q, r], ...], ...]}`
 
 The preset shape, written by `simulate_game` (the `preset` of
 `SimResult.to_json()`) and read back as its `overrides`: `mode` by value,
@@ -85,6 +90,7 @@ from pydantic import (
     Field,
     StrictBool,
     StrictInt,
+    model_validator,
     with_config,
 )
 from typing_extensions import TypedDict
@@ -325,13 +331,67 @@ class PlayerJSON(BaseModel):
     )
 
 
-class WateredVineyardJSON(BaseModel):
-    """One watered claimed vineyard and the water rights it causes."""
+def _is_none(value: object) -> bool:
+    return value is None
+
+
+VertexJSON = Annotated[
+    list[Annotated[list[int], Field(min_length=2, max_length=2)]],
+    Field(
+        min_length=3,
+        max_length=3,
+        description="A hex vertex (Rules v3) as its 3 hexes, [[q, r], [q, r], [q, r]], in hex order.",
+    ),
+]
+
+
+class PlantedVineyardJSON(BaseModel):
+    """A vineyard planted on a hex vertex (Rules v3): its spot, its owner, and its varietal."""
 
     model_config = ConfigDict(extra="forbid", strict=True)
 
-    q: int = Field(description="Axial q coordinate of the vineyard.")
-    r: int = Field(description="Axial r coordinate of the vineyard.")
+    hexes: VertexJSON
+    player: str = Field(description="Id of the player who planted it (its owner).")
+    varietal: VarietalName = Field(description="The grape the roulette gave it (lowercase ASCII).")
+
+
+class RiverStripJSON(BaseModel):
+    """The river strip of a Rules v3 open board (board_shape "river_strip")."""
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    segments: list[list[Annotated[list[int], Field(min_length=2, max_length=2)]]] = Field(
+        description=(
+            "The printed river pieces north to south, each its river hexes [q, r] north to "
+            "south, one per row from r 0. East of each row's river hex the table is open."
+        )
+    )
+
+
+class WateredVineyardJSON(BaseModel):
+    """One watered vineyard and the water rights it causes.
+
+    A hex vineyard has `q` and `r`; a vertex vineyard (Rules v3) has `hexes`
+    instead.
+    """
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    q: int | None = Field(
+        default=None, exclude_if=_is_none,
+        description="Axial q coordinate of a hex vineyard; left out for a vertex vineyard.",
+    )
+    r: int | None = Field(
+        default=None, exclude_if=_is_none,
+        description="Axial r coordinate of a hex vineyard; left out for a vertex vineyard.",
+    )
+    hexes: VertexJSON | None = Field(
+        default=None, exclude_if=_is_none,
+        description=(
+            "Rules v3: the vertex the vineyard is planted on, as its 3 hexes [[q, r], ...]; "
+            "left out for a hex vineyard."
+        ),
+    )
     varietal: VarietalName = Field(description="The grape (lowercase ASCII).")
     path: list[CanalJSON] = Field(
         description="The canals the water runs through, from the river end to the vineyard."
@@ -339,6 +399,14 @@ class WateredVineyardJSON(BaseModel):
     pays: list[str] = Field(
         description="Rival ids the claimant pays 1 point each (owners on the path), in seat order."
     )
+
+    @model_validator(mode="after")
+    def _one_spot(self) -> WateredVineyardJSON:
+        if self.hexes is None and (self.q is None or self.r is None):
+            raise ValueError("a watered vineyard needs q and r (a hex) or hexes (a vertex)")
+        if self.hexes is not None and (self.q is not None or self.r is not None):
+            raise ValueError("a watered vineyard has q and r (a hex) or hexes (a vertex), not both")
+        return self
 
 
 _BODEGAS_DESCRIPTION = (
@@ -504,6 +572,25 @@ class PresetJSON(BaseModel):
     multiple_bodegas: bool = Field(description=_MULTIPLE_BODEGAS_DESCRIPTION)
     season_roll_personal_faces: bool = Field(description=_SEASON_ROLL_PERSONAL_FACES_DESCRIPTION)
     seat_bonus: dict[PlayerCountName, list[int]] = Field(description=_SEAT_BONUS_DESCRIPTION)
+    # Rules v3 options (#149), left out of simulate_game's JSON at their defaults.
+    planting: PlantingName | None = Field(
+        default=None, exclude_if=_is_none,
+        description=_PLANTING_DESCRIPTION + ' Left out when "hexes".',
+    )
+    resow_can_move: bool | None = Field(
+        default=None, exclude_if=_is_none, description=_RESOW_CAN_MOVE_DESCRIPTION
+    )
+    board_shape: BoardShapeName | None = Field(
+        default=None, exclude_if=_is_none,
+        description=_BOARD_SHAPE_DESCRIPTION + ' Left out when "field".',
+    )
+    river_hexes_per_segment: int | None = Field(
+        default=None, exclude_if=_is_none,
+        description=_RIVER_HEXES_DESCRIPTION + " Left out at the default.",
+    )
+    bag_size: dict[PlayerCountName, int] | None = Field(
+        default=None, exclude_if=_is_none, description=_BAG_SIZE_DESCRIPTION + " Left out when {}."
+    )
 
 
 @with_config(ConfigDict(extra="forbid"))
@@ -1095,8 +1182,10 @@ def strip_to_json(board: Board) -> dict[str, Any] | None:
     return {"segments": [[[h.q, h.r] for h in segment] for segment in board.strip.segments]}
 
 
-def strip_from_json(item: Mapping[str, Any]) -> Board:
+def strip_from_json(item: Mapping[str, Any] | RiverStripJSON) -> Board:
     """The river strip `Board` for one object of `strip_to_json`; `RiverStrip` checks it."""
+    if isinstance(item, RiverStripJSON):
+        item = item.model_dump()
     if not isinstance(item, Mapping) or set(item) != {"segments"}:
         raise ValueError(f"a river strip must be an object with exactly the key segments, got {item!r}")
     segments = item["segments"]
@@ -1118,8 +1207,10 @@ def planted_to_json(board: Board) -> list[dict[str, Any]]:
     ]
 
 
-def planted_from_json(item: Mapping[str, Any]) -> PlantedVineyard:
+def planted_from_json(item: Mapping[str, Any] | PlantedVineyardJSON) -> PlantedVineyard:
     """The `PlantedVineyard` for one object of `planted_to_json`."""
+    if isinstance(item, PlantedVineyardJSON):
+        item = item.model_dump()
     if not isinstance(item, Mapping):
         raise TypeError(f"a planted vineyard must be an object, got {item!r}")
     if set(item) != {"hexes", "player", "varietal"}:

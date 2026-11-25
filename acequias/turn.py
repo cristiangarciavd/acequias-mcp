@@ -737,7 +737,11 @@ def _apply_v3(
 
 def _roll_v3(state: GameState, player: str, rng: random.Random, preset: Preset) -> GameState:
     """The state after ``player``'s mandatory roll: the bribe paid, the face pending or applied."""
-    face = roll_face(preset, rng)
+    return _v3_rolled(state, player, roll_face(preset, rng), preset)
+
+
+def _v3_rolled(state: GameState, player: str, face: DieFace, preset: Preset) -> GameState:
+    """The state after ``player``'s mandatory roll shows ``face``; no draw. The bots plan with it."""
     cost = preset.action_die_cost if face in _BRIBE_FACES else 0
     players = tuple(
         replace(p, debt=p.debt + cost) if p.id == player else p for p in state.players
@@ -763,18 +767,27 @@ def _resolve_v3_face(
         if face in _BRIBE_FACES:
             raise IllegalAction(f"the {face.value} face is mandatory; it cannot be declined")
         return replace(state, pending_face=None)
+    board = _v3_face_board(state, player, action, preset)
+    if isinstance(action, ResowVineyard):
+        board = _respun(board, action.vertex, rng.choice(preset.roulette))
+    return replace(state, board=board, pending_face=None)
+
+
+def _v3_face_board(state: GameState, player: str, action: Action, preset: Preset) -> Board:
+    """The board after ``player`` uses the pending face with ``action``; no draw.
+
+    A ``ResowVineyard`` is checked and leaves the board as it is (``apply``
+    then respins the vineyard). Raises ``IllegalAction`` as ``apply`` does.
+    """
+    face = state.pending_face
     board = state.board
     if face is DieFace.FLOODGATE and isinstance(action, PlaceFloodgate):
         board = _floodgate_board(state, action)
     elif face is DieFace.RELEASE and isinstance(action, Release):
         board = _release_board(state, action)
     elif face is DieFace.RESOW and isinstance(action, ResowVineyard):
-        vineyard = board.planted_at(action.vertex)
-        if vineyard is None:
+        if board.planted_at(action.vertex) is None:
             raise IllegalAction(f"no vineyard is planted on {action.vertex}")
-        varietal = rng.choice(preset.roulette)
-        rest = tuple(v for v in board.planted if v != vineyard)
-        board = board._derive(planted=rest + (replace(vineyard, varietal=varietal),))
     elif face is DieFace.RESOW and isinstance(action, MoveVineyard) and preset.resow_can_move:
         vineyard = board.planted_at(action.vertex)
         if vineyard is None or vineyard.owner != player:
@@ -787,7 +800,37 @@ def _resolve_v3_face(
         raise IllegalAction(
             f"the pending {face.value} face does not allow {type(action).__name__}"
         )
-    return replace(state, board=board, pending_face=None)
+    return board
+
+
+def _respun(board: Board, vertex: Vertex, varietal) -> Board:
+    """``board`` with the vineyard planted on ``vertex`` given ``varietal``."""
+    vineyard = board.planted_at(vertex)
+    rest = tuple(v for v in board.planted if v != vineyard)
+    return board._derive(planted=rest + (replace(vineyard, varietal=varietal),))
+
+
+def _v3_board_after(state: GameState, player: str, action: Action) -> tuple[Board, Vertex | None]:
+    """The board after ``player`` takes a Rules v3 action or face use, with no draw.
+
+    Also returns the vertex whose varietal the roulette would pick (a
+    ``Plant`` or ``ResowVineyard``), else None. A ``Plant`` is planted with
+    the roulette's first sector as a stand-in; a ``ResowVineyard`` keeps the
+    old varietal. The market is left out. Raises ``IllegalAction`` as
+    ``apply`` does for a ``PlaceCanal``, ``Plant``, or face use; ``state``
+    and ``player`` must already be checked. The bots weigh moves with it.
+    """
+    preset = _preset(state)
+    if state.pending_face is not None:
+        board = _v3_face_board(state, player, action, preset)
+        return board, action.vertex if isinstance(action, ResowVineyard) else None
+    if isinstance(action, PlaceCanal):
+        return _canal_board(state, player, action), None
+    if isinstance(action, Plant):
+        _check_plant(state, player, action.vertex, preset)
+        vineyard = PlantedVineyard(action.vertex, player, preset.roulette[0])
+        return state.board._derive(planted=state.board.planted + (vineyard,)), action.vertex
+    raise IllegalAction(f"{type(action).__name__} changes no board under Rules v3")
 
 
 def _v3_face_uses(board: Board, player: str, face: DieFace, preset: Preset) -> list[Action]:

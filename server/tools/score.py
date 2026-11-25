@@ -25,8 +25,10 @@ from server.schemas import (
     FloodgateJSON,
     HexJSON,
     ModeName,
+    PlantedVineyardJSON,
     PlayerJSON,
     PresetOverridesJSON,
+    RiverStripJSON,
     ScoreJSON,
     canal_from_json,
     claim_from_json,
@@ -35,9 +37,11 @@ from server.schemas import (
     mode_from_json,
     mode_to_json,
     overrides_from_json,
+    planted_from_json,
     planting_from_json,
     players_from_json,
     score_to_json,
+    strip_from_json,
 )
 
 
@@ -63,7 +67,12 @@ def calculate_score(
     ],
     hexes: Annotated[
         list[HexJSON],
-        Field(description="The board hexes, in the shape generate_board returns them."),
+        Field(
+            description=(
+                "The board hexes, in the shape generate_board returns them; leave it empty "
+                "for a river strip board (give strip instead)."
+            )
+        ),
     ],
     players: Annotated[
         list[PlayerJSON],
@@ -94,6 +103,24 @@ def calculate_score(
             )
         ),
     ] = [],
+    planted: Annotated[
+        list[PlantedVineyardJSON],
+        Field(
+            description=(
+                'Rules v3 (overrides planting "vertices"): the vineyards planted on hex '
+                "vertices, at most one per vertex; any order."
+            )
+        ),
+    ] = [],
+    strip: Annotated[
+        RiverStripJSON | None,
+        Field(
+            description=(
+                'Rules v3 open board (overrides board_shape "river_strip"): the river strip, '
+                "as generate_board returns it; then hexes must be empty."
+            )
+        ),
+    ] = None,
     overrides: Annotated[
         PresetOverridesJSON,
         Field(
@@ -115,10 +142,17 @@ def calculate_score(
     gets water_right_points (3 in the shipped presets). Every watered claimed
     vineyard is listed with the canal path its water takes and the rivals its
     claimant pays, so the water rights can be checked by hand. The state is scored as given, finished or not.
+    Rules v3 boards give their planted vineyards in planted (and a river strip in strip); a
+    vertex vineyard scores like a hex one, and a vertex touches a canal when the canal sits on
+    one of its 3 hexes, whatever its openings.
     """
-    tiles = hexes_to_board(hexes).tiles
+    if strip is not None and hexes:
+        raise ValueError("give hexes or strip, not both: a river strip board has no other hexes")
+    base = strip_from_json(strip) if strip is not None else hexes_to_board(hexes)
     board = Board(
-        tiles=tiles,
+        tiles=base.tiles,
+        strip=base.strip,
+        planted=tuple(planted_from_json(item) for item in planted),
         canals=tuple(canal_from_json(item) for item in canals),
         floodgates=tuple(floodgate_from_json(item) for item in floodgates),
         claims=tuple(claim_from_json(item) for item in claims),
