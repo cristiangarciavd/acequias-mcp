@@ -61,7 +61,9 @@ def test_parallel_chunks_equal_simulate_game(tmp_path):
     outcomes = tune.run_all(jobs, 2, store, chunk_games=2)
     for job, outcome in zip(jobs, outcomes):
         assert outcome.status == "ok"
-        assert outcome.data == simulate_game(tune.rules_of(job), job.n, job.seed).to_json()
+        data = dict(outcome.data)
+        assert set(data.pop("floodgates")) == {"placed", "peak", "peak_max"}  # tune's own (#160)
+        assert data == simulate_game(tune.rules_of(job), job.n, job.seed).to_json()
     assert len(list(tmp_path.glob("*.chunk"))) == 3 + 2
     assert not list(tmp_path.glob("*.tmp"))
 
@@ -72,7 +74,8 @@ def test_failures_are_reported_and_the_run_goes_on(capsys):
     dies = flash_job("greedy", 2, {"marker": _Die()})
     outcomes = tune.run_all([ok, infeasible, dies], 2, None, chunk_games=1)
     assert outcomes[0].status == "ok"
-    assert outcomes[0].data == simulate_game(tune.rules_of(ok), 3, ok.seed).to_json()
+    data = {k: v for k, v in outcomes[0].data.items() if k != "floodgates"}
+    assert data == simulate_game(tune.rules_of(ok), 3, ok.seed).to_json()
     assert outcomes[1].status == tune.INFEASIBLE
     assert outcomes[2].status == tune.FAILED and outcomes[2].error.startswith(tune.DIED)
     assert "RETRY" in capsys.readouterr().err

@@ -111,11 +111,12 @@ with its defaults; ``beam`` is 3, not 5, to stay under 5 s per Normal
 Rules v3 (``Preset.planting`` ``VERTICES``, #153). Every bot makes the
 mandatory roll (the only legal action). ``greedy_bot`` (and
 ``saboteur_bot``, which plays greedy's choice) plays a face's use with the
-best vineyard swing (watered vertex vineyard points, its own less its
-rivals'; a resown vineyard at the roulette's mean), declining a resow below
+best vineyard swing (its split vineyard points less its rivals', #160; a
+resown vineyard at the roulette's mean), declining a resow or move below
 0 but always playing a mandatory floodgate or release; then it plants on
 any plantable spot (``rng.choice``), else places the canal that opens the
-most new plantable spots for it, else passes. ``score_aware_bot`` values
+most new plantable spots for it, else passes. Plantable spots follow
+``Preset.vertex_needs_three_canals``. ``score_aware_bot`` values
 actions as above on the board ``acequias.turn._v3_board_after`` gives (a
 new or resown vineyard is blank: the roulette's mean, never in the bodega),
 plus a planting potential per player (``_Evaluator._potential_of``: half
@@ -144,11 +145,11 @@ from typing import TypeVar
 
 from acequias.config import PlantingRules, Preset, VarietalRules
 from acequias.config import preset as shipped_preset
-from acequias.flow import _choose, _graph, _reach, _watered, vertex_water, wet_canals
+from acequias.flow import _graph, _reach, _watered, vertex_thirds, wet_canals
 from acequias.game import Bot, _next_turn, act, game_over
 from acequias.hex import Direction, Hex, Vertex
 from acequias.model import ActionsLeft, Board, DieFace, GameState, SeasonRoll, Terrain
-from acequias.scoring import Score, bodega_count, calculate_score
+from acequias.scoring import Score, bodega_count, calculate_score, split_points
 from acequias.turn import (
     Action,
     Bribe,
@@ -529,14 +530,59 @@ def _vertices(hex: Hex) -> tuple[Vertex, ...]:
     return hex.vertices()
 
 
-def _plantable(board: Board, wet: Iterable[Hex]) -> dict[str, set[Vertex]]:
-    """Each player's plantable spots: the free vertices of their canals in ``wet``."""
+def _plantable(board: Board, wet: Iterable[Hex], three: bool = False) -> dict[str, set[Vertex]]:
+    """Each player's plantable spots: the free vertices of their canals in ``wet``
+    (with ``three``, only those with a canal on each of their 3 hexes)."""
     spots: dict[str, set[Vertex]] = {}
     planted = board.planted_at
+    canals = board._canal_index
     for hex in wet:
         mine = spots.setdefault(board.canal_at(hex).owner, set())
-        mine.update(v for v in _vertices(hex) if planted(v) is None)
+        mine.update(
+            v for v in _vertices(hex)
+            if planted(v) is None and (not three or all(h in canals for h in v.hexes))
+        )
     return spots
+
+
+def _new_spots(
+    board: Board, canal: PlaceCanal, player: str, is_wet: bool, wet: frozenset[Hex],
+    spots: Mapping[str, set[Vertex]], three: bool,
+) -> dict[str, set[Vertex]]:
+    """The spots each player gains when ``player`` places ``canal`` (``is_wet``: it carries
+    water), assuming it waters no other canal: free vertices of its hex that become
+    plantable (with ``three``, once each of their hexes holds a canal)."""
+    hex = canal.hex
+    canals = board._canal_index
+    gained: dict[str, set[Vertex]] = {}
+    for v in _vertices(hex):
+        if board.planted_at(v) is not None:
+            continue
+        if three and not all(h == hex or h in canals for h in v.hexes):
+            continue
+        owners = {canals[h].owner for h in v.hexes if h in wet}
+        if is_wet:
+            owners.add(player)
+        for pid in owners:
+            if v not in spots.get(pid, ()):
+                gained.setdefault(pid, set()).add(v)
+    return gained
+
+
+def _split_values(
+    board: Board, value_of: Callable, wet: frozenset[Hex] | None = None
+) -> dict[str, Fraction]:
+    """Each canal owner's split vineyard points on a Rules v3 ``board`` (#160).
+
+    ``value_of(vineyard, thirds)`` is what a player's ``thirds`` watered
+    thirds of the planted ``vineyard`` are worth.
+    """
+    totals: dict[str, Fraction] = {}
+    for vertex, thirds_of in vertex_thirds(board, wet).items():
+        vineyard = board.planted_at(vertex)
+        for pid, thirds in thirds_of.items():
+            totals[pid] = totals.get(pid, Fraction(0)) + value_of(vineyard, thirds)
+    return totals
 
 
 def _blanks_after(blanks: frozenset[Vertex], action: Action, spin: Vertex | None) -> frozenset[Vertex]:
@@ -562,13 +608,14 @@ def _greedy_v3(state: GameState, player: str, rng: random.Random) -> Action:
         return _pick(plants, rng)
     canals = [a for a in actions if isinstance(a, PlaceCanal)]
     board = state.board
+    three = (state.preset or shipped_preset(state.mode)).vertex_needs_three_canals
     wet = wet_canals(board)
-    mine = _plantable(board, wet).get(player, set())
+    spots = _plantable(board, wet, three)
     gains = []
     for canal in canals:
         _, is_wet, _ = _links(board, canal, wet)
-        free = {v for v in _vertices(canal.hex) if board.planted_at(v) is None}
-        gains.append(len(free - mine) if is_wet else 0)
+        gained = _new_spots(board, canal, player, is_wet, wet, spots, three)
+        gains.append(len(gained.get(player, ())))
     best = max(gains, default=0)
     if best == 0:
         return Pass()
@@ -578,21 +625,20 @@ def _greedy_v3(state: GameState, player: str, rng: random.Random) -> Action:
 def _resolve_face_v3(
     state: GameState, player: str, actions: Sequence[Action], rng: random.Random
 ) -> Action:
-    """Greedy's use of a Rules v3 face: the best vineyard swing, declining resow below 0."""
+    """Greedy's use of a Rules v3 face: the best vineyard swing, declining resow or move below 0."""
     preset = state.preset or shipped_preset(state.mode)
     points = preset.varietal_points
     mean = Fraction(sum(points[v] for v in preset.roulette), len(preset.roulette))
 
     def swing(board: Board, blank: Vertex | None) -> Fraction:
-        own = rivals = Fraction(0)
-        for vertex in vertex_water(board):
-            vineyard = board.planted_at(vertex)
-            value = mean if vertex == blank else Fraction(points[vineyard.varietal])
-            if vineyard.owner == player:
-                own += value
-            else:
-                rivals += value
-        return own - rivals
+        def value_of(vineyard, thirds: int) -> Fraction:
+            if vineyard.vertex == blank:
+                return mean * thirds / 3
+            return Fraction(split_points(points[vineyard.varietal], thirds))
+
+        totals = _split_values(board, value_of, wet_canals(board))
+        own = totals.pop(player, Fraction(0))
+        return own - sum(totals.values(), Fraction(0))
 
     before = swing(state.board, None)
     uses = [a for a in actions if not isinstance(a, DeclineFace)]
@@ -656,9 +702,10 @@ class _Evaluator:
             self.reach = self.mean / 2
             links, sources, _ = _graph(state.board)
             wet = _reach(sources, links, allowed=None)
-            self.flow = links, sources, {h: state.board.canal_at(h).owner for h in wet}
+            self.owner_of = {h: state.board.canal_at(h).owner for h in wet}
             self.wet = frozenset(wet)
-            self.spots = _plantable(state.board, self.wet)
+            self.three = preset.vertex_needs_three_canals
+            self.spots = _plantable(state.board, self.wet, self.three)
             totals = self._totals_v3(state.board, blanks)
             self.totals_now = totals
             self._root_water = None
@@ -758,9 +805,10 @@ class _Evaluator:
 
         A watered vineyard on a vertex of ``blanks`` (planted or resown in
         the plan, its spin not known) counts at the roulette's mean points
-        and never towards the bodega, as in ``_totals``: vineyards and
-        bodega come from a scoring with the blanks dropped, the rest
-        (rights, debt) from the full scoring. With ``potential`` each
+        (split: a third of it per watered third, #160) and never towards
+        the bodega, as in ``_totals``: vineyards and bodega come from a
+        scoring with the blanks dropped, the rest (debt) from the full
+        scoring. With ``potential`` each
         player below the cluster cap adds ``_potential`` of their
         plantable spots.
         """
@@ -770,7 +818,7 @@ class _Evaluator:
             known = self._score(dropped)
             totals = {
                 pid: s.total - s.vineyards - s.bodega + known[pid].vineyards + known[pid].bodega
-                + self.mean * sum(1 for w in s.watered_vineyards if w.vertex in blanks)
+                + self.mean * sum(w.thirds for w in s.watered_vineyards if w.vertex in blanks) / 3
                 for pid, s in full.items()
             }
         else:
@@ -784,40 +832,31 @@ class _Evaluator:
     def _plant(self, state: GameState, action: Plant) -> Fraction | None:
         """A ``Plant``'s value without scoring the board; None when it cannot be worked out so.
 
-        Planting changes no canal, so no other vineyard's water or path
-        changes, and the new vineyard is blank (no bodega): the change is
-        its mean points less the rights of its path (``acequias.flow``'s
-        path choice on the current water), those rights to each rival on
-        it, and the spot it takes from everyone's planting potential.
-        Equal to scoring the board in full (``tests/test_bots_v3.py``).
+        Planting changes no canal, so no water changes, and the new
+        vineyard is blank (no bodega): the change is a third of its mean
+        points to the owner of each watered canal on its vertex (split
+        scoring, #160), and the spot it takes from everyone's planting
+        potential. Equal to scoring the board in full
+        (``tests/test_bots_v3.py``).
         """
         board = state.board
         if board is not self.state.board or state.pending_face is not None or not self.fast:
             return None
         vertex = action.vertex
-        links, sources, owner_of = self.flow
-        ends = {h for h in vertex.hexes if h in self.wet}
-        if not ends:
+        owner_of = self.owner_of
+        ends = [h for h in vertex.hexes if h in self.wet]
+        if not any(owner_of[h] == self.player for h in ends):
             return None  # not plantable; let the full path raise
-        path = _choose(vertex, self.player, ends, sources, links, owner_of)
-        pays = {owner_of[h] for h in path} - {self.player}
-        right = self.preset.water_right_points
         after = {}
         for pid, now in self.totals_now.items():
-            total = now + (right if pid in pays else 0)
+            total = now + self.mean * sum(1 for h in ends if owner_of[h] == pid) / 3
             if self.potential:
                 spots = self.spots.get(pid, set())
                 planted = sum(1 for v in board.planted if v.owner == pid)
-                if pid == self.player:
-                    total += self.mean - right * len(pays)
-                    planted_after = planted + 1
-                else:
-                    planted_after = planted
+                planted_after = planted + 1 if pid == self.player else planted
                 total += self._potential_of(planted_after, len(spots - {vertex})) - self._potential_of(
                     planted, len(spots)
                 )
-            elif pid == self.player:
-                total += self.mean - right * len(pays)
             after[pid] = total
         return (after[self.player] - self.own_now) - (
             max(after[r] for r in self.rivals) - self.rival_now
@@ -846,7 +885,7 @@ class _Evaluator:
         if self.shared is not None and key in self.shared:
             return self.shared[key]
         wet = wet_canals(board)
-        result = wet, _plantable(board, wet)
+        result = wet, _plantable(board, wet, self.preset.vertex_needs_three_canals)
         if self.shared is not None:
             self.shared[key] = result
         return result
@@ -855,80 +894,61 @@ class _Evaluator:
         """A Rules v3 canal's value without scoring the board, when it is a leaf; else None.
 
         A canal that links to one water source only (the river, or one
-        canal) carries no water on to anything, so it is on no vineyard's
-        path except as its last canal. A dry one changes nothing. A wet
-        one adds its free vertices to its owner's plantable spots, and is a
-        new end for the vineyards on its vertices: each of those gets its
-        path chosen again (``acequias.flow``'s path choice on the water
-        with the canal added), which may water it or change its rights,
-        and its owner's bodega is counted again. Equal to scoring the board
-        in full (``tests/test_bots_v3.py``); other canals are scored in full.
+        canal) carries no water on to anything, so no other canal's water
+        changes. It may open spots on its vertices (``_new_spots``: for its
+        owner when wet, and with ``vertex_needs_three_canals`` for anyone
+        whose wet canal shares a vertex it completes). A wet one is a new
+        watered third, its owner's, of each vineyard on its vertices (split
+        scoring, #160), and its owner's bodega is counted again. Equal to
+        scoring the board in full (``tests/test_bots_v3.py``); other canals
+        are scored in full.
         """
         board = state.board
         if board is not self.state.board or not self.fast:
             return None
-        sources, wet, linked = _links(board, action, self.wet)
+        sources, wet, _ = _links(board, action, self.wet)
         if sources != 1:
             return None
-        if not wet:
-            return Fraction(0)
         hex = action.hex
-        vertices = _vertices(hex)
-        touched = [v for v in map(board.planted_at, vertices) if v is not None]
         delta = {pid: Fraction(0) for pid in self.totals_now}
         if self.potential:
-            mine = self.spots.get(self.player, set())
-            free = [v for v in vertices if board.planted_at(v) is None]
-            delta[self.player] += self._potential(board, self.player, len(mine.union(free))) - (
-                self._potential(board, self.player, len(mine))
-            )
-        if touched:
-            self._rewater(hex, linked, touched, delta)
+            gained = _new_spots(board, action, self.player, wet, self.wet, self.spots, self.three)
+            for pid, new in gained.items():
+                if pid not in delta:
+                    continue
+                spots = self.spots.get(pid, set())
+                delta[pid] += self._potential(board, pid, len(spots | new)) - (
+                    self._potential(board, pid, len(spots))
+                )
+        if wet:
+            touched = [v for v in map(board.planted_at, _vertices(hex)) if v is not None]
+            if touched:
+                self._rewater(touched, delta)
         after = {pid: now + delta[pid] for pid, now in self.totals_now.items()}
         return (after[self.player] - self.own_now) - (
             max(after[r] for r in self.rivals) - self.rival_now
         )
 
-    def _rewater(
-        self, hex: Hex, linked: Hex | None, touched: list, delta: dict[str, Fraction]
-    ) -> None:
-        """Add to ``delta`` the score changes of the ``touched`` vineyards when the wet leaf
-        canal on ``hex`` (linked to canal ``linked``, or to the river when None) is placed."""
-        links, sources, owner_of = self.flow
-        links = dict(links)
-        links[hex] = () if linked is None else (linked,)
-        if linked is None:
-            sources = sources | {hex}
-        else:
-            links[linked] = links[linked] + (hex,)
-        owner_of = {**owner_of, hex: self.player}
-        wet = self.wet | {hex}
+    def _rewater(self, touched: list, delta: dict[str, Fraction]) -> None:
+        """Add to ``delta`` the score changes of the ``touched`` vineyards when a wet leaf
+        canal of the player goes on one hex of each of their vertices: one more watered
+        third each for the player (#160), and their bodega counted again."""
         root = self._root()
         points = self.preset.varietal_points
-        right = self.preset.water_right_points
-        varietals = {pid: list(v) for pid, v in root["varietals"].items()}
-        changed = set()
+        owner_of = self.owner_of
+        me = self.player
+        varietals = list(root[me])
         for vineyard in touched:
-            vertex, owner = vineyard.vertex, vineyard.owner
-            ends = {h for h in vertex.hexes if h in wet}
-            path = _choose(vertex, owner, ends, sources, links, owner_of)
-            pays = {owner_of[h] for h in path} - {owner}
-            old = root["pays"].get(vertex)
-            if old is None:  # newly watered
-                if vertex in self.blanks:
-                    delta[owner] += self.mean
-                else:
-                    delta[owner] += points[vineyard.varietal]
-                    varietals[owner].append(vineyard.varietal)
-                    changed.add(owner)
-                old = frozenset()
-            delta[owner] -= right * (len(pays) - len(old))
-            for rival in old:
-                delta[rival] -= right
-            for rival in pays:
-                delta[rival] += right
-        for pid in changed:
-            delta[pid] += self._bodega(varietals[pid]) - self._bodega(root["varietals"][pid])
+            thirds = sum(1 for h in vineyard.vertex.hexes if h in self.wet and owner_of[h] == me)
+            if vineyard.vertex in self.blanks:
+                delta[me] += self.mean / 3
+                continue
+            value = points[vineyard.varietal]
+            delta[me] += split_points(value, thirds + 1) - split_points(value, thirds)
+            if thirds == 0:
+                varietals.append(vineyard.varietal)
+        if len(varietals) != len(root[me]):
+            delta[me] += self._bodega(varietals) - self._bodega(root[me])
 
     def _bodega(self, varietals: list) -> int:
         """The bodega points of a player's watered varietals, as ``calculate_score`` counts them."""
@@ -937,21 +957,15 @@ class _Evaluator:
             bodegas = min(bodegas, 1)
         return self.preset.bodega_points * bodegas
 
-    def _root(self) -> dict:
-        """The root board's water by vineyard: the rivals each pays (watered ones only), and
-        each player's watered varietals that are not blank."""
+    def _root(self) -> dict[str, list]:
+        """Each player's varietals on the root board that count towards their bodega:
+        those of the vineyards with one of their watered thirds, blanks left out."""
         if self._root_water is None:
             full = self._score(self.state.board)
             self._root_water = {
-                "pays": {
-                    w.vertex: frozenset(w.pays) for s in full.values() for w in s.watered_vineyards
-                    if w.vertex is not None
-                },
-                "varietals": {
-                    pid: [w.varietal for w in s.watered_vineyards
-                          if w.vertex is not None and w.vertex not in self.blanks]
-                    for pid, s in full.items()
-                },
+                pid: [w.varietal for w in s.watered_vineyards
+                      if w.vertex is not None and w.vertex not in self.blanks]
+                for pid, s in full.items()
             }
         return self._root_water
 

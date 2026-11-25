@@ -115,7 +115,7 @@ def test_constructive_die_faces_and_the_default_die_is_unchanged():
         assert action_die_rules(roulette_rules(preset(mode))).action_die == ACTION_DIE_FACES
         p = preset(mode)
         assert (p.season_points, p.drought_points, p.season_roll_every) == (None, None, None)
-    assert [f.is_season for f in DieFace] == [False, False, False, True, True]
+    assert [f.is_season for f in DieFace] == [False, False, False, False, True, True]
 
 
 def test_season_points_default_to_a_common_plot_and_scale():
@@ -229,7 +229,7 @@ def test_constructive_die_rolls_every_face():
         else:
             assert after.player("a").drought
             seen.add(DieFace.DROUGHT)
-    assert seen == set(DieFace)
+    assert seen == set(DieFace) - {DieFace.MOVE}  # the move face is Rules v3 only
 
 
 # --- Scoring ---------------------------------------------------------------------
@@ -488,7 +488,7 @@ def test_simulation_counts_season_faces_and_rolls():
     rules = SimRules(Mode.FLASH, 2, ("random", "random"), _overrides(EVERY2))
     result = simulate_game(rules, 6, 5)
     faces = result.die_faces_per_game
-    assert set(faces) == {f.value for f in DieFace}
+    assert set(faces) == {f.value for f in DieFace} - {"move"}  # Rules v3 only
     assert result.actions_per_game["die"] == pytest.approx(sum(faces.values()))
     assert faces["good_season"] + faces["drought"] > 0
     assert set(result.score_terms) >= {"season", "drought"}

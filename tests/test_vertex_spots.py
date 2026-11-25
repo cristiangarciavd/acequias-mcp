@@ -291,28 +291,28 @@ def test_a_gated_canal_leaves_its_vineyard_dry():
 
 
 def test_scoring_vertex_vineyards():
+    # Split scoring (#160): each watered third scores value // 3 (6 // 3, 7 // 3 = 2 here)
+    # for its canal's owner, whoever planted; no water rights.
     planted = (
-        vineyard(NORTH_OF_A, "p1", Varietal.MALBEC),
-        vineyard(A.vertex(3), "p1", Varietal.BONARDA),
-        vineyard(EAST_OF_C, "p1", Varietal.SYRAH),  # pays p2
-        vineyard(A_AND_B, "p2", Varietal.MERLOT),  # pays p1
-        vineyard(D.vertex(0), "p2", Varietal.MALBEC),  # dry
+        vineyard(NORTH_OF_A, "p1", Varietal.MALBEC),  # A: p1's third
+        vineyard(A.vertex(3), "p1", Varietal.BONARDA),  # A: p1's third
+        vineyard(EAST_OF_C, "p1", Varietal.SYRAH),  # C: p1's third; D is empty
+        vineyard(A_AND_B, "p2", Varietal.MERLOT),  # A: p1's third, B: p2's
+        vineyard(D.vertex(0), "p2", Varietal.MALBEC),  # dry: no canal on its hexes
     )
     scores = calculate_score(state(board(planted), debt=(2, 1)))
     p1, p2 = scores["p1"], scores["p2"]
-    assert p1.vineyards == 6 + 7 + 6
-    assert p1.bodegas == 1 and p1.bodega == 6
-    assert p1.rights_paid == 3 and p1.rights_collected == 3
-    assert p1.total == 19 + 6 - 3 + 3 - 2
-    assert p1.watered == 3
-    assert [v.vertex for v in p1.watered_vineyards] == sorted(
-        [NORTH_OF_A, A.vertex(3), EAST_OF_C]
-    )
-    assert all(v.hex is None for v in p1.watered_vineyards)
-    assert p2.vineyards == 6 and p2.watered == 1
-    assert p2.rights_paid == 3 and p2.rights_collected == 3
-    assert p2.total == 6 - 3 + 3 - 1
-    assert p1.watered_vineyards[-1].pays == ("p2",)
+    assert p1.vineyards == 2 + 2 + 2 + 2
+    assert p1.bodegas == 1 and p1.bodega == 6  # Merlot, planted by p2, counts for p1
+    assert p1.rights_paid == p1.rights_collected == 0
+    assert p1.total == 8 + 6 - 2
+    assert p1.watered == 4
+    assert [v.vertex for v in p1.watered_vineyards] == sorted([NORTH_OF_A, A.vertex(3), EAST_OF_C, A_AND_B])
+    assert all(v.hex is None and v.thirds == 1 and v.pays == () for v in p1.watered_vineyards)
+    assert {v.vertex: v.planter for v in p1.watered_vineyards}[A_AND_B] == "p2"
+    assert p2.vineyards == 2 and p2.watered == 1
+    assert p2.rights_paid == p2.rights_collected == 0
+    assert p2.total == 2 - 1
 
 
 # --- JSON ------------------------------------------------------------------------

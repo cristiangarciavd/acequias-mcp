@@ -124,14 +124,17 @@ class Mode(Enum):
 class DieFace(Enum):
     """A face of the action die (``action_die`` bribe rules): what the roll lets you do.
 
-    ``FLOODGATE``, ``RELEASE`` and ``RESOW`` are personal: the roller uses
-    or declines them. ``GOOD_SEASON`` and ``DROUGHT`` are season faces:
-    they always apply, to every player, as soon as they are rolled.
+    ``FLOODGATE``, ``RELEASE``, ``RESOW`` and ``MOVE`` are personal: the
+    roller uses or declines them. ``MOVE`` (Rules v3 only, #160) moves one
+    of the roller's planted vineyards. ``GOOD_SEASON`` and ``DROUGHT`` are
+    season faces: they always apply, to every player, as soon as they are
+    rolled.
     """
 
     FLOODGATE = "floodgate"
     RELEASE = "release"
     RESOW = "resow"
+    MOVE = "move"
     GOOD_SEASON = "good_season"
     DROUGHT = "drought"
 

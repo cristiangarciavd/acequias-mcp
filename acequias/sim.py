@@ -91,8 +91,13 @@ V3_ACTION_NAMES = (
 planting only (so Rules v1/v2 results keep their keys); a v3 resow counts
 as ``"resow"``."""
 
-DIE_FACE_NAMES = tuple(face.value for face in DieFace)
-"""The keys of ``SimResult.die_faces_per_game``."""
+DIE_FACE_NAMES = tuple(face.value for face in DieFace if face is not DieFace.MOVE)
+"""The keys of ``SimResult.die_faces_per_game``; under vertex planting (Rules v3)
+also ``V3_DIE_FACE_NAMES``."""
+
+V3_DIE_FACE_NAMES = (DieFace.MOVE.value,)
+"""The Rules v3 die face keys (#160), added under vertex planting only, so Rules
+v1/v2 results keep their keys."""
 
 
 # --- Input -------------------------------------------------------------------
@@ -267,8 +272,9 @@ class SimResult:
     """Share of games whose log has at least one ``RollActionDie``."""
     die_faces_per_game: Mapping[str, float] = field(hash=False)
     """Face value (``"floodgate"``, ``"release"``, ``"resow"``,
-    ``"good_season"``, ``"drought"``): the mean number of rolls per game
-    that showed that face. Season rolls count as rolls."""
+    ``"good_season"``, ``"drought"``, and under vertex planting ``"move"``):
+    the mean number of rolls per game that showed that face. Season rolls
+    count as rolls."""
     die_use_rate: float | None
     """Share of rolls resolved with a use, not ``DeclineFace`` (a season face
     always counts as used); None with no rolls."""
@@ -334,6 +340,8 @@ def summarize(rules: SimRules, seed: int, records: Iterable[GameRecord]) -> SimR
     varietal_games = {varietal: 0 for varietal in _in_play(preset)}
     with_die = rolls = uses = 0
     faces = {name: 0 for name in DIE_FACE_NAMES}
+    if preset.planting is PlantingRules.VERTICES:
+        faces.update({name: 0 for name in V3_DIE_FACE_NAMES})
 
     for record in records:
         order = turn_order(record.start, 1)
@@ -436,7 +444,7 @@ def _preset_values(preset: Preset) -> Mapping[str, object]:
             if value is not PlantingRules.HEXES:
                 values[f.name] = value.value
             continue
-        if f.name == "resow_can_move":
+        if f.name == "vertex_needs_three_canals":
             if value:  # Rules v3 only, written only when set, like ``planting``
                 values[f.name] = value
             continue

@@ -19,9 +19,10 @@ Every number comes from ``acequias.sim``: this script builds ``SimRules``
 with ``overrides`` (``Preset`` field names, #22), plays game ``i`` of a
 configuration as ``play_one(rules, game_seed(seed, i))``, and summarizes the
 records in game order with ``summarize``, exactly what ``simulate_game``
-does, so a result equals ``simulate_game(rules, n, seed)``. It reimplements
-no rule and no statistic; the only arithmetic here is presentation (the 95%
-margin of ``turn_order_advantage``, the pass share, and minutes at
+does, so a result equals ``simulate_game(rules, n, seed)`` plus one key of
+its own, ``floodgates`` (``floodgate_stats``, #160, counted from the logs).
+It reimplements no rule; the only other arithmetic here is presentation
+(the 95% margin of ``turn_order_advantage``, the pass share, and minutes at
 ``MINUTES_PER_TURN``).
 
 Parallel games (#43): each configuration is split into chunks of
@@ -91,14 +92,27 @@ strip base (``V3_RIVER_HEXES`` river hexes per segment and
 ``V3_BAG_PER_PLAYER`` pieces per player, or ``--v3-river-hexes`` and
 ``--v3-bag-per-player``, e.g. strip's best): rounds, action die cost (the
 bribe), vineyard points (common / rare, with the bodega and water rights
-in proportion), bodega points, ``resow_can_move`` on, river hexes per
-segment, and bag size; score_aware seating, seed ``V3_SWEEP_SEED``.
-Rules v3 rows (sweeps ``strip`` and ``v3``) get their own columns: plants,
-canals and passes per game, planted vineyards per player, die faces and
-uses, and the bodega rate:
+in proportion), bodega points, the Rules v3 die with its move face
+(``V3_DIE_FACES``, #160), river hexes per segment, and bag size;
+score_aware seating, seed ``V3_SWEEP_SEED``.
+
+Sweep ``v3split`` (#160) plays Rules v3 with split vineyard scoring at
+``acequias.config.V3_POINTS`` (6 / rare 9) around a river strip base of
+``V3SPLIT_RIVER_HEXES`` river hexes per segment and ``V3SPLIT_BAG_PER_PLAYER``
+pieces per player. Each of 4 setups (``vertex_needs_three_canals`` off / on
+x the Rules v3 die with a move face / the old die with 2 resows and no
+move) runs its base and one value at a time: bag 20 and 24 per player, 6
+river hexes per segment, bodega points 3 / 6 / 9 (the shipped value is the
+base), rounds -2 and +2; score_aware seating, seed ``V3SPLIT_SWEEP_SEED``.
+Rules v3 rows (sweeps ``strip``, ``v3`` and ``v3split``) get their own
+columns: plants, canals and passes per game, planted vineyards per player,
+die faces and uses, the bodega rate, and floodgates (placed per game, and
+the most on the board at once: mean and max over games, to size the
+physical floodgate supply):
 
     uv run python scripts/tune.py --sweep strip v3
     uv run python scripts/tune.py --sweep v3 --v3-river-hexes 6 --v3-bag-per-player 12
+    uv run python scripts/tune.py --sweep v3split
 
 Turns and minutes count turns (rounds x P), not log records: under action
 die rules a die turn is 2 records, so ``turns_per_game`` would overcount. A candidate the preset or the board
@@ -138,6 +152,8 @@ from types import MappingProxyType
 import acequias
 from acequias.config import (
     CONSTRUCTIVE_DIE_FACES,
+    V3_DIE_FACES,
+    V3_POINTS as V3_SPLIT_POINTS,
     BoardShape,
     PlantingRules,
     ROULETTE_POINTS,
@@ -153,6 +169,7 @@ from acequias.config import players_text
 from acequias.config import preset as shipped_preset
 from acequias.model import DieFace, Mode, PieceKind, Varietal
 from acequias.sim import GameRecord, SimRules, game_seed, play_one, summarize
+from acequias.turn import PlaceFloodgate, Release
 
 # --- Constants ---------------------------------------------------------------
 
@@ -741,7 +758,7 @@ def v3_sweeps(river_hexes: int = V3_RIVER_HEXES, bag_per_player: int = V3_BAG_PE
         )
         return (
             ("base", {}), *rounds, *costs, *points, *bodega,
-            ("resow can move", {"resow_can_move": True}), *hexes, *bags,
+            ("move face", {"action_die": V3_DIE_FACES}), *hexes, *bags,
         )
 
     return (
@@ -751,9 +768,65 @@ def v3_sweeps(river_hexes: int = V3_RIVER_HEXES, bag_per_player: int = V3_BAG_PE
     )
 
 
+# --- Rules v3 split scoring (#160) ------------------------------------------------
+
+V3SPLIT_SWEEP_SEED = 160_001
+"""The run seed of sweep ``v3split`` (#160); no earlier run used it."""
+V3SPLIT_RIVER_HEXES = (5, 6)
+"""Sweep ``v3split``'s river hexes per segment; the first is the base."""
+V3SPLIT_BAG_PER_PLAYER = (16, 20, 24)
+"""Sweep ``v3split``'s bag sizes in pieces per player; the first is the base."""
+V3SPLIT_BODEGA_POINTS = (3, 6, 9)
+"""Sweep ``v3split``'s bodega points; the shipped value of the mode is the base."""
+V3SPLIT_ROUND_STEPS = (-2, 2)
+"""Sweep ``v3split``'s round counts: the shipped rounds of each player count plus these."""
+V3SPLIT_DICE = (("move die", V3_DIE_FACES), ("old die", CONSTRUCTIVE_DIE_FACES))
+"""Sweep ``v3split``'s action dice: the Rules v3 die (a move face, #160) and the old one
+(2 resows, no move)."""
+
+
+def v3split_sweeps() -> tuple[Sweep, ...]:
+    """Sweep ``v3split`` (#160): split scoring at ``acequias.config.V3_POINTS``; 4 setups (three canals
+    off / on x move die / old die), each its base and one value at a time."""
+    base = {
+        mode: {
+            **strip_overrides(mode, V3SPLIT_RIVER_HEXES[0], V3SPLIT_BAG_PER_PLAYER[0]),
+            "varietal_points": V3_SPLIT_POINTS,
+        }
+        for mode in Mode
+    }
+
+    def candidates(mode: Mode) -> tuple[tuple[str, dict], ...]:
+        p = shipped_preset(mode)
+        changes = (
+            ("base", {}),
+            *((f"bag {per}/player", {"bag_size": {n: per * n for n in p.player_counts}})
+              for per in V3SPLIT_BAG_PER_PLAYER[1:]),
+            *((f"{n} river hexes/segment", {"river_hexes_per_segment": n}) for n in V3SPLIT_RIVER_HEXES[1:]),
+            *((f"bodega {b}", {"bodega_points": b}) for b in V3SPLIT_BODEGA_POINTS if b != p.bodega_points),
+            *((f"rounds {step:+d} ({rounds_label({n: r + step for n, r in p.rounds.items()})})",
+               {"rounds": {n: r + step for n, r in p.rounds.items()}}) for step in V3SPLIT_ROUND_STEPS),
+        )
+        return tuple(
+            (f"{'3 canals' if three else 'any vertex'}, {die_name}: {label}",
+             {"vertex_needs_three_canals": three, "action_die": die, **change})
+            for three in (False, True)
+            for die_name, die in V3SPLIT_DICE
+            for label, change in changes
+        )
+
+    return (
+        Sweep("v3split", f"Rules v3 split scoring ({V3_SPLIT_POINTS[Varietal.MALBEC]} / rare "
+                         f"{V3_SPLIT_POINTS[Varietal.BONARDA]}): three canals x die, one value at a time around a "
+                         f"river strip base ({V3SPLIT_RIVER_HEXES[0]} river hexes/segment, bag "
+                         f"{V3SPLIT_BAG_PER_PLAYER[0]}/player)",
+              {mode: candidates(mode) for mode in Mode}, ("score_aware",), base, V3SPLIT_SWEEP_SEED),
+    )
+
+
 V1_SWEEPS = SWEEPS
 """The sweeps of #20 (Rules v1, greedy and mixed seatings)."""
-SWEEPS = V1_SWEEPS + v2_sweeps() + strip_sweeps() + v3_sweeps()
+SWEEPS = V1_SWEEPS + v2_sweeps() + strip_sweeps() + v3_sweeps() + v3split_sweeps()
 SWEEP_NAMES = tuple(s.name for s in SWEEPS)
 
 
@@ -1196,7 +1269,9 @@ def run_all(jobs: list[Job], workers: int, checkpoints: Checkpoints | None = Non
             continue
         try:
             games = [record for part in records[j] for record in part]
-            outcomes.append(Outcome("ok", data=summarize(rules_of(job), job.seed, games).to_json()))
+            data = summarize(rules_of(job), job.seed, games).to_json()
+            data["floodgates"] = floodgate_stats(games)
+            outcomes.append(Outcome("ok", data=data))
         except Exception as error:  # noqa: BLE001 - reported with its job, the run goes on
             outcomes.append(Outcome(FAILED, error=f"{type(error).__name__}: {error}"))
     for job, outcome in zip(jobs, outcomes):
@@ -1206,6 +1281,31 @@ def run_all(jobs: list[Job], workers: int, checkpoints: Checkpoints | None = Non
 
 
 # --- Formatting --------------------------------------------------------------
+
+
+def floodgate_stats(records: list[GameRecord]) -> dict[str, float]:
+    """Floodgates per game (#160, to size the physical supply): ``placed`` (mean placements),
+    ``peak`` (mean of each game's most floodgates on the board at once) and ``peak_max`` (the
+    most in any game). Only ``PlaceFloodgate`` adds one and only ``Release`` removes one (a
+    d6 ``Bribe`` moves or removes one: counted as neither, so its peak is an upper bound)."""
+    placed: list[int] = []
+    peaks: list[int] = []
+    for record in records:
+        on_board = peak = count = len(record.start.board.floodgates)
+        for r in record.log:
+            if isinstance(r.action, PlaceFloodgate):
+                on_board += 1
+                count += 1
+                peak = max(peak, on_board)
+            elif isinstance(r.action, Release):
+                on_board -= 1
+        placed.append(count)
+        peaks.append(peak)
+    return {
+        "placed": sum(placed) / len(placed),
+        "peak": sum(peaks) / len(peaks),
+        "peak_max": float(max(peaks)),
+    }
 
 
 def _f(x: float | None, digits: int = 2) -> str:
@@ -1228,8 +1328,9 @@ TURNS_NOTE = (
 )
 V3_NOTE = (
     "Rules v3: a turn is one mandatory roll, then its face's use and 1 action (2 after a good season, "
-    "none after a drought). Rolls per face: floodgate / release / resow / good season / drought. "
-    "Planted per player: plants per game / P (a moved vineyard keeps its count)."
+    "none after a drought). Rolls per face: floodgate / release / resow / good season / drought "
+    "/ move. Planted per player: plants per game / P (a moved vineyard keeps its count). Floodgates: "
+    "placed per game / most on the board at once, mean / max over games."
 )
 SWEEP_HEADER = (
     "| Candidate | P | Seating | Advantage ± 95% | Win rate by position | Shared wins "
@@ -1242,9 +1343,9 @@ V3_SWEEP_HEADER = (
     "| Candidate | P | Seating | Advantage ± 95% | Win rate by position | Shared wins "
     "| Turns (min) | Plant / canal / pass per game | Planted per player | Winning score | Score "
     "| Vineyard points | Bodega rate | Bodega points | Rights paid | Mean debt "
-    "| Rolls per face | Floodgate / release / resow / move uses | Die use rate |"
+    "| Rolls per face | Floodgate / release / resow / move uses | Die use rate | Floodgates |"
 )
-V3_SWEEP_COLUMNS = 19
+V3_SWEEP_COLUMNS = 20
 
 
 def is_v3(overrides: Mapping[str, object]) -> bool:
@@ -1270,7 +1371,7 @@ def _die(data: Mapping[str, object]) -> list[str]:
     return [
         f"{data['games_with_die']:.3f}",
         f"{data['actions_per_game']['die']:.2f}",
-        " / ".join(f"{faces[f.value]:.2f}" for f in DieFace),
+        " / ".join(f"{rate:.2f}" for rate in faces.values()),
         _f(data["die_use_rate"], 3),
     ]
 
@@ -1317,10 +1418,18 @@ def v3_sweep_row(job: Job, outcome: Outcome) -> str:
         f"| {_spread(data['winning_score'])} | {_spread(terms['total'])} "
         f"| {terms['vineyards']['mean']:.2f} | {_f(data['bodega_rate'], 3)} | {terms['bodega']['mean']:.2f} "
         f"| {terms['rights_paid']['mean']:.2f} | {terms['debt']['mean']:.2f} "
-        f"| {' / '.join(f'{faces[f.value]:.2f}' for f in DieFace)} "
+        f"| {' / '.join(f'{rate:.2f}' for rate in faces.values())} "
         f"| {a['floodgate']:.2f} / {a['release']:.2f} / {a['resow']:.2f} / {a['move']:.2f} "
-        f"| {_f(data['die_use_rate'], 3)} |"
+        f"| {_f(data['die_use_rate'], 3)} | {_floodgates(data)} |"
     )
+
+
+def _floodgates(data: Mapping[str, object]) -> str:
+    """Floodgates placed per game / most on the board at once (mean / max); "-" when not counted."""
+    f = data.get("floodgates")
+    if f is None:
+        return "-"
+    return f"{f['placed']:.2f} / {f['peak']:.2f} / {f['peak_max']:.0f}"
 
 
 def detail_rows(job: Job, outcome: Outcome) -> list[str]:
@@ -1548,7 +1657,7 @@ def main(argv: list[str] | None = None) -> int:
     modes = [Mode(args.mode)] if args.mode else list(Mode)
     sweeps = V1_SWEEPS + v2_sweeps(args.scale, args.rare_bonus, args.multiple_bodegas, args.season_global_only,
                                    args.seat_bonus, args.rounds) + strip_sweeps(args.river_hexes, args.bag_per_player) \
-        + v3_sweeps(args.v3_river_hexes, args.v3_bag_per_player)
+        + v3_sweeps(args.v3_river_hexes, args.v3_bag_per_player) + v3split_sweeps()
     flags = "" if (args.scale, args.rare_bonus) == (1, 1) else f" --scale {args.scale} --rare-bonus {args.rare_bonus}"
     if args.multiple_bodegas:
         flags += " --multiple-bodegas"

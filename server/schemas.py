@@ -12,8 +12,8 @@ String mappings (`acequias` enum -> JSON string):
   `"Torrontés"` or `"Cabernet Sauvignon"`)
 - `VarietalRules`: its value, `"fixed"` or `"roulette"`
 - `BribeRules`: its value, `"d6"` or `"action_die"`
-- `DieFace`: its value, `"floodgate"`, `"release"`, `"resow"`, `"good_season"`,
-  or `"drought"`
+- `DieFace`: its value, `"floodgate"`, `"release"`, `"resow"`, `"move"`
+  (Rules v3 only), `"good_season"`, or `"drought"`
 - `Mode`: its value, `"normal"` or `"flash"`
 - `PieceKind` (canal shapes only): its lowercase enum name, ASCII only:
   `"straight"`, `"gentle_curve"`, `"sharp_curve"`, `"symmetric_y"`,
@@ -138,7 +138,7 @@ VarietalRulesName = Literal["fixed", "roulette"]
 BribeRulesName = Literal["d6", "action_die"]
 PlantingName = Literal["hexes", "vertices"]
 BoardShapeName = Literal["field", "river_strip"]
-DieFaceName = Literal["floodgate", "release", "resow", "good_season", "drought"]
+DieFaceName = Literal["floodgate", "release", "resow", "move", "good_season", "drought"]
 ModeName = Literal["normal", "flash"]
 KindName = Literal["straight", "gentle_curve", "sharp_curve", "symmetric_y", "t_branch", "claw"]
 DirectionName = Literal["E", "NE", "NW", "W", "SW", "SE"]
@@ -372,7 +372,7 @@ class WateredVineyardJSON(BaseModel):
     """One watered vineyard and the water rights it causes.
 
     A hex vineyard has `q` and `r`; a vertex vineyard (Rules v3) has `hexes`
-    instead.
+    instead, plus `planter`, `thirds` and `points` (split scoring).
     """
 
     model_config = ConfigDict(extra="forbid", strict=True)
@@ -394,10 +394,34 @@ class WateredVineyardJSON(BaseModel):
     )
     varietal: VarietalName = Field(description="The grape (lowercase ASCII).")
     path: list[CanalJSON] = Field(
-        description="The canals the water runs through, from the river end to the vineyard."
+        description=(
+            "The canals the water runs through, from the river end to the vineyard. For a "
+            "vertex vineyard: the player's watered canals on its vertex, one per third."
+        )
     )
     pays: list[str] = Field(
-        description="Rival ids the claimant pays 1 point each (owners on the path), in seat order."
+        description=(
+            "Rival ids the claimant pays 1 point each (owners on the path), in seat order. "
+            "Always empty for a vertex vineyard (no water rights under Rules v3)."
+        )
+    )
+    planter: str | None = Field(
+        default=None, exclude_if=_is_none,
+        description="Rules v3: who planted the vertex vineyard; left out for a hex vineyard.",
+    )
+    thirds: int | None = Field(
+        default=None, exclude_if=_is_none,
+        description=(
+            "Rules v3: the player's watered thirds of the vertex vineyard, 1 to 3 (canals of "
+            "theirs carrying water on its hexes); left out for a hex vineyard."
+        ),
+    )
+    points: int | None = Field(
+        default=None, exclude_if=_is_none,
+        description=(
+            "Rules v3: what the player scores from the vertex vineyard, value x thirds / 3 "
+            "rounded down; left out for a hex vineyard."
+        ),
     )
 
     @model_validator(mode="after")
@@ -486,9 +510,9 @@ _BRIBE_RULES_DESCRIPTION = (
 _WATER_RIGHT_DESCRIPTION = "Points a vineyard pays each distinct rival on its water path."
 _DIE_COST_DESCRIPTION = "Debt one roll of the action die costs (action_die rules)."
 _ACTION_DIE_DESCRIPTION = (
-    'The faces of the action die in order, each "floodgate", "release", "resow", '
-    '"good_season", or "drought" (action_die rules). A season face (good_season, drought) '
-    "applies to every player when rolled."
+    'The faces of the action die in order, each "floodgate", "release", "resow", "move" '
+    '(planting "vertices" only), "good_season", or "drought" (action_die rules). A season '
+    "face (good_season, drought) applies to every player when rolled."
 )
 _SEASON_POINTS_DESCRIPTION = (
     "Points every player gains on a good_season face; null: one common vineyard plot's value."
@@ -533,10 +557,11 @@ _BAG_SIZE_DESCRIPTION = (
     'Pieces in the bag (market included) per player count, keyed "2" to "5". A player count '
     "not given gets one piece per empty hex of the board; {} is off."
 )
-_RESOW_CAN_MOVE_DESCRIPTION = (
-    'Rules v3 only (planting "vertices"): whether the resow face may instead move one of the '
-    "roller's vineyards to another spot they may plant on. false by default; left out of "
-    "simulate_game's JSON when false."
+_THREE_CANALS_DESCRIPTION = (
+    'Rules v3 only (planting "vertices"): whether a vineyard may be planted only on a vertex '
+    "whose 3 hexes all hold a canal. false: a vertex with a river or empty hex may be planted, "
+    "and that third scores for nobody. false by default; left out of simulate_game's JSON "
+    "when false."
 )
 
 
@@ -577,8 +602,8 @@ class PresetJSON(BaseModel):
         default=None, exclude_if=_is_none,
         description=_PLANTING_DESCRIPTION + ' Left out when "hexes".',
     )
-    resow_can_move: bool | None = Field(
-        default=None, exclude_if=_is_none, description=_RESOW_CAN_MOVE_DESCRIPTION
+    vertex_needs_three_canals: bool | None = Field(
+        default=None, exclude_if=_is_none, description=_THREE_CANALS_DESCRIPTION
     )
     board_shape: BoardShapeName | None = Field(
         default=None, exclude_if=_is_none,
@@ -687,7 +712,7 @@ class PresetOverridesJSON(TypedDict, total=False):
         Field(description=_SEAT_BONUS_DESCRIPTION + " Each list has one int >= 0 per player."),
     ]
     planting: Annotated[PlantingName, Field(description=_PLANTING_DESCRIPTION)]
-    resow_can_move: Annotated[StrictBool, Field(description=_RESOW_CAN_MOVE_DESCRIPTION)]
+    vertex_needs_three_canals: Annotated[StrictBool, Field(description=_THREE_CANALS_DESCRIPTION)]
     board_shape: Annotated[BoardShapeName, Field(description=_BOARD_SHAPE_DESCRIPTION)]
     river_hexes_per_segment: Annotated[
         StrictInt, Field(description=_RIVER_HEXES_DESCRIPTION + " 1 or more.")
@@ -1135,8 +1160,10 @@ def watered_vineyard_to_json(vineyard: WateredVineyard) -> dict[str, Any]:
     A vertex vineyard (Rules v3) has `hexes` (its vertex) instead of `q`, `r`.
     """
     where: dict[str, Any]
+    split: dict[str, Any] = {}
     if vineyard.vertex is not None:
         where = {"hexes": vertex_to_json(vineyard.vertex)}
+        split = {"planter": vineyard.planter, "thirds": vineyard.thirds, "points": vineyard.points}
     else:
         where = {"q": vineyard.hex.q, "r": vineyard.hex.r}
     return {
@@ -1144,6 +1171,7 @@ def watered_vineyard_to_json(vineyard: WateredVineyard) -> dict[str, Any]:
         "varietal": varietal_to_json(vineyard.varietal),
         "path": [canal_to_json(canal) for canal in vineyard.path.canals],
         "pays": list(vineyard.pays),
+        **split,
     }
 
 
