@@ -8812,5 +8812,559 @@
     "stdev": 3.2998316455372216
    }
   }
+ },
+ "S7": {
+  "games": [
+   {
+    "final": {
+     "bag": [
+      "STRAIGHT",
+      "SHARP_CURVE",
+      "GENTLE_CURVE",
+      "SYMMETRIC_Y",
+      "STRAIGHT",
+      "STRAIGHT",
+      "GENTLE_CURVE",
+      "STRAIGHT"
+     ],
+     "canals": [
+      {
+       "hex": [
+        -1,
+        3
+       ],
+       "kind": "GENTLE_CURVE",
+       "owner": "p2",
+       "rotation": 4
+      },
+      {
+       "hex": [
+        -1,
+        4
+       ],
+       "kind": "GENTLE_CURVE",
+       "owner": "p1",
+       "rotation": 1
+      },
+      {
+       "hex": [
+        0,
+        1
+       ],
+       "kind": "T_BRANCH",
+       "owner": "p1",
+       "rotation": 2
+      },
+      {
+       "hex": [
+        0,
+        2
+       ],
+       "kind": "SHARP_CURVE",
+       "owner": "p2",
+       "rotation": 1
+      },
+      {
+       "hex": [
+        0,
+        3
+       ],
+       "kind": "GENTLE_CURVE",
+       "owner": "p2",
+       "rotation": 1
+      },
+      {
+       "hex": [
+        1,
+        0
+       ],
+       "kind": "SHARP_CURVE",
+       "owner": "p1",
+       "rotation": 3
+      },
+      {
+       "hex": [
+        1,
+        1
+       ],
+       "kind": "CLAW",
+       "owner": "p2",
+       "rotation": 2
+      },
+      {
+       "hex": [
+        1,
+        2
+       ],
+       "kind": "STRAIGHT",
+       "owner": "p1",
+       "rotation": 1
+      },
+      {
+       "hex": [
+        2,
+        1
+       ],
+       "kind": "SHARP_CURVE",
+       "owner": "p2",
+       "rotation": 3
+      }
+     ],
+     "claims": [],
+     "current_player": "p2",
+     "floodgates": [],
+     "market": [
+      "STRAIGHT",
+      "STRAIGHT",
+      "STRAIGHT",
+      "STRAIGHT"
+     ],
+     "pending_face": null,
+     "plantings": [],
+     "players": [
+      {
+       "debt": 2,
+       "drought": 0,
+       "id": "p1",
+       "season": 6,
+       "seat": 1
+      },
+      {
+       "debt": 1,
+       "drought": 0,
+       "id": "p2",
+       "season": 6,
+       "seat": 2
+      }
+     ],
+     "round": 7,
+     "season_roll": null,
+     "start_player": "p2"
+    },
+    "game_seed": 5489229095833132262,
+    "log": [
+     {
+      "action": {
+       "hex": [
+        -1,
+        3
+       ],
+       "kind": "GENTLE_CURVE",
+       "rotation": 4,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 1
+     },
+     {
+      "action": {
+       "hex": [
+        0,
+        1
+       ],
+       "kind": "T_BRANCH",
+       "rotation": 2,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 1
+     },
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "RESOW",
+      "player": "p2",
+      "round": 2
+     },
+     {
+      "action": {
+       "hex": [
+        1,
+        0
+       ],
+       "kind": "SHARP_CURVE",
+       "rotation": 3,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 2
+     },
+     {
+      "action": {
+       "hex": [
+        0,
+        3
+       ],
+       "kind": "GENTLE_CURVE",
+       "rotation": 1,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 2
+     },
+     {
+      "action": {
+       "hex": [
+        0,
+        2
+       ],
+       "kind": "SHARP_CURVE",
+       "rotation": 1,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 3
+     },
+     {
+      "action": {
+       "hex": [
+        -1,
+        4
+       ],
+       "kind": "GENTLE_CURVE",
+       "rotation": 1,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 3
+     },
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "FLOODGATE",
+      "player": "p1",
+      "round": 4
+     },
+     {
+      "action": {
+       "hex": [
+        1,
+        2
+       ],
+       "kind": "STRAIGHT",
+       "rotation": 1,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 4
+     },
+     {
+      "action": {
+       "hex": [
+        1,
+        1
+       ],
+       "kind": "CLAW",
+       "rotation": 2,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 4
+     },
+     {
+      "action": {
+       "hex": [
+        2,
+        1
+       ],
+       "kind": "SHARP_CURVE",
+       "rotation": 3,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 5
+     },
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "RESOW",
+      "player": "p1",
+      "round": 5
+     },
+     {
+      "action": {
+       "type": "DeclineFace"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 5
+     },
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "GOOD_SEASON",
+      "player": "p2",
+      "round": 6
+     },
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "FLOODGATE",
+      "player": "p1",
+      "round": 6
+     },
+     {
+      "action": {
+       "direction": "NE",
+       "hex": [
+        -1,
+        4
+       ],
+       "type": "PlaceFloodgate"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 6
+     },
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "RELEASE",
+      "player": "p2",
+      "round": 6
+     },
+     {
+      "action": {
+       "direction": "NE",
+       "hex": [
+        -1,
+        4
+       ],
+       "type": "Release"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 6
+     }
+    ],
+    "scores": {
+     "p1": {
+      "bodega": 0,
+      "bodegas": 0,
+      "debt": 2,
+      "drought": 0,
+      "player": "p1",
+      "rights_collected": 0,
+      "rights_paid": 0,
+      "season": 6,
+      "seat": 1,
+      "seat_bonus": 0,
+      "total": 4,
+      "vineyards": 0,
+      "watered": 0,
+      "watered_vineyards": []
+     },
+     "p2": {
+      "bodega": 0,
+      "bodegas": 0,
+      "debt": 1,
+      "drought": 0,
+      "player": "p2",
+      "rights_collected": 0,
+      "rights_paid": 0,
+      "season": 6,
+      "seat": 2,
+      "seat_bonus": 0,
+      "total": 5,
+      "vineyards": 0,
+      "watered": 0,
+      "watered_vineyards": []
+     }
+    },
+    "water": [],
+    "winners": [
+     "p2"
+    ]
+   }
+  ],
+  "n": 1,
+  "seed": 14715,
+  "simulate_game": {
+   "actions_per_game": {
+    "bribe": 0.0,
+    "canal": 9.0,
+    "decline": 1.0,
+    "die": 6.0,
+    "floodgate": 1.0,
+    "pass": 0.0,
+    "release": 1.0,
+    "resow": 0.0
+   },
+   "bodega_rate": 0.0,
+   "die_faces_per_game": {
+    "drought": 0.0,
+    "floodgate": 2.0,
+    "good_season": 1.0,
+    "release": 1.0,
+    "resow": 2.0
+   },
+   "die_use_rate": 0.8333333333333334,
+   "games_with_bribe": 0.0,
+   "games_with_die": 1.0,
+   "games_with_floodgate": 1.0,
+   "mean_total_by_position": [
+    5.0,
+    4.0
+   ],
+   "mode": "flash",
+   "n": 1,
+   "players": 2,
+   "policies": [
+    "random",
+    "random"
+   ],
+   "preset": {
+    "action_die": [
+     "floodgate",
+     "release",
+     "resow",
+     "resow",
+     "good_season",
+     "drought"
+    ],
+    "action_die_cost": 1,
+    "bag_mix": {
+     "claw": 5,
+     "floodgate": 0,
+     "gentle_curve": 22,
+     "sharp_curve": 17,
+     "straight": 44,
+     "symmetric_y": 6,
+     "t_branch": 6
+    },
+    "bodega_points": 3,
+    "bodega_varietals": 3,
+    "bribe_rules": "action_die",
+    "die_faces": 6,
+    "drought_points": null,
+    "grape_clusters_per_player": null,
+    "hexes_per_player": 14,
+    "market_size": 4,
+    "mode": "flash",
+    "multiple_bodegas": true,
+    "roulette": [
+     "malbec",
+     "malbec",
+     "cabernet_sauvignon",
+     "cabernet_sauvignon",
+     "syrah",
+     "syrah",
+     "merlot",
+     "merlot",
+     "torrontes",
+     "torrontes",
+     "chardonnay",
+     "chardonnay",
+     "bonarda",
+     "cabernet_franc"
+    ],
+    "rounds": {
+     "2": 6,
+     "3": 6
+    },
+    "season_points": null,
+    "season_roll_every": 2,
+    "season_roll_personal_faces": false,
+    "seat_bonus": {},
+    "stone_share": 10,
+    "varietal_points": {
+     "bonarda": 7,
+     "cabernet_franc": 7,
+     "cabernet_sauvignon": 6,
+     "chardonnay": 6,
+     "malbec": 6,
+     "merlot": 6,
+     "syrah": 6,
+     "torrontes": 6
+    },
+    "varietal_rules": "roulette",
+    "vineyard_distance": [
+     4,
+     4
+    ],
+    "vineyards_per_player": 2,
+    "water_right_points": 3
+   },
+   "score_terms": {
+    "bodega": {
+     "mean": 0.0,
+     "stdev": 0.0
+    },
+    "debt": {
+     "mean": 1.5,
+     "stdev": 0.5
+    },
+    "drought": {
+     "mean": 0.0,
+     "stdev": 0.0
+    },
+    "rights_collected": {
+     "mean": 0.0,
+     "stdev": 0.0
+    },
+    "rights_paid": {
+     "mean": 0.0,
+     "stdev": 0.0
+    },
+    "season": {
+     "mean": 6.0,
+     "stdev": 0.0
+    },
+    "total": {
+     "mean": 4.5,
+     "stdev": 0.5
+    },
+    "vineyards": {
+     "mean": 0.0,
+     "stdev": 0.0
+    }
+   },
+   "seed": 14715,
+   "shared_win_rate": 0.0,
+   "turn_order_advantage": 1.0,
+   "turns_per_game": 18.0,
+   "win_rate_bribers": null,
+   "win_rate_by_policy": {
+    "random": 1.0
+   },
+   "win_rate_by_position": [
+    1.0,
+    0.0
+   ],
+   "win_rate_by_seat": [
+    0.0,
+    1.0
+   ],
+   "win_rate_non_bribers": 0.5,
+   "winner_varietal_rate": {
+    "bonarda": 0.0,
+    "cabernet_franc": 0.0,
+    "cabernet_sauvignon": 0.0,
+    "chardonnay": 0.0,
+    "malbec": 0.0,
+    "merlot": 0.0,
+    "syrah": 0.0,
+    "torrontes": 0.0
+   },
+   "winning_score": {
+    "mean": 5.0,
+    "stdev": 0.0
+   }
+  }
  }
 }
