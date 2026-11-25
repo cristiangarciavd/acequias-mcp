@@ -163,7 +163,7 @@ Gains and losses show in the score as the `season` and `drought` terms (`total =
 
 #### Rules v3 (opt-in, not shipped)
 
-Rules v3 (#149) is an opt-in preset variant, off in the shipped presets; it ships only after tuning and the owner's approval. It is turned on with `planting = vertices` (`PlantingRules.VERTICES`, which needs roulette varietals and action die rules), and optionally the open river strip board with `board_shape = river_strip`.
+Rules v3 (#149) is an opt-in preset variant, off in the shipped presets; it ships only after tuning and the owner's approval. It is turned on with `planting = vertices` (`PlantingRules.VERTICES`, which needs roulette varietals and action die rules), and optionally the open river strip board with `board_shape = river_strip`. Player documents: the [rules sheet](_docs/rules-v3.md), the [varietal fact card](_docs/varietals.md), and the [action die notes](_docs/action-die.md).
 
 - **Turn:** every turn starts with a **mandatory roll** of the action die. Floodgate and Release cost the bribe (`action_die_cost` in debt, paid even with no use) and must be used when they can (place a floodgate on any open canal edge; remove a floodgate). Resow and Move are free and optional: Resow respins any planted vineyard, yours or a rival's (no moving); Move (#160, the Rules v3 die `V3_DIE_FACES`: floodgate, release, resow, move, good season, drought, one face each, the move icon a moving truck) moves one of your planted vineyards to another empty vertex you may plant on (the same rule as a new vineyard). The old die (2 resows, no move) stays playable for comparison. Good season gives **2 actions** (plant + plant, or canal + plant; never 2 canals); Drought loses the turn. Then take your action: **place a canal**, **plant a vineyard**, or **pass** (always allowed). There is no claim phase, no season roll, and no season or drought points.
 - **Planting:** vineyards grow on hex **vertices** (the point where 3 hexes meet), not on vineyard tiles. A player plants on a free vertex next to one of **their own** canals that carries water right now, and spins the roulette for its varietal; planting makes it theirs. A vertex touches a canal when the canal sits on one of its 3 hexes, regardless of openings. Planting next to rivals' canals is allowed. With `vertex_needs_three_canals` (off by default) a vineyard may be planted only on a vertex whose 3 hexes all hold a canal (anyone's, wet or dry); off, a vertex with a river or empty hex may be planted and that third is lost.
@@ -489,5 +489,8 @@ Each tool lives in `server/tools/` and is registered in `server/app.py` on the m
 
 - [Process](_docs/process.md): how work is organized
 - [Task template](_docs/task-template.md): the shape every issue follows
+- [Rules v3 rules sheet](_docs/rules-v3.md): the Rules v3 rules for players
+- [Varietal fact card](_docs/varietals.md): the 8 varietals, print colors, points, and sourced facts
+- [Action die](_docs/action-die.md): what each Rules v3 die face means in Mendoza, and its icon
 - [AGENTS.md](AGENTS.md): instructions for coding agents
 - `_docs/outdated/`: superseded documents kept for history only; this README and the GitHub issues replace them

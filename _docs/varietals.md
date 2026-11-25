@@ -1,10 +1,158 @@
-# Grape varietals of Mendoza - research notes
+# Grape varietals of Mendoza - fact card and research notes
+
+The eight varietals of the game's roulette. The **fact card** below is the
+player-facing part, for the rules sheet ([`rules-v3.md`](rules-v3.md)) and the printed
+roulette: each fact comes from an Argentine official or institutional source (the
+Instituto Nacional de Vitivinicultura, INV; the Universidad Nacional de Cuyo; Bodegas
+de Argentina), linked next to it. The **research notes** after it are the longer
+background, with planted-area figures read from the INV tables and some secondary
+sources; use them for context, not for print.
+
+## Fact card
+
+Points are the Rules v3 values (#160): 6 for a common varietal, 9 for the rare
+Bonarda and Cabernet Franc, which have one roulette sector each (the others have two).
+The shipped Rules v2 game gives the rare ones 7. Areas are hectares of vines on
+31 Dec 2024 from the INV *Informe Anual de Superficie 2024* ([INV 2024][inv-sup]).
+
+| Varietal | Print color | Points | Roulette sectors |
+| --- | --- | --- | --- |
+| Malbec | Violet | 6 | 2 |
+| Syrah | Violet | 6 | 2 |
+| Bonarda | Violet | 9 (rare) | 1 |
+| Cabernet Sauvignon | Red | 6 | 2 |
+| Merlot | Red | 6 | 2 |
+| Cabernet Franc | Red | 9 (rare) | 1 |
+| Torrontés | Fluorescent green | 6 | 2 |
+| Chardonnay | Fluorescent green | 6 | 2 |
+
+### Malbec - violet, 6
+
+- Came to Mendoza with the French vines of the *Quinta Agronómica*, run by the French
+  agronomist Michel Aimé Pouget, whom Sarmiento hired. The project for the school was
+  presented to Mendoza's legislature on **17 April 1853** ([UNCuyo][uncuyo-malbec];
+  [Bodegas de Argentina][bda-malbec]).
+- That date is **Malbec World Day**, chosen by Wines of Argentina in 2011
+  ([UNCuyo][uncuyo-malbec]; [Bodegas de Argentina][bda-malbec]).
+- Argentina's most planted grape: 47,064 ha, about **one vine in four** in the
+  country; Mendoza grows 39,856 ha of it, about 85% ([INV 2024][inv-sup]).
+- Its biggest block is the Valle de Uco; Luján de Cuyo is the top single department
+  ([INV 2024][inv-sup]).
+
+### Syrah - violet, 6
+
+- Grown across Europe and best known from France's Rhône; INV notes that its origin
+  is uncertain, with tradition linking it to Shiraz in ancient Persia
+  ([INV Syrah][inv-syrah]; [INV Syrah 2024 report][inv-syrah-pdf]).
+- Expressive wines with blackberry, plum, cherry and leather, plus spice and herbs
+  such as thyme and rosemary ([INV Syrah][inv-syrah]).
+- 10,420 ha in Argentina and 7,700 in Mendoza, with San Juan second; in Mendoza it
+  has its largest share in the warm East, around San Martín ([INV 2024][inv-sup]).
+
+### Bonarda - violet, 9 (rare)
+
+- Comes from Savoy, in France next to Italy; in the United States it is Charbono
+  ([INV Bonarda][inv-bonarda]).
+- Arrived in Argentina with the immigrants of the late 19th century
+  ([INV Bonarda][inv-bonarda]).
+- Argentina's second red: 16,774 ha, 14,027 of them in Mendoza (about 84%), mostly in
+  the East: San Martín, Rivadavia, Santa Rosa, Junín ([INV 2024][inv-sup]).
+- Long a blending grape for its big yields and deep color; with lower yields it now
+  makes fine single-varietal wines ([INV Bonarda][inv-bonarda]).
+
+### Cabernet Sauvignon - red, 6
+
+- From Bordeaux, France: a natural cross of Cabernet Franc and Sauvignon Blanc
+  ([INV Cabernet Sauvignon][inv-cs]).
+- Its berries have thick, very dark skins rich in tannins
+  ([INV Cabernet Sauvignon][inv-cs]).
+- Argentina's #4 grape with 12,727 ha (9,787 in Mendoza), but shrinking: 2,832 ha
+  fewer than in 2015 ([INV 2024][inv-sup]).
+- In Mendoza its largest blocks are in the Valle de Uco and Luján de Cuyo
+  ([INV 2024][inv-sup]).
+
+### Merlot - red, 6
+
+- Probably from south-west France; its name may come from the blackbird (*merle*)
+  ([INV Merlot][inv-merlot]).
+- Full-bodied, balanced wines with elegant tannins: plum and sour cherry, rose,
+  spice, black pepper and cinnamon ([INV Merlot][inv-merlot]).
+- 4,348 ha in Argentina and 3,449 in Mendoza; the main block is the Valle de Uco
+  (Tupungato, Tunuyán) ([INV 2024][inv-sup]).
+
+### Cabernet Franc - red, 9 (rare)
+
+- Native to Bordeaux and widely grown in the Loire. Argentina had only 76 ha up to
+  1990; the planting boom came after 2000 ([INV Cabernet Franc][inv-cf]).
+- Ruby red, with green bell pepper, eucalyptus, menthol, spice and red berries;
+  elegant and structured ([INV Cabernet Franc][inv-cf]).
+- 2,009 ha in Argentina and 1,661 in Mendoza, more than double the 2015 area; over
+  half of Mendoza's grows in the Valle de Uco ([INV 2024][inv-sup]).
+- Its day is **4 December** ([INV Cabernet Franc][inv-cf]).
+
+### Torrontés - fluorescent green, 6
+
+- Argentina's own grape: Torrontés Riojano and Torrontés Sanjuanino are crosses of
+  Muscat of Alexandria and Criolla Chica; the third type is Torrontés Mendocino
+  ([INV Torrontés][inv-torrontes]; [Agüero et al. 2003][aguero]).
+- Aromatic, yet it makes a **dry** wine with a distinctive Muscat flavor
+  ([INV Torrontés][inv-torrontes]).
+- Torrontés Riojano covers 6,867 ha; Mendoza grows 3,207 ha of it, the most of any
+  province, mostly in the East and Lavalle ([INV 2024][inv-sup]).
+
+### Chardonnay - fluorescent green, 6
+
+- France's main white grape, grown in Burgundy, Chablis and Champagne
+  ([INV Chardonnay][inv-chardonnay]).
+- In Argentina it is the base of most sparkling wines
+  ([INV Chardonnay][inv-chardonnay]).
+- 5,542 ha in Argentina and 4,606 in Mendoza (about 83%); Tupungato, in the Valle de
+  Uco, is the top department ([INV 2024][inv-sup]).
+- Versatile and aromatically complex, with good ageing potential
+  ([INV Chardonnay][inv-chardonnay]).
+
+### Fact card sources
+
+- INV, *Informe Anual de Superficie 2024*: https://argentina.gob.ar/sites/default/files/2018/10/anuario_superficie_2024.pdf
+- INV, *Informe de variedad: Syrah* (Feb 2026): https://www.argentina.gob.ar/noticias/informe-de-variedad-syrah-0
+- INV, *Informe de variedades: Syrah* (Feb 2025): https://argentina.gob.ar/sites/default/files/2018/10/01_syrah_2024.pdf
+- INV, *Informe de variedad: Bonarda* (Jul 2024): https://www.argentina.gob.ar/noticias/informe-de-variedad-bonarda-0
+- INV, *Informe de variedad: Cabernet Sauvignon* (Aug 2024): https://www.argentina.gob.ar/noticias/informe-de-variedad-cabernet-sauvignon-0
+- INV, *Informe de variedad: Merlot* (Nov 2024): https://www.argentina.gob.ar/noticias/informe-de-variedad-merlot-0
+- INV, *Informe de variedad: Cabernet Franc* (Dec 2024): https://www.argentina.gob.ar/noticias/informe-de-variedad-cabernet-franc-0
+- INV, *Informe de variedad: Torrontés y su actualidad en Argentina* (Nov 2021): https://www.argentina.gob.ar/noticias/informe-de-variedad-torrontes-y-su-actualidad-en-argentina
+- INV, *Informe de variedad: Chardonnay* (May 2024): https://www.argentina.gob.ar/noticias/informe-de-variedad-chardonnay
+- Agüero et al. (2003), *Identity and parentage of some South American grapevine cultivars present in Argentina*, AJEV 54(4), hosted by the Argentine government: https://www.argentina.gob.ar/sites/default/files/identity_and_parentage_of_some_south_american_grapevine_cultivars_present_in_argentina.pdf
+- Universidad Nacional de Cuyo, *¿Qué une a Sarmiento con el Malbec y la UNCUYO?* (Apr 2022): https://www.uncuyo.edu.ar/prensa/que-une-a-sarmiento-con-el-malbec-y-la-uncuyo-te-contamos-su-historia
+- Bodegas de Argentina, *Día del Malbec*: https://bodegasdeargentina.org/dia-del-malbec/noticias/
+
+[inv-sup]: https://argentina.gob.ar/sites/default/files/2018/10/anuario_superficie_2024.pdf
+[inv-syrah]: https://www.argentina.gob.ar/noticias/informe-de-variedad-syrah-0
+[inv-syrah-pdf]: https://argentina.gob.ar/sites/default/files/2018/10/01_syrah_2024.pdf
+[inv-bonarda]: https://www.argentina.gob.ar/noticias/informe-de-variedad-bonarda-0
+[inv-cs]: https://www.argentina.gob.ar/noticias/informe-de-variedad-cabernet-sauvignon-0
+[inv-merlot]: https://www.argentina.gob.ar/noticias/informe-de-variedad-merlot-0
+[inv-cf]: https://www.argentina.gob.ar/noticias/informe-de-variedad-cabernet-franc-0
+[inv-torrontes]: https://www.argentina.gob.ar/noticias/informe-de-variedad-torrontes-y-su-actualidad-en-argentina
+[inv-chardonnay]: https://www.argentina.gob.ar/noticias/informe-de-variedad-chardonnay
+[aguero]: https://www.argentina.gob.ar/sites/default/files/identity_and_parentage_of_some_south_american_grapevine_cultivars_present_in_argentina.pdf
+[uncuyo-malbec]: https://www.uncuyo.edu.ar/prensa/que-une-a-sarmiento-con-el-malbec-y-la-uncuyo-te-contamos-su-historia
+[bda-malbec]: https://bodegasdeargentina.org/dia-del-malbec/noticias/
+
+---
+
+## Research notes
 
 Background for the eight varietals in the game. Planted-area figures come from the
 **INV Informe Anual de Superficie 2024** (vineyard registry as of 31 Dec 2024), read
 straight from the PDF tables. Where possible they were cross-checked against INV
 single-variety reports and press summaries. Argentina had about 201,000 ha of vines in
-2024, and Mendoza had 142,785 ha (about 71%).
+2024, and Mendoza had 142,785 ha (about 71%). The INV single-variety reports sometimes
+give other totals for the same year (for example 13,006 ha of Cabernet Sauvignon and
+10,658 ha of Syrah in 2024), because they read the registry at another date; the fact
+card uses the annual report's figures throughout. Facts from non-Argentine or press
+sources (Decanter, Jancis Robinson, Wine Spectator, Wine Folly, Wikipedia, Forbes) are
+background only and are not used on the fact card.
 
 Zone mapping used below. The department tables were added up into the zones the game uses:
 
@@ -185,7 +333,7 @@ National ranking, 2024 (INV, all grape types including table grapes and raisins)
 
 ---
 
-## Sources
+## Research sources
 
 - INV, Informe Anual de Superficie 2024 (tables by variety, province and Mendoza department): https://argentina.gob.ar/sites/default/files/2018/10/anuario_superficie_2024.pdf
 - INV, Informe de variedades: Syrah (Feb 2025): https://argentina.gob.ar/sites/default/files/2018/10/01_syrah_2024.pdf
