@@ -1,0 +1,8816 @@
+{
+ "S1": {
+  "games": [
+   {
+    "final": {
+     "bag": [
+      "SHARP_CURVE",
+      "STRAIGHT",
+      "STRAIGHT",
+      "SHARP_CURVE",
+      "GENTLE_CURVE",
+      "GENTLE_CURVE",
+      "GENTLE_CURVE",
+      "T_BRANCH",
+      "SHARP_CURVE",
+      "STRAIGHT",
+      "SYMMETRIC_Y"
+     ],
+     "canals": [
+      {
+       "hex": [
+        -2,
+        5
+       ],
+       "kind": "GENTLE_CURVE",
+       "owner": "p2",
+       "rotation": 3
+      },
+      {
+       "hex": [
+        -2,
+        6
+       ],
+       "kind": "STRAIGHT",
+       "owner": "p1",
+       "rotation": 0
+      },
+      {
+       "hex": [
+        -1,
+        3
+       ],
+       "kind": "STRAIGHT",
+       "owner": "p2",
+       "rotation": 0
+      },
+      {
+       "hex": [
+        -1,
+        4
+       ],
+       "kind": "T_BRANCH",
+       "owner": "p1",
+       "rotation": 3
+      },
+      {
+       "hex": [
+        -1,
+        6
+       ],
+       "kind": "SHARP_CURVE",
+       "owner": "p2",
+       "rotation": 3
+      },
+      {
+       "hex": [
+        0,
+        1
+       ],
+       "kind": "SHARP_CURVE",
+       "owner": "p2",
+       "rotation": 4
+      },
+      {
+       "hex": [
+        0,
+        3
+       ],
+       "kind": "GENTLE_CURVE",
+       "owner": "p1",
+       "rotation": 3
+      },
+      {
+       "hex": [
+        0,
+        4
+       ],
+       "kind": "GENTLE_CURVE",
+       "owner": "p1",
+       "rotation": 1
+      },
+      {
+       "hex": [
+        1,
+        0
+       ],
+       "kind": "STRAIGHT",
+       "owner": "p1",
+       "rotation": 0
+      },
+      {
+       "hex": [
+        1,
+        2
+       ],
+       "kind": "SYMMETRIC_Y",
+       "owner": "p1",
+       "rotation": 1
+      },
+      {
+       "hex": [
+        2,
+        0
+       ],
+       "kind": "STRAIGHT",
+       "owner": "p2",
+       "rotation": 0
+      },
+      {
+       "hex": [
+        2,
+        1
+       ],
+       "kind": "STRAIGHT",
+       "owner": "p2",
+       "rotation": 1
+      },
+      {
+       "hex": [
+        3,
+        0
+       ],
+       "kind": "CLAW",
+       "owner": "p1",
+       "rotation": 3
+      }
+     ],
+     "claims": [
+      [
+       [
+        3,
+        1
+       ],
+       "p1"
+      ]
+     ],
+     "current_player": "p2",
+     "floodgates": [],
+     "market": [
+      "STRAIGHT",
+      "STRAIGHT",
+      "STRAIGHT",
+      "STRAIGHT"
+     ],
+     "pending_face": null,
+     "plantings": [
+      [
+       [
+        3,
+        1
+       ],
+       "CABERNET_FRANC"
+      ]
+     ],
+     "players": [
+      {
+       "debt": 0,
+       "drought": 0,
+       "id": "p1",
+       "season": 12,
+       "seat": 1
+      },
+      {
+       "debt": 3,
+       "drought": 0,
+       "id": "p2",
+       "season": 12,
+       "seat": 2
+      }
+     ],
+     "round": 11,
+     "season_roll": null,
+     "start_player": "p2"
+    },
+    "game_seed": 4919778206284616659,
+    "log": [
+     {
+      "action": {
+       "hex": [
+        0,
+        1
+       ],
+       "kind": "SHARP_CURVE",
+       "rotation": 4,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 1
+     },
+     {
+      "action": {
+       "hex": [
+        -1,
+        4
+       ],
+       "kind": "T_BRANCH",
+       "rotation": 3,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 1
+     },
+     {
+      "action": {
+       "hex": [
+        1,
+        0
+       ],
+       "kind": "STRAIGHT",
+       "rotation": 0,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 2
+     },
+     {
+      "action": {
+       "hex": [
+        -1,
+        3
+       ],
+       "kind": "STRAIGHT",
+       "rotation": 0,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 2
+     },
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "GOOD_SEASON",
+      "player": "p2",
+      "round": 3
+     },
+     {
+      "action": {
+       "hex": [
+        -2,
+        5
+       ],
+       "kind": "GENTLE_CURVE",
+       "rotation": 3,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 3
+     },
+     {
+      "action": {
+       "hex": [
+        0,
+        4
+       ],
+       "kind": "GENTLE_CURVE",
+       "rotation": 1,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 3
+     },
+     {
+      "action": {
+       "hex": [
+        -2,
+        6
+       ],
+       "kind": "STRAIGHT",
+       "rotation": 0,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 4
+     },
+     {
+      "action": {
+       "hex": [
+        -1,
+        6
+       ],
+       "kind": "SHARP_CURVE",
+       "rotation": 3,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 4
+     },
+     {
+      "action": {
+       "hex": [
+        2,
+        0
+       ],
+       "kind": "STRAIGHT",
+       "rotation": 0,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 5
+     },
+     {
+      "action": {
+       "hex": [
+        3,
+        0
+       ],
+       "kind": "CLAW",
+       "rotation": 3,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 5
+     },
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "RESOW",
+      "player": "p1",
+      "round": 6
+     },
+     {
+      "action": {
+       "hex": [
+        0,
+        3
+       ],
+       "kind": "GENTLE_CURVE",
+       "rotation": 3,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 6
+     },
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "RESOW",
+      "player": "p2",
+      "round": 6
+     },
+     {
+      "action": {
+       "hex": [
+        3,
+        1
+       ],
+       "type": "Resow"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 6
+     },
+     {
+      "action": {
+       "hex": [
+        2,
+        1
+       ],
+       "kind": "STRAIGHT",
+       "rotation": 1,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 7
+     },
+     {
+      "action": {
+       "hex": [
+        1,
+        2
+       ],
+       "kind": "SYMMETRIC_Y",
+       "rotation": 1,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 7
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 8
+     },
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "RESOW",
+      "player": "p2",
+      "round": 8
+     },
+     {
+      "action": {
+       "type": "DeclineFace"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 8
+     },
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "GOOD_SEASON",
+      "player": "p2",
+      "round": 9
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 9
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 9
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 10
+     },
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "RELEASE",
+      "player": "p2",
+      "round": 10
+     },
+     {
+      "action": {
+       "type": "DeclineFace"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 10
+     }
+    ],
+    "scores": {
+     "p1": {
+      "bodega": 0,
+      "bodegas": 0,
+      "debt": 0,
+      "drought": 0,
+      "player": "p1",
+      "rights_collected": 0,
+      "rights_paid": 3,
+      "season": 12,
+      "seat": 1,
+      "seat_bonus": 0,
+      "total": 16,
+      "vineyards": 7,
+      "watered": 1,
+      "watered_vineyards": [
+       {
+        "hex": [
+         3,
+         1
+        ],
+        "path": {
+         "canals": [
+          [
+           1,
+           0
+          ],
+          [
+           2,
+           0
+          ],
+          [
+           3,
+           0
+          ]
+         ],
+         "owners": [
+          "p1",
+          "p2"
+         ]
+        },
+        "pays": [
+         "p2"
+        ],
+        "varietal": "CABERNET_FRANC"
+       }
+      ]
+     },
+     "p2": {
+      "bodega": 0,
+      "bodegas": 0,
+      "debt": 3,
+      "drought": 0,
+      "player": "p2",
+      "rights_collected": 3,
+      "rights_paid": 0,
+      "season": 12,
+      "seat": 2,
+      "seat_bonus": 0,
+      "total": 12,
+      "vineyards": 0,
+      "watered": 0,
+      "watered_vineyards": []
+     }
+    },
+    "water": [
+     {
+      "canals": [
+       [
+        1,
+        0
+       ],
+       [
+        2,
+        0
+       ],
+       [
+        3,
+        0
+       ]
+      ],
+      "owners": [
+       "p1",
+       "p2"
+      ],
+      "vineyard": [
+       3,
+       1
+      ]
+     }
+    ],
+    "winners": [
+     "p1"
+    ]
+   },
+   {
+    "final": {
+     "bag": [
+      "SYMMETRIC_Y",
+      "GENTLE_CURVE",
+      "SYMMETRIC_Y",
+      "STRAIGHT",
+      "STRAIGHT",
+      "STRAIGHT",
+      "GENTLE_CURVE",
+      "STRAIGHT",
+      "STRAIGHT",
+      "GENTLE_CURVE",
+      "SHARP_CURVE",
+      "STRAIGHT"
+     ],
+     "canals": [
+      {
+       "hex": [
+        -2,
+        5
+       ],
+       "kind": "T_BRANCH",
+       "owner": "p1",
+       "rotation": 2
+      },
+      {
+       "hex": [
+        -2,
+        6
+       ],
+       "kind": "SHARP_CURVE",
+       "owner": "p2",
+       "rotation": 3
+      },
+      {
+       "hex": [
+        -1,
+        4
+       ],
+       "kind": "STRAIGHT",
+       "owner": "p1",
+       "rotation": 0
+      },
+      {
+       "hex": [
+        -1,
+        5
+       ],
+       "kind": "SHARP_CURVE",
+       "owner": "p2",
+       "rotation": 1
+      },
+      {
+       "hex": [
+        0,
+        1
+       ],
+       "kind": "T_BRANCH",
+       "owner": "p2",
+       "rotation": 4
+      },
+      {
+       "hex": [
+        0,
+        2
+       ],
+       "kind": "STRAIGHT",
+       "owner": "p1",
+       "rotation": 0
+      },
+      {
+       "hex": [
+        0,
+        3
+       ],
+       "kind": "SHARP_CURVE",
+       "owner": "p1",
+       "rotation": 5
+      },
+      {
+       "hex": [
+        0,
+        4
+       ],
+       "kind": "CLAW",
+       "owner": "p2",
+       "rotation": 2
+      },
+      {
+       "hex": [
+        1,
+        0
+       ],
+       "kind": "SHARP_CURVE",
+       "owner": "p2",
+       "rotation": 3
+      },
+      {
+       "hex": [
+        1,
+        2
+       ],
+       "kind": "GENTLE_CURVE",
+       "owner": "p1",
+       "rotation": 1
+      },
+      {
+       "hex": [
+        2,
+        1
+       ],
+       "kind": "GENTLE_CURVE",
+       "owner": "p2",
+       "rotation": 4
+      },
+      {
+       "hex": [
+        3,
+        1
+       ],
+       "kind": "STRAIGHT",
+       "owner": "p1",
+       "rotation": 0
+      }
+     ],
+     "claims": [],
+     "current_player": "p1",
+     "floodgates": [],
+     "market": [
+      "STRAIGHT",
+      "STRAIGHT",
+      "STRAIGHT",
+      "GENTLE_CURVE"
+     ],
+     "pending_face": null,
+     "plantings": [],
+     "players": [
+      {
+       "debt": 0,
+       "drought": 3,
+       "id": "p1",
+       "season": 6,
+       "seat": 1
+      },
+      {
+       "debt": 1,
+       "drought": 3,
+       "id": "p2",
+       "season": 6,
+       "seat": 2
+      }
+     ],
+     "round": 11,
+     "season_roll": null,
+     "start_player": "p1"
+    },
+    "game_seed": 2336587313866907679,
+    "log": [
+     {
+      "action": {
+       "hex": [
+        -1,
+        4
+       ],
+       "kind": "STRAIGHT",
+       "rotation": 0,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 1
+     },
+     {
+      "action": {
+       "hex": [
+        0,
+        4
+       ],
+       "kind": "CLAW",
+       "rotation": 2,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 1
+     },
+     {
+      "action": {
+       "hex": [
+        0,
+        1
+       ],
+       "kind": "T_BRANCH",
+       "rotation": 4,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 2
+     },
+     {
+      "action": {
+       "hex": [
+        0,
+        3
+       ],
+       "kind": "SHARP_CURVE",
+       "rotation": 5,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 2
+     },
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "DROUGHT",
+      "player": "p1",
+      "round": 3
+     },
+     {
+      "action": {
+       "hex": [
+        -2,
+        5
+       ],
+       "kind": "T_BRANCH",
+       "rotation": 2,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 3
+     },
+     {
+      "action": {
+       "hex": [
+        -2,
+        6
+       ],
+       "kind": "SHARP_CURVE",
+       "rotation": 3,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 3
+     },
+     {
+      "action": {
+       "hex": [
+        1,
+        0
+       ],
+       "kind": "SHARP_CURVE",
+       "rotation": 3,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 4
+     },
+     {
+      "action": {
+       "hex": [
+        0,
+        2
+       ],
+       "kind": "STRAIGHT",
+       "rotation": 0,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 4
+     },
+     {
+      "action": {
+       "hex": [
+        1,
+        2
+       ],
+       "kind": "GENTLE_CURVE",
+       "rotation": 1,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 5
+     },
+     {
+      "action": {
+       "hex": [
+        -1,
+        5
+       ],
+       "kind": "SHARP_CURVE",
+       "rotation": 1,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 5
+     },
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "RESOW",
+      "player": "p2",
+      "round": 6
+     },
+     {
+      "action": {
+       "hex": [
+        2,
+        1
+       ],
+       "kind": "GENTLE_CURVE",
+       "rotation": 4,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 6
+     },
+     {
+      "action": {
+       "hex": [
+        3,
+        1
+       ],
+       "kind": "STRAIGHT",
+       "rotation": 0,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 6
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 7
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 7
+     },
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "GOOD_SEASON",
+      "player": "p2",
+      "round": 8
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 8
+     },
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "RESOW",
+      "player": "p1",
+      "round": 9
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 9
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 9
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 10
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 10
+     }
+    ],
+    "scores": {
+     "p1": {
+      "bodega": 0,
+      "bodegas": 0,
+      "debt": 0,
+      "drought": 3,
+      "player": "p1",
+      "rights_collected": 0,
+      "rights_paid": 0,
+      "season": 6,
+      "seat": 1,
+      "seat_bonus": 0,
+      "total": 3,
+      "vineyards": 0,
+      "watered": 0,
+      "watered_vineyards": []
+     },
+     "p2": {
+      "bodega": 0,
+      "bodegas": 0,
+      "debt": 1,
+      "drought": 3,
+      "player": "p2",
+      "rights_collected": 0,
+      "rights_paid": 0,
+      "season": 6,
+      "seat": 2,
+      "seat_bonus": 0,
+      "total": 2,
+      "vineyards": 0,
+      "watered": 0,
+      "watered_vineyards": []
+     }
+    },
+    "water": [],
+    "winners": [
+     "p1"
+    ]
+   }
+  ],
+  "n": 2,
+  "seed": 12601,
+  "simulate_game": {
+   "actions_per_game": {
+    "bribe": 0.0,
+    "canal": 12.5,
+    "decline": 1.0,
+    "die": 5.0,
+    "floodgate": 0.0,
+    "pass": 5.5,
+    "release": 0.0,
+    "resow": 0.5
+   },
+   "bodega_rate": 0.0,
+   "die_faces_per_game": {
+    "drought": 0.5,
+    "floodgate": 0.0,
+    "good_season": 1.5,
+    "release": 0.5,
+    "resow": 2.5
+   },
+   "die_use_rate": 0.8,
+   "games_with_bribe": 0.0,
+   "games_with_die": 1.0,
+   "games_with_floodgate": 0.0,
+   "mean_total_by_position": [
+    7.5,
+    9.0
+   ],
+   "mode": "normal",
+   "n": 2,
+   "players": 2,
+   "policies": [
+    "score_aware",
+    "random"
+   ],
+   "preset": {
+    "action_die": [
+     "floodgate",
+     "release",
+     "resow",
+     "resow",
+     "good_season",
+     "drought"
+    ],
+    "action_die_cost": 1,
+    "bag_mix": {
+     "claw": 5,
+     "floodgate": 0,
+     "gentle_curve": 22,
+     "sharp_curve": 17,
+     "straight": 44,
+     "symmetric_y": 6,
+     "t_branch": 6
+    },
+    "bodega_points": 6,
+    "bodega_varietals": 3,
+    "bribe_rules": "action_die",
+    "die_faces": 6,
+    "drought_points": null,
+    "grape_clusters_per_player": null,
+    "hexes_per_player": 18,
+    "market_size": 4,
+    "mode": "normal",
+    "multiple_bodegas": true,
+    "roulette": [
+     "malbec",
+     "malbec",
+     "cabernet_sauvignon",
+     "cabernet_sauvignon",
+     "syrah",
+     "syrah",
+     "merlot",
+     "merlot",
+     "torrontes",
+     "torrontes",
+     "chardonnay",
+     "chardonnay",
+     "bonarda",
+     "cabernet_franc"
+    ],
+    "rounds": {
+     "2": 10,
+     "3": 15,
+     "4": 12,
+     "5": 10
+    },
+    "season_points": null,
+    "season_roll_every": 3,
+    "season_roll_personal_faces": false,
+    "seat_bonus": {},
+    "stone_share": 10,
+    "varietal_points": {
+     "bonarda": 7,
+     "cabernet_franc": 7,
+     "cabernet_sauvignon": 6,
+     "chardonnay": 6,
+     "malbec": 6,
+     "merlot": 6,
+     "syrah": 6,
+     "torrontes": 6
+    },
+    "varietal_rules": "roulette",
+    "vineyard_distance": [
+     4,
+     4
+    ],
+    "vineyards_per_player": 2,
+    "water_right_points": 3
+   },
+   "score_terms": {
+    "bodega": {
+     "mean": 0.0,
+     "stdev": 0.0
+    },
+    "debt": {
+     "mean": 1.0,
+     "stdev": 1.224744871391589
+    },
+    "drought": {
+     "mean": 1.5,
+     "stdev": 1.5
+    },
+    "rights_collected": {
+     "mean": 0.75,
+     "stdev": 1.299038105676658
+    },
+    "rights_paid": {
+     "mean": 0.75,
+     "stdev": 1.299038105676658
+    },
+    "season": {
+     "mean": 9.0,
+     "stdev": 3.0
+    },
+    "total": {
+     "mean": 8.25,
+     "stdev": 5.931905258852336
+    },
+    "vineyards": {
+     "mean": 1.75,
+     "stdev": 3.031088913245535
+    }
+   },
+   "seed": 12601,
+   "shared_win_rate": 0.0,
+   "turn_order_advantage": 0.0,
+   "turns_per_game": 24.5,
+   "win_rate_bribers": null,
+   "win_rate_by_policy": {
+    "random": 0.0,
+    "score_aware": 1.0
+   },
+   "win_rate_by_position": [
+    0.5,
+    0.5
+   ],
+   "win_rate_by_seat": [
+    1.0,
+    0.0
+   ],
+   "win_rate_non_bribers": 0.5,
+   "winner_varietal_rate": {
+    "bonarda": 0.0,
+    "cabernet_franc": 0.5,
+    "cabernet_sauvignon": 0.0,
+    "chardonnay": 0.0,
+    "malbec": 0.0,
+    "merlot": 0.0,
+    "syrah": 0.0,
+    "torrontes": 0.0
+   },
+   "winning_score": {
+    "mean": 9.5,
+    "stdev": 6.5
+   }
+  }
+ },
+ "S2": {
+  "games": [
+   {
+    "final": {
+     "bag": [
+      "STRAIGHT",
+      "STRAIGHT",
+      "CLAW",
+      "STRAIGHT",
+      "GENTLE_CURVE",
+      "GENTLE_CURVE",
+      "SHARP_CURVE",
+      "GENTLE_CURVE",
+      "STRAIGHT",
+      "STRAIGHT",
+      "SHARP_CURVE",
+      "SHARP_CURVE",
+      "GENTLE_CURVE",
+      "T_BRANCH",
+      "STRAIGHT",
+      "GENTLE_CURVE",
+      "STRAIGHT",
+      "STRAIGHT",
+      "GENTLE_CURVE",
+      "STRAIGHT",
+      "STRAIGHT",
+      "STRAIGHT",
+      "STRAIGHT",
+      "GENTLE_CURVE"
+     ],
+     "canals": [
+      {
+       "hex": [
+        -3,
+        8
+       ],
+       "kind": "STRAIGHT",
+       "owner": "p1",
+       "rotation": 1
+      },
+      {
+       "hex": [
+        -3,
+        9
+       ],
+       "kind": "CLAW",
+       "owner": "p2",
+       "rotation": 1
+      },
+      {
+       "hex": [
+        -2,
+        6
+       ],
+       "kind": "SHARP_CURVE",
+       "owner": "p3",
+       "rotation": 2
+      },
+      {
+       "hex": [
+        -2,
+        7
+       ],
+       "kind": "SYMMETRIC_Y",
+       "owner": "p2",
+       "rotation": 1
+      },
+      {
+       "hex": [
+        -2,
+        8
+       ],
+       "kind": "SYMMETRIC_Y",
+       "owner": "p2",
+       "rotation": 0
+      },
+      {
+       "hex": [
+        -2,
+        9
+       ],
+       "kind": "STRAIGHT",
+       "owner": "p1",
+       "rotation": 1
+      },
+      {
+       "hex": [
+        -1,
+        4
+       ],
+       "kind": "SHARP_CURVE",
+       "owner": "p3",
+       "rotation": 1
+      },
+      {
+       "hex": [
+        -1,
+        5
+       ],
+       "kind": "STRAIGHT",
+       "owner": "p3",
+       "rotation": 0
+      },
+      {
+       "hex": [
+        -1,
+        8
+       ],
+       "kind": "SHARP_CURVE",
+       "owner": "p3",
+       "rotation": 3
+      },
+      {
+       "hex": [
+        0,
+        2
+       ],
+       "kind": "GENTLE_CURVE",
+       "owner": "p2",
+       "rotation": 4
+      },
+      {
+       "hex": [
+        0,
+        3
+       ],
+       "kind": "SHARP_CURVE",
+       "owner": "p1",
+       "rotation": 2
+      },
+      {
+       "hex": [
+        0,
+        5
+       ],
+       "kind": "STRAIGHT",
+       "owner": "p2",
+       "rotation": 0
+      },
+      {
+       "hex": [
+        1,
+        1
+       ],
+       "kind": "STRAIGHT",
+       "owner": "p1",
+       "rotation": 2
+      },
+      {
+       "hex": [
+        1,
+        2
+       ],
+       "kind": "T_BRANCH",
+       "owner": "p3",
+       "rotation": 2
+      }
+     ],
+     "claims": [],
+     "current_player": "p1",
+     "floodgates": [],
+     "market": [
+      "STRAIGHT",
+      "SYMMETRIC_Y",
+      "T_BRANCH",
+      "GENTLE_CURVE"
+     ],
+     "pending_face": null,
+     "plantings": [],
+     "players": [
+      {
+       "debt": 7,
+       "drought": 9,
+       "id": "p1",
+       "season": 6,
+       "seat": 1
+      },
+      {
+       "debt": 0,
+       "drought": 9,
+       "id": "p2",
+       "season": 6,
+       "seat": 2
+      },
+      {
+       "debt": 0,
+       "drought": 9,
+       "id": "p3",
+       "season": 6,
+       "seat": 3
+      }
+     ],
+     "round": 16,
+     "season_roll": null,
+     "start_player": "p1"
+    },
+    "game_seed": 7213007179619434317,
+    "log": [
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "GOOD_SEASON",
+      "player": "p1",
+      "round": 1
+     },
+     {
+      "action": {
+       "hex": [
+        0,
+        2
+       ],
+       "kind": "GENTLE_CURVE",
+       "rotation": 4,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 1
+     },
+     {
+      "action": {
+       "hex": [
+        1,
+        2
+       ],
+       "kind": "T_BRANCH",
+       "rotation": 2,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p3",
+      "round": 1
+     },
+     {
+      "action": {
+       "hex": [
+        -2,
+        7
+       ],
+       "kind": "SYMMETRIC_Y",
+       "rotation": 1,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 2
+     },
+     {
+      "action": {
+       "hex": [
+        -2,
+        6
+       ],
+       "kind": "SHARP_CURVE",
+       "rotation": 2,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p3",
+      "round": 2
+     },
+     {
+      "action": {
+       "hex": [
+        1,
+        1
+       ],
+       "kind": "STRAIGHT",
+       "rotation": 2,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 2
+     },
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "RELEASE",
+      "player": "p1",
+      "round": 3
+     },
+     {
+      "action": {
+       "hex": [
+        -1,
+        5
+       ],
+       "kind": "STRAIGHT",
+       "rotation": 0,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p3",
+      "round": 3
+     },
+     {
+      "action": {
+       "hex": [
+        -3,
+        8
+       ],
+       "kind": "STRAIGHT",
+       "rotation": 1,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 3
+     },
+     {
+      "action": {
+       "hex": [
+        -3,
+        9
+       ],
+       "kind": "CLAW",
+       "rotation": 1,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 3
+     },
+     {
+      "action": {
+       "hex": [
+        0,
+        3
+       ],
+       "kind": "SHARP_CURVE",
+       "rotation": 2,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 4
+     },
+     {
+      "action": {
+       "hex": [
+        0,
+        5
+       ],
+       "kind": "STRAIGHT",
+       "rotation": 0,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 4
+     },
+     {
+      "action": {
+       "hex": [
+        -1,
+        4
+       ],
+       "kind": "SHARP_CURVE",
+       "rotation": 1,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p3",
+      "round": 4
+     },
+     {
+      "action": {
+       "hex": [
+        -2,
+        8
+       ],
+       "kind": "SYMMETRIC_Y",
+       "rotation": 0,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 5
+     },
+     {
+      "action": {
+       "hex": [
+        -1,
+        8
+       ],
+       "kind": "SHARP_CURVE",
+       "rotation": 3,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p3",
+      "round": 5
+     },
+     {
+      "action": {
+       "hex": [
+        -2,
+        9
+       ],
+       "kind": "STRAIGHT",
+       "rotation": 1,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 5
+     },
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "RESOW",
+      "player": "p2",
+      "round": 6
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p3",
+      "round": 6
+     },
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "RESOW",
+      "player": "p1",
+      "round": 6
+     },
+     {
+      "action": {
+       "type": "DeclineFace"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 6
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 6
+     },
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "RESOW",
+      "player": "p1",
+      "round": 7
+     },
+     {
+      "action": {
+       "type": "DeclineFace"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 7
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 7
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p3",
+      "round": 7
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 8
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p3",
+      "round": 8
+     },
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "RELEASE",
+      "player": "p1",
+      "round": 8
+     },
+     {
+      "action": {
+       "type": "DeclineFace"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 8
+     },
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "DROUGHT",
+      "player": "p3",
+      "round": 9
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p3",
+      "round": 9
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 9
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 9
+     },
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "RESOW",
+      "player": "p1",
+      "round": 10
+     },
+     {
+      "action": {
+       "type": "DeclineFace"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 10
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 10
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p3",
+      "round": 10
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 11
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p3",
+      "round": 11
+     },
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "DROUGHT",
+      "player": "p1",
+      "round": 11
+     },
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "DROUGHT",
+      "player": "p1",
+      "round": 12
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p3",
+      "round": 12
+     },
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "RESOW",
+      "player": "p1",
+      "round": 12
+     },
+     {
+      "action": {
+       "type": "DeclineFace"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 12
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 12
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 13
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 13
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p3",
+      "round": 13
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 14
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p3",
+      "round": 14
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 14
+     },
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "FLOODGATE",
+      "player": "p2",
+      "round": 15
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p3",
+      "round": 15
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 15
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 15
+     }
+    ],
+    "scores": {
+     "p1": {
+      "bodega": 0,
+      "bodegas": 0,
+      "debt": 7,
+      "drought": 0,
+      "player": "p1",
+      "rights_collected": 0,
+      "rights_paid": 0,
+      "season": 6,
+      "seat": 1,
+      "seat_bonus": 0,
+      "total": -1,
+      "vineyards": 0,
+      "watered": 0,
+      "watered_vineyards": []
+     },
+     "p2": {
+      "bodega": 0,
+      "bodegas": 0,
+      "debt": 0,
+      "drought": 6,
+      "player": "p2",
+      "rights_collected": 0,
+      "rights_paid": 0,
+      "season": 6,
+      "seat": 2,
+      "seat_bonus": 0,
+      "total": 0,
+      "vineyards": 0,
+      "watered": 0,
+      "watered_vineyards": []
+     },
+     "p3": {
+      "bodega": 0,
+      "bodegas": 0,
+      "debt": 0,
+      "drought": 6,
+      "player": "p3",
+      "rights_collected": 0,
+      "rights_paid": 0,
+      "season": 6,
+      "seat": 3,
+      "seat_bonus": 0,
+      "total": 0,
+      "vineyards": 0,
+      "watered": 0,
+      "watered_vineyards": []
+     }
+    },
+    "water": [],
+    "winners": [
+     "p2",
+     "p3"
+    ]
+   },
+   {
+    "final": {
+     "bag": [
+      "GENTLE_CURVE",
+      "GENTLE_CURVE",
+      "STRAIGHT",
+      "GENTLE_CURVE",
+      "SYMMETRIC_Y",
+      "STRAIGHT",
+      "GENTLE_CURVE",
+      "STRAIGHT",
+      "STRAIGHT",
+      "SHARP_CURVE",
+      "T_BRANCH",
+      "STRAIGHT",
+      "SHARP_CURVE",
+      "STRAIGHT",
+      "STRAIGHT",
+      "GENTLE_CURVE",
+      "SYMMETRIC_Y",
+      "SYMMETRIC_Y",
+      "T_BRANCH",
+      "GENTLE_CURVE",
+      "CLAW",
+      "STRAIGHT"
+     ],
+     "canals": [
+      {
+       "hex": [
+        -3,
+        8
+       ],
+       "kind": "SHARP_CURVE",
+       "owner": "p1",
+       "rotation": 3
+      },
+      {
+       "hex": [
+        -3,
+        9
+       ],
+       "kind": "STRAIGHT",
+       "owner": "p3",
+       "rotation": 0
+      },
+      {
+       "hex": [
+        -2,
+        6
+       ],
+       "kind": "CLAW",
+       "owner": "p2",
+       "rotation": 3
+      },
+      {
+       "hex": [
+        -2,
+        8
+       ],
+       "kind": "GENTLE_CURVE",
+       "owner": "p3",
+       "rotation": 5
+      },
+      {
+       "hex": [
+        -2,
+        9
+       ],
+       "kind": "SHARP_CURVE",
+       "owner": "p2",
+       "rotation": 2
+      },
+      {
+       "hex": [
+        -1,
+        4
+       ],
+       "kind": "STRAIGHT",
+       "owner": "p2",
+       "rotation": 2
+      },
+      {
+       "hex": [
+        -1,
+        5
+       ],
+       "kind": "GENTLE_CURVE",
+       "owner": "p2",
+       "rotation": 0
+      },
+      {
+       "hex": [
+        0,
+        2
+       ],
+       "kind": "STRAIGHT",
+       "owner": "p1",
+       "rotation": 0
+      },
+      {
+       "hex": [
+        0,
+        3
+       ],
+       "kind": "STRAIGHT",
+       "owner": "p3",
+       "rotation": 0
+      },
+      {
+       "hex": [
+        0,
+        4
+       ],
+       "kind": "T_BRANCH",
+       "owner": "p3",
+       "rotation": 4
+      },
+      {
+       "hex": [
+        1,
+        0
+       ],
+       "kind": "SHARP_CURVE",
+       "owner": "p3",
+       "rotation": 3
+      },
+      {
+       "hex": [
+        1,
+        1
+       ],
+       "kind": "GENTLE_CURVE",
+       "owner": "p2",
+       "rotation": 1
+      },
+      {
+       "hex": [
+        1,
+        2
+       ],
+       "kind": "STRAIGHT",
+       "owner": "p2",
+       "rotation": 0
+      },
+      {
+       "hex": [
+        1,
+        3
+       ],
+       "kind": "SHARP_CURVE",
+       "owner": "p1",
+       "rotation": 3
+      },
+      {
+       "hex": [
+        2,
+        0
+       ],
+       "kind": "STRAIGHT",
+       "owner": "p3",
+       "rotation": 1
+      },
+      {
+       "hex": [
+        2,
+        2
+       ],
+       "kind": "SHARP_CURVE",
+       "owner": "p1",
+       "rotation": 3
+      }
+     ],
+     "claims": [],
+     "current_player": "p2",
+     "floodgates": [],
+     "market": [
+      "STRAIGHT",
+      "STRAIGHT",
+      "STRAIGHT",
+      "STRAIGHT"
+     ],
+     "pending_face": null,
+     "plantings": [],
+     "players": [
+      {
+       "debt": 7,
+       "drought": 0,
+       "id": "p1",
+       "season": 18,
+       "seat": 1
+      },
+      {
+       "debt": 0,
+       "drought": 0,
+       "id": "p2",
+       "season": 18,
+       "seat": 2
+      },
+      {
+       "debt": 0,
+       "drought": 0,
+       "id": "p3",
+       "season": 18,
+       "seat": 3
+      }
+     ],
+     "round": 16,
+     "season_roll": null,
+     "start_player": "p2"
+    },
+    "game_seed": 1551317059071427275,
+    "log": [
+     {
+      "action": {
+       "hex": [
+        -1,
+        4
+       ],
+       "kind": "STRAIGHT",
+       "rotation": 2,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 1
+     },
+     {
+      "action": {
+       "hex": [
+        1,
+        0
+       ],
+       "kind": "SHARP_CURVE",
+       "rotation": 3,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p3",
+      "round": 1
+     },
+     {
+      "action": {
+       "hex": [
+        -3,
+        8
+       ],
+       "kind": "SHARP_CURVE",
+       "rotation": 3,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 1
+     },
+     {
+      "action": {
+       "hex": [
+        0,
+        3
+       ],
+       "kind": "STRAIGHT",
+       "rotation": 0,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p3",
+      "round": 2
+     },
+     {
+      "action": {
+       "hex": [
+        0,
+        2
+       ],
+       "kind": "STRAIGHT",
+       "rotation": 0,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 2
+     },
+     {
+      "action": {
+       "hex": [
+        -2,
+        6
+       ],
+       "kind": "CLAW",
+       "rotation": 3,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 2
+     },
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "GOOD_SEASON",
+      "player": "p2",
+      "round": 3
+     },
+     {
+      "action": {
+       "hex": [
+        1,
+        3
+       ],
+       "kind": "SHARP_CURVE",
+       "rotation": 3,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 3
+     },
+     {
+      "action": {
+       "hex": [
+        -1,
+        5
+       ],
+       "kind": "GENTLE_CURVE",
+       "rotation": 0,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 3
+     },
+     {
+      "action": {
+       "hex": [
+        0,
+        4
+       ],
+       "kind": "T_BRANCH",
+       "rotation": 4,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p3",
+      "round": 3
+     },
+     {
+      "action": {
+       "hex": [
+        1,
+        1
+       ],
+       "kind": "GENTLE_CURVE",
+       "rotation": 1,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 4
+     },
+     {
+      "action": {
+       "hex": [
+        2,
+        0
+       ],
+       "kind": "STRAIGHT",
+       "rotation": 1,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p3",
+      "round": 4
+     },
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "GOOD_SEASON",
+      "player": "p1",
+      "round": 4
+     },
+     {
+      "action": {
+       "hex": [
+        -3,
+        9
+       ],
+       "kind": "STRAIGHT",
+       "rotation": 0,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p3",
+      "round": 5
+     },
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "RESOW",
+      "player": "p1",
+      "round": 5
+     },
+     {
+      "action": {
+       "type": "DeclineFace"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 5
+     },
+     {
+      "action": {
+       "hex": [
+        1,
+        2
+       ],
+       "kind": "STRAIGHT",
+       "rotation": 0,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 5
+     },
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "FLOODGATE",
+      "player": "p3",
+      "round": 6
+     },
+     {
+      "action": {
+       "hex": [
+        2,
+        2
+       ],
+       "kind": "SHARP_CURVE",
+       "rotation": 3,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 6
+     },
+     {
+      "action": {
+       "hex": [
+        -2,
+        9
+       ],
+       "kind": "SHARP_CURVE",
+       "rotation": 2,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 6
+     },
+     {
+      "action": {
+       "hex": [
+        -2,
+        8
+       ],
+       "kind": "GENTLE_CURVE",
+       "rotation": 5,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p3",
+      "round": 6
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 7
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p3",
+      "round": 7
+     },
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "RESOW",
+      "player": "p1",
+      "round": 7
+     },
+     {
+      "action": {
+       "type": "DeclineFace"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 7
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p3",
+      "round": 8
+     },
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "RESOW",
+      "player": "p1",
+      "round": 8
+     },
+     {
+      "action": {
+       "type": "DeclineFace"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 8
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 8
+     },
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "FLOODGATE",
+      "player": "p1",
+      "round": 9
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 9
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 9
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p3",
+      "round": 9
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 10
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p3",
+      "round": 10
+     },
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "RELEASE",
+      "player": "p1",
+      "round": 10
+     },
+     {
+      "action": {
+       "type": "DeclineFace"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 10
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p3",
+      "round": 11
+     },
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "RELEASE",
+      "player": "p1",
+      "round": 11
+     },
+     {
+      "action": {
+       "type": "DeclineFace"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 11
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 11
+     },
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "GOOD_SEASON",
+      "player": "p2",
+      "round": 12
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 12
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 12
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p3",
+      "round": 12
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 13
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p3",
+      "round": 13
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 13
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p3",
+      "round": 14
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 14
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 14
+     },
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "FLOODGATE",
+      "player": "p3",
+      "round": 15
+     },
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "RELEASE",
+      "player": "p1",
+      "round": 15
+     },
+     {
+      "action": {
+       "type": "DeclineFace"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 15
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 15
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p3",
+      "round": 15
+     }
+    ],
+    "scores": {
+     "p1": {
+      "bodega": 0,
+      "bodegas": 0,
+      "debt": 7,
+      "drought": 0,
+      "player": "p1",
+      "rights_collected": 0,
+      "rights_paid": 0,
+      "season": 18,
+      "seat": 1,
+      "seat_bonus": 0,
+      "total": 11,
+      "vineyards": 0,
+      "watered": 0,
+      "watered_vineyards": []
+     },
+     "p2": {
+      "bodega": 0,
+      "bodegas": 0,
+      "debt": 0,
+      "drought": 0,
+      "player": "p2",
+      "rights_collected": 0,
+      "rights_paid": 0,
+      "season": 18,
+      "seat": 2,
+      "seat_bonus": 0,
+      "total": 18,
+      "vineyards": 0,
+      "watered": 0,
+      "watered_vineyards": []
+     },
+     "p3": {
+      "bodega": 0,
+      "bodegas": 0,
+      "debt": 0,
+      "drought": 0,
+      "player": "p3",
+      "rights_collected": 0,
+      "rights_paid": 0,
+      "season": 18,
+      "seat": 3,
+      "seat_bonus": 0,
+      "total": 18,
+      "vineyards": 0,
+      "watered": 0,
+      "watered_vineyards": []
+     }
+    },
+    "water": [],
+    "winners": [
+     "p2",
+     "p3"
+    ]
+   }
+  ],
+  "n": 2,
+  "seed": 12602,
+  "simulate_game": {
+   "actions_per_game": {
+    "bribe": 0.0,
+    "canal": 15.0,
+    "decline": 5.5,
+    "die": 12.0,
+    "floodgate": 0.0,
+    "pass": 23.0,
+    "release": 0.0,
+    "resow": 0.0
+   },
+   "bodega_rate": 0.0,
+   "die_faces_per_game": {
+    "drought": 1.5,
+    "floodgate": 2.0,
+    "good_season": 2.0,
+    "release": 2.5,
+    "resow": 4.0
+   },
+   "die_use_rate": 0.5416666666666666,
+   "games_with_bribe": 0.0,
+   "games_with_die": 1.0,
+   "games_with_floodgate": 0.0,
+   "mean_total_by_position": [
+    8.5,
+    9.0,
+    5.5
+   ],
+   "mode": "normal",
+   "n": 2,
+   "players": 3,
+   "policies": [
+    "random",
+    "score_aware",
+    "greedy"
+   ],
+   "preset": {
+    "action_die": [
+     "floodgate",
+     "release",
+     "resow",
+     "resow",
+     "good_season",
+     "drought"
+    ],
+    "action_die_cost": 1,
+    "bag_mix": {
+     "claw": 5,
+     "floodgate": 0,
+     "gentle_curve": 22,
+     "sharp_curve": 17,
+     "straight": 44,
+     "symmetric_y": 6,
+     "t_branch": 6
+    },
+    "bodega_points": 6,
+    "bodega_varietals": 3,
+    "bribe_rules": "action_die",
+    "die_faces": 6,
+    "drought_points": null,
+    "grape_clusters_per_player": null,
+    "hexes_per_player": 18,
+    "market_size": 4,
+    "mode": "normal",
+    "multiple_bodegas": true,
+    "roulette": [
+     "malbec",
+     "malbec",
+     "cabernet_sauvignon",
+     "cabernet_sauvignon",
+     "syrah",
+     "syrah",
+     "merlot",
+     "merlot",
+     "torrontes",
+     "torrontes",
+     "chardonnay",
+     "chardonnay",
+     "bonarda",
+     "cabernet_franc"
+    ],
+    "rounds": {
+     "2": 10,
+     "3": 15,
+     "4": 12,
+     "5": 10
+    },
+    "season_points": null,
+    "season_roll_every": 3,
+    "season_roll_personal_faces": false,
+    "seat_bonus": {},
+    "stone_share": 10,
+    "varietal_points": {
+     "bonarda": 7,
+     "cabernet_franc": 7,
+     "cabernet_sauvignon": 6,
+     "chardonnay": 6,
+     "malbec": 6,
+     "merlot": 6,
+     "syrah": 6,
+     "torrontes": 6
+    },
+    "varietal_rules": "roulette",
+    "vineyard_distance": [
+     4,
+     4
+    ],
+    "vineyards_per_player": 2,
+    "water_right_points": 3
+   },
+   "score_terms": {
+    "bodega": {
+     "mean": 0.0,
+     "stdev": 0.0
+    },
+    "debt": {
+     "mean": 2.3333333333333335,
+     "stdev": 3.2998316455372216
+    },
+    "drought": {
+     "mean": 2.0,
+     "stdev": 2.8284271247461903
+    },
+    "rights_collected": {
+     "mean": 0.0,
+     "stdev": 0.0
+    },
+    "rights_paid": {
+     "mean": 0.0,
+     "stdev": 0.0
+    },
+    "season": {
+     "mean": 12.0,
+     "stdev": 6.0
+    },
+    "total": {
+     "mean": 7.666666666666667,
+     "stdev": 8.339997335464536
+    },
+    "vineyards": {
+     "mean": 0.0,
+     "stdev": 0.0
+    }
+   },
+   "seed": 12602,
+   "shared_win_rate": 1.0,
+   "turn_order_advantage": 0.5,
+   "turns_per_game": 55.5,
+   "win_rate_bribers": null,
+   "win_rate_by_policy": {
+    "greedy": 0.5,
+    "random": 0.0,
+    "score_aware": 0.5
+   },
+   "win_rate_by_position": [
+    0.25,
+    0.5,
+    0.25
+   ],
+   "win_rate_by_seat": [
+    0.0,
+    0.5,
+    0.5
+   ],
+   "win_rate_non_bribers": 0.3333333333333333,
+   "winner_varietal_rate": {
+    "bonarda": 0.0,
+    "cabernet_franc": 0.0,
+    "cabernet_sauvignon": 0.0,
+    "chardonnay": 0.0,
+    "malbec": 0.0,
+    "merlot": 0.0,
+    "syrah": 0.0,
+    "torrontes": 0.0
+   },
+   "winning_score": {
+    "mean": 9.0,
+    "stdev": 9.0
+   }
+  }
+ },
+ "S3": {
+  "games": [
+   {
+    "final": {
+     "bag": [
+      "STRAIGHT",
+      "SHARP_CURVE",
+      "GENTLE_CURVE",
+      "GENTLE_CURVE",
+      "SHARP_CURVE",
+      "STRAIGHT",
+      "CLAW",
+      "STRAIGHT",
+      "CLAW",
+      "CLAW",
+      "GENTLE_CURVE",
+      "T_BRANCH",
+      "STRAIGHT",
+      "GENTLE_CURVE",
+      "GENTLE_CURVE",
+      "SHARP_CURVE",
+      "STRAIGHT",
+      "SYMMETRIC_Y",
+      "STRAIGHT",
+      "STRAIGHT",
+      "STRAIGHT",
+      "GENTLE_CURVE",
+      "GENTLE_CURVE",
+      "STRAIGHT",
+      "GENTLE_CURVE",
+      "GENTLE_CURVE",
+      "STRAIGHT",
+      "STRAIGHT",
+      "STRAIGHT",
+      "STRAIGHT",
+      "SYMMETRIC_Y",
+      "SHARP_CURVE"
+     ],
+     "canals": [
+      {
+       "hex": [
+        -6,
+        13
+       ],
+       "kind": "GENTLE_CURVE",
+       "owner": "p3",
+       "rotation": 3
+      },
+      {
+       "hex": [
+        -5,
+        11
+       ],
+       "kind": "STRAIGHT",
+       "owner": "p1",
+       "rotation": 2
+      },
+      {
+       "hex": [
+        -5,
+        12
+       ],
+       "kind": "SHARP_CURVE",
+       "owner": "p3",
+       "rotation": 2
+      },
+      {
+       "hex": [
+        -4,
+        10
+       ],
+       "kind": "T_BRANCH",
+       "owner": "p3",
+       "rotation": 0
+      },
+      {
+       "hex": [
+        -4,
+        11
+       ],
+       "kind": "GENTLE_CURVE",
+       "owner": "p1",
+       "rotation": 5
+      },
+      {
+       "hex": [
+        -4,
+        12
+       ],
+       "kind": "GENTLE_CURVE",
+       "owner": "p2",
+       "rotation": 0
+      },
+      {
+       "hex": [
+        -3,
+        8
+       ],
+       "kind": "STRAIGHT",
+       "owner": "p4",
+       "rotation": 0
+      },
+      {
+       "hex": [
+        -3,
+        9
+       ],
+       "kind": "STRAIGHT",
+       "owner": "p4",
+       "rotation": 1
+      },
+      {
+       "hex": [
+        -3,
+        10
+       ],
+       "kind": "SHARP_CURVE",
+       "owner": "p2",
+       "rotation": 3
+      },
+      {
+       "hex": [
+        -3,
+        12
+       ],
+       "kind": "STRAIGHT",
+       "owner": "p3",
+       "rotation": 0
+      },
+      {
+       "hex": [
+        -2,
+        5
+       ],
+       "kind": "STRAIGHT",
+       "owner": "p1",
+       "rotation": 2
+      },
+      {
+       "hex": [
+        -2,
+        6
+       ],
+       "kind": "STRAIGHT",
+       "owner": "p2",
+       "rotation": 0
+      },
+      {
+       "hex": [
+        -2,
+        8
+       ],
+       "kind": "STRAIGHT",
+       "owner": "p1",
+       "rotation": 0
+      },
+      {
+       "hex": [
+        -1,
+        3
+       ],
+       "kind": "T_BRANCH",
+       "owner": "p4",
+       "rotation": 2
+      },
+      {
+       "hex": [
+        -1,
+        4
+       ],
+       "kind": "SHARP_CURVE",
+       "owner": "p4",
+       "rotation": 2
+      },
+      {
+       "hex": [
+        -1,
+        5
+       ],
+       "kind": "STRAIGHT",
+       "owner": "p2",
+       "rotation": 2
+      },
+      {
+       "hex": [
+        -1,
+        6
+       ],
+       "kind": "SHARP_CURVE",
+       "owner": "p2",
+       "rotation": 2
+      },
+      {
+       "hex": [
+        -1,
+        8
+       ],
+       "kind": "STRAIGHT",
+       "owner": "p4",
+       "rotation": 0
+      },
+      {
+       "hex": [
+        0,
+        1
+       ],
+       "kind": "SHARP_CURVE",
+       "owner": "p3",
+       "rotation": 2
+      },
+      {
+       "hex": [
+        0,
+        2
+       ],
+       "kind": "SHARP_CURVE",
+       "owner": "p1",
+       "rotation": 2
+      }
+     ],
+     "claims": [
+      [
+       [
+        -2,
+        12
+       ],
+       "p3"
+      ],
+      [
+       [
+        0,
+        8
+       ],
+       "p4"
+      ]
+     ],
+     "current_player": "p4",
+     "floodgates": [],
+     "market": [
+      "STRAIGHT",
+      "STRAIGHT",
+      "STRAIGHT",
+      "SYMMETRIC_Y"
+     ],
+     "pending_face": null,
+     "plantings": [
+      [
+       [
+        -2,
+        12
+       ],
+       "CHARDONNAY"
+      ],
+      [
+       [
+        0,
+        8
+       ],
+       "CABERNET_SAUVIGNON"
+      ]
+     ],
+     "players": [
+      {
+       "debt": 0,
+       "drought": 6,
+       "id": "p1",
+       "season": 0,
+       "seat": 1
+      },
+      {
+       "debt": 0,
+       "drought": 6,
+       "id": "p2",
+       "season": 0,
+       "seat": 2
+      },
+      {
+       "debt": 2,
+       "drought": 6,
+       "id": "p3",
+       "season": 0,
+       "seat": 3
+      },
+      {
+       "debt": 0,
+       "drought": 6,
+       "id": "p4",
+       "season": 0,
+       "seat": 4
+      }
+     ],
+     "round": 13,
+     "season_roll": null,
+     "start_player": "p4"
+    },
+    "game_seed": 4934042666179645276,
+    "log": [
+     {
+      "action": {
+       "hex": [
+        -1,
+        3
+       ],
+       "kind": "T_BRANCH",
+       "rotation": 2,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p4",
+      "round": 1
+     },
+     {
+      "action": {
+       "hex": [
+        0,
+        2
+       ],
+       "kind": "SHARP_CURVE",
+       "rotation": 2,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 1
+     },
+     {
+      "action": {
+       "hex": [
+        -2,
+        6
+       ],
+       "kind": "STRAIGHT",
+       "rotation": 0,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 1
+     },
+     {
+      "action": {
+       "hex": [
+        0,
+        1
+       ],
+       "kind": "SHARP_CURVE",
+       "rotation": 2,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p3",
+      "round": 1
+     },
+     {
+      "action": {
+       "hex": [
+        -5,
+        11
+       ],
+       "kind": "STRAIGHT",
+       "rotation": 2,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 2
+     },
+     {
+      "action": {
+       "hex": [
+        -1,
+        6
+       ],
+       "kind": "SHARP_CURVE",
+       "rotation": 2,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 2
+     },
+     {
+      "action": {
+       "hex": [
+        -6,
+        13
+       ],
+       "kind": "GENTLE_CURVE",
+       "rotation": 3,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p3",
+      "round": 2
+     },
+     {
+      "action": {
+       "hex": [
+        -1,
+        4
+       ],
+       "kind": "SHARP_CURVE",
+       "rotation": 2,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p4",
+      "round": 2
+     },
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "FLOODGATE",
+      "player": "p4",
+      "round": 3
+     },
+     {
+      "action": {
+       "hex": [
+        -1,
+        5
+       ],
+       "kind": "STRAIGHT",
+       "rotation": 2,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 3
+     },
+     {
+      "action": {
+       "hex": [
+        -5,
+        12
+       ],
+       "kind": "SHARP_CURVE",
+       "rotation": 2,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p3",
+      "round": 3
+     },
+     {
+      "action": {
+       "hex": [
+        -3,
+        8
+       ],
+       "kind": "STRAIGHT",
+       "rotation": 0,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p4",
+      "round": 3
+     },
+     {
+      "action": {
+       "hex": [
+        -2,
+        8
+       ],
+       "kind": "STRAIGHT",
+       "rotation": 0,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 3
+     },
+     {
+      "action": {
+       "hex": [
+        -4,
+        10
+       ],
+       "kind": "T_BRANCH",
+       "rotation": 0,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p3",
+      "round": 4
+     },
+     {
+      "action": {
+       "hex": [
+        -1,
+        8
+       ],
+       "kind": "STRAIGHT",
+       "rotation": 0,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p4",
+      "round": 4
+     },
+     {
+      "action": {
+       "hex": [
+        -2,
+        5
+       ],
+       "kind": "STRAIGHT",
+       "rotation": 2,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 4
+     },
+     {
+      "action": {
+       "hex": [
+        -3,
+        10
+       ],
+       "kind": "SHARP_CURVE",
+       "rotation": 3,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 4
+     },
+     {
+      "action": {
+       "hex": [
+        -3,
+        9
+       ],
+       "kind": "STRAIGHT",
+       "rotation": 1,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p4",
+      "round": 5
+     },
+     {
+      "action": {
+       "hex": [
+        -4,
+        11
+       ],
+       "kind": "GENTLE_CURVE",
+       "rotation": 5,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 5
+     },
+     {
+      "action": {
+       "hex": [
+        -4,
+        12
+       ],
+       "kind": "GENTLE_CURVE",
+       "rotation": 0,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 5
+     },
+     {
+      "action": {
+       "hex": [
+        -3,
+        12
+       ],
+       "kind": "STRAIGHT",
+       "rotation": 0,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p3",
+      "round": 5
+     },
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "DROUGHT",
+      "player": "p1",
+      "round": 6
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 6
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 6
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p3",
+      "round": 6
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p4",
+      "round": 6
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 7
+     },
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "RESOW",
+      "player": "p3",
+      "round": 7
+     },
+     {
+      "action": {
+       "hex": [
+        -2,
+        12
+       ],
+       "type": "Resow"
+      },
+      "face": null,
+      "player": "p3",
+      "round": 7
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p4",
+      "round": 7
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 7
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p3",
+      "round": 8
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p4",
+      "round": 8
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 8
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 8
+     },
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "DROUGHT",
+      "player": "p2",
+      "round": 9
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p4",
+      "round": 9
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 9
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 9
+     },
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "RELEASE",
+      "player": "p3",
+      "round": 9
+     },
+     {
+      "action": {
+       "type": "DeclineFace"
+      },
+      "face": null,
+      "player": "p3",
+      "round": 9
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 10
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 10
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p3",
+      "round": 10
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p4",
+      "round": 10
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 11
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p3",
+      "round": 11
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p4",
+      "round": 11
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 11
+     },
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "RESOW",
+      "player": "p3",
+      "round": 12
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p3",
+      "round": 12
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p4",
+      "round": 12
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 12
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 12
+     }
+    ],
+    "scores": {
+     "p1": {
+      "bodega": 0,
+      "bodegas": 0,
+      "debt": 0,
+      "drought": 6,
+      "player": "p1",
+      "rights_collected": 6,
+      "rights_paid": 0,
+      "season": 0,
+      "seat": 1,
+      "seat_bonus": 0,
+      "total": 0,
+      "vineyards": 0,
+      "watered": 0,
+      "watered_vineyards": []
+     },
+     "p2": {
+      "bodega": 0,
+      "bodegas": 0,
+      "debt": 0,
+      "drought": 3,
+      "player": "p2",
+      "rights_collected": 3,
+      "rights_paid": 0,
+      "season": 0,
+      "seat": 2,
+      "seat_bonus": 0,
+      "total": 0,
+      "vineyards": 0,
+      "watered": 0,
+      "watered_vineyards": []
+     },
+     "p3": {
+      "bodega": 0,
+      "bodegas": 0,
+      "debt": 2,
+      "drought": 0,
+      "player": "p3",
+      "rights_collected": 0,
+      "rights_paid": 6,
+      "season": 0,
+      "seat": 3,
+      "seat_bonus": 0,
+      "total": -2,
+      "vineyards": 6,
+      "watered": 1,
+      "watered_vineyards": [
+       {
+        "hex": [
+         -2,
+         12
+        ],
+        "path": {
+         "canals": [
+          [
+           -4,
+           10
+          ],
+          [
+           -3,
+           10
+          ],
+          [
+           -4,
+           11
+          ],
+          [
+           -4,
+           12
+          ],
+          [
+           -3,
+           12
+          ]
+         ],
+         "owners": [
+          "p1",
+          "p2",
+          "p3"
+         ]
+        },
+        "pays": [
+         "p1",
+         "p2"
+        ],
+        "varietal": "CHARDONNAY"
+       }
+      ]
+     },
+     "p4": {
+      "bodega": 0,
+      "bodegas": 0,
+      "debt": 0,
+      "drought": 3,
+      "player": "p4",
+      "rights_collected": 0,
+      "rights_paid": 3,
+      "season": 0,
+      "seat": 4,
+      "seat_bonus": 0,
+      "total": 0,
+      "vineyards": 6,
+      "watered": 1,
+      "watered_vineyards": [
+       {
+        "hex": [
+         0,
+         8
+        ],
+        "path": {
+         "canals": [
+          [
+           -3,
+           8
+          ],
+          [
+           -2,
+           8
+          ],
+          [
+           -1,
+           8
+          ]
+         ],
+         "owners": [
+          "p1",
+          "p4"
+         ]
+        },
+        "pays": [
+         "p1"
+        ],
+        "varietal": "CABERNET_SAUVIGNON"
+       }
+      ]
+     }
+    },
+    "water": [
+     {
+      "canals": [
+       [
+        -4,
+        10
+       ],
+       [
+        -3,
+        10
+       ],
+       [
+        -4,
+        11
+       ],
+       [
+        -4,
+        12
+       ],
+       [
+        -3,
+        12
+       ]
+      ],
+      "owners": [
+       "p1",
+       "p2",
+       "p3"
+      ],
+      "vineyard": [
+       -2,
+       12
+      ]
+     },
+     {
+      "canals": [
+       [
+        -3,
+        8
+       ],
+       [
+        -2,
+        8
+       ],
+       [
+        -1,
+        8
+       ]
+      ],
+      "owners": [
+       "p1",
+       "p4"
+      ],
+      "vineyard": [
+       0,
+       8
+      ]
+     }
+    ],
+    "winners": [
+     "p4"
+    ]
+   }
+  ],
+  "n": 1,
+  "seed": 12603,
+  "simulate_game": {
+   "actions_per_game": {
+    "bribe": 0.0,
+    "canal": 20.0,
+    "decline": 1.0,
+    "die": 6.0,
+    "floodgate": 0.0,
+    "pass": 26.0,
+    "release": 0.0,
+    "resow": 1.0
+   },
+   "bodega_rate": 0.0,
+   "die_faces_per_game": {
+    "drought": 2.0,
+    "floodgate": 1.0,
+    "good_season": 0.0,
+    "release": 1.0,
+    "resow": 2.0
+   },
+   "die_use_rate": 0.8333333333333334,
+   "games_with_bribe": 0.0,
+   "games_with_die": 1.0,
+   "games_with_floodgate": 0.0,
+   "mean_total_by_position": [
+    0.0,
+    0.0,
+    0.0,
+    -2.0
+   ],
+   "mode": "normal",
+   "n": 1,
+   "players": 4,
+   "policies": [
+    "score_aware",
+    "saboteur",
+    "random",
+    "greedy"
+   ],
+   "preset": {
+    "action_die": [
+     "floodgate",
+     "release",
+     "resow",
+     "resow",
+     "good_season",
+     "drought"
+    ],
+    "action_die_cost": 1,
+    "bag_mix": {
+     "claw": 5,
+     "floodgate": 0,
+     "gentle_curve": 22,
+     "sharp_curve": 17,
+     "straight": 44,
+     "symmetric_y": 6,
+     "t_branch": 6
+    },
+    "bodega_points": 6,
+    "bodega_varietals": 3,
+    "bribe_rules": "action_die",
+    "die_faces": 6,
+    "drought_points": null,
+    "grape_clusters_per_player": null,
+    "hexes_per_player": 18,
+    "market_size": 4,
+    "mode": "normal",
+    "multiple_bodegas": true,
+    "roulette": [
+     "malbec",
+     "malbec",
+     "cabernet_sauvignon",
+     "cabernet_sauvignon",
+     "syrah",
+     "syrah",
+     "merlot",
+     "merlot",
+     "torrontes",
+     "torrontes",
+     "chardonnay",
+     "chardonnay",
+     "bonarda",
+     "cabernet_franc"
+    ],
+    "rounds": {
+     "2": 10,
+     "3": 15,
+     "4": 12,
+     "5": 10
+    },
+    "season_points": null,
+    "season_roll_every": 3,
+    "season_roll_personal_faces": false,
+    "seat_bonus": {},
+    "stone_share": 10,
+    "varietal_points": {
+     "bonarda": 7,
+     "cabernet_franc": 7,
+     "cabernet_sauvignon": 6,
+     "chardonnay": 6,
+     "malbec": 6,
+     "merlot": 6,
+     "syrah": 6,
+     "torrontes": 6
+    },
+    "varietal_rules": "roulette",
+    "vineyard_distance": [
+     4,
+     4
+    ],
+    "vineyards_per_player": 2,
+    "water_right_points": 3
+   },
+   "score_terms": {
+    "bodega": {
+     "mean": 0.0,
+     "stdev": 0.0
+    },
+    "debt": {
+     "mean": 0.5,
+     "stdev": 0.8660254037844386
+    },
+    "drought": {
+     "mean": 3.0,
+     "stdev": 2.1213203435596424
+    },
+    "rights_collected": {
+     "mean": 2.25,
+     "stdev": 2.48746859276655
+    },
+    "rights_paid": {
+     "mean": 2.25,
+     "stdev": 2.48746859276655
+    },
+    "season": {
+     "mean": 0.0,
+     "stdev": 0.0
+    },
+    "total": {
+     "mean": -0.5,
+     "stdev": 0.8660254037844386
+    },
+    "vineyards": {
+     "mean": 3.0,
+     "stdev": 3.0
+    }
+   },
+   "seed": 12603,
+   "shared_win_rate": 0.0,
+   "turn_order_advantage": 3.0,
+   "turns_per_game": 54.0,
+   "win_rate_bribers": null,
+   "win_rate_by_policy": {
+    "greedy": 1.0,
+    "random": 0.0,
+    "saboteur": 0.0,
+    "score_aware": 0.0
+   },
+   "win_rate_by_position": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "win_rate_by_seat": [
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "win_rate_non_bribers": 0.25,
+   "winner_varietal_rate": {
+    "bonarda": 0.0,
+    "cabernet_franc": 0.0,
+    "cabernet_sauvignon": 1.0,
+    "chardonnay": 0.0,
+    "malbec": 0.0,
+    "merlot": 0.0,
+    "syrah": 0.0,
+    "torrontes": 0.0
+   },
+   "winning_score": {
+    "mean": 0.0,
+    "stdev": 0.0
+   }
+  }
+ },
+ "S4": {
+  "games": [
+   {
+    "final": {
+     "bag": [
+      "T_BRANCH",
+      "STRAIGHT",
+      "GENTLE_CURVE",
+      "STRAIGHT",
+      "STRAIGHT",
+      "SHARP_CURVE",
+      "STRAIGHT",
+      "SYMMETRIC_Y",
+      "STRAIGHT",
+      "STRAIGHT",
+      "SHARP_CURVE",
+      "GENTLE_CURVE",
+      "STRAIGHT",
+      "GENTLE_CURVE",
+      "SHARP_CURVE",
+      "STRAIGHT",
+      "STRAIGHT",
+      "GENTLE_CURVE",
+      "T_BRANCH",
+      "CLAW",
+      "STRAIGHT",
+      "STRAIGHT",
+      "STRAIGHT",
+      "STRAIGHT",
+      "SHARP_CURVE",
+      "GENTLE_CURVE",
+      "GENTLE_CURVE",
+      "SYMMETRIC_Y",
+      "GENTLE_CURVE",
+      "STRAIGHT",
+      "GENTLE_CURVE",
+      "GENTLE_CURVE",
+      "T_BRANCH",
+      "STRAIGHT",
+      "SYMMETRIC_Y",
+      "SYMMETRIC_Y",
+      "STRAIGHT",
+      "SHARP_CURVE",
+      "SHARP_CURVE",
+      "STRAIGHT",
+      "SHARP_CURVE"
+     ],
+     "canals": [
+      {
+       "hex": [
+        -7,
+        17
+       ],
+       "kind": "STRAIGHT",
+       "owner": "p2",
+       "rotation": 0
+      },
+      {
+       "hex": [
+        -6,
+        14
+       ],
+       "kind": "STRAIGHT",
+       "owner": "p1",
+       "rotation": 2
+      },
+      {
+       "hex": [
+        -6,
+        15
+       ],
+       "kind": "SHARP_CURVE",
+       "owner": "p2",
+       "rotation": 2
+      },
+      {
+       "hex": [
+        -6,
+        17
+       ],
+       "kind": "SHARP_CURVE",
+       "owner": "p2",
+       "rotation": 3
+      },
+      {
+       "hex": [
+        -5,
+        12
+       ],
+       "kind": "T_BRANCH",
+       "owner": "p4",
+       "rotation": 3
+      },
+      {
+       "hex": [
+        -5,
+        13
+       ],
+       "kind": "CLAW",
+       "owner": "p1",
+       "rotation": 2
+      },
+      {
+       "hex": [
+        -4,
+        10
+       ],
+       "kind": "SHARP_CURVE",
+       "owner": "p4",
+       "rotation": 1
+      },
+      {
+       "hex": [
+        -4,
+        12
+       ],
+       "kind": "STRAIGHT",
+       "owner": "p3",
+       "rotation": 0
+      },
+      {
+       "hex": [
+        -4,
+        13
+       ],
+       "kind": "GENTLE_CURVE",
+       "owner": "p2",
+       "rotation": 0
+      },
+      {
+       "hex": [
+        -3,
+        8
+       ],
+       "kind": "GENTLE_CURVE",
+       "owner": "p4",
+       "rotation": 0
+      },
+      {
+       "hex": [
+        -3,
+        9
+       ],
+       "kind": "GENTLE_CURVE",
+       "owner": "p1",
+       "rotation": 2
+      },
+      {
+       "hex": [
+        -3,
+        12
+       ],
+       "kind": "GENTLE_CURVE",
+       "owner": "p4",
+       "rotation": 3
+      },
+      {
+       "hex": [
+        -3,
+        13
+       ],
+       "kind": "SHARP_CURVE",
+       "owner": "p5",
+       "rotation": 2
+      },
+      {
+       "hex": [
+        -2,
+        6
+       ],
+       "kind": "STRAIGHT",
+       "owner": "p3",
+       "rotation": 0
+      },
+      {
+       "hex": [
+        -2,
+        7
+       ],
+       "kind": "STRAIGHT",
+       "owner": "p4",
+       "rotation": 1
+      },
+      {
+       "hex": [
+        -1,
+        4
+       ],
+       "kind": "GENTLE_CURVE",
+       "owner": "p2",
+       "rotation": 1
+      },
+      {
+       "hex": [
+        -1,
+        5
+       ],
+       "kind": "STRAIGHT",
+       "owner": "p5",
+       "rotation": 0
+      },
+      {
+       "hex": [
+        -1,
+        6
+       ],
+       "kind": "CLAW",
+       "owner": "p5",
+       "rotation": 3
+      },
+      {
+       "hex": [
+        -1,
+        7
+       ],
+       "kind": "SHARP_CURVE",
+       "owner": "p3",
+       "rotation": 1
+      },
+      {
+       "hex": [
+        0,
+        2
+       ],
+       "kind": "GENTLE_CURVE",
+       "owner": "p1",
+       "rotation": 1
+      },
+      {
+       "hex": [
+        0,
+        3
+       ],
+       "kind": "CLAW",
+       "owner": "p2",
+       "rotation": 2
+      },
+      {
+       "hex": [
+        0,
+        5
+       ],
+       "kind": "STRAIGHT",
+       "owner": "p3",
+       "rotation": 0
+      },
+      {
+       "hex": [
+        0,
+        6
+       ],
+       "kind": "STRAIGHT",
+       "owner": "p5",
+       "rotation": 1
+      },
+      {
+       "hex": [
+        1,
+        0
+       ],
+       "kind": "STRAIGHT",
+       "owner": "p1",
+       "rotation": 1
+      },
+      {
+       "hex": [
+        1,
+        1
+       ],
+       "kind": "STRAIGHT",
+       "owner": "p5",
+       "rotation": 0
+      },
+      {
+       "hex": [
+        2,
+        1
+       ],
+       "kind": "STRAIGHT",
+       "owner": "p3",
+       "rotation": 0
+      }
+     ],
+     "claims": [],
+     "current_player": "p2",
+     "floodgates": [],
+     "market": [
+      "STRAIGHT",
+      "STRAIGHT",
+      "GENTLE_CURVE",
+      "STRAIGHT"
+     ],
+     "pending_face": null,
+     "plantings": [],
+     "players": [
+      {
+       "debt": 4,
+       "drought": 6,
+       "id": "p1",
+       "season": 12,
+       "seat": 1
+      },
+      {
+       "debt": 0,
+       "drought": 6,
+       "id": "p2",
+       "season": 12,
+       "seat": 2
+      },
+      {
+       "debt": 0,
+       "drought": 6,
+       "id": "p3",
+       "season": 12,
+       "seat": 3
+      },
+      {
+       "debt": 2,
+       "drought": 6,
+       "id": "p4",
+       "season": 12,
+       "seat": 4
+      },
+      {
+       "debt": 0,
+       "drought": 6,
+       "id": "p5",
+       "season": 12,
+       "seat": 5
+      }
+     ],
+     "round": 11,
+     "season_roll": null,
+     "start_player": "p2"
+    },
+    "game_seed": 7200687559480831652,
+    "log": [
+     {
+      "action": {
+       "hex": [
+        0,
+        3
+       ],
+       "kind": "CLAW",
+       "rotation": 2,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 1
+     },
+     {
+      "action": {
+       "hex": [
+        -2,
+        6
+       ],
+       "kind": "STRAIGHT",
+       "rotation": 0,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p3",
+      "round": 1
+     },
+     {
+      "action": {
+       "hex": [
+        -5,
+        12
+       ],
+       "kind": "T_BRANCH",
+       "rotation": 3,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p4",
+      "round": 1
+     },
+     {
+      "action": {
+       "hex": [
+        -1,
+        6
+       ],
+       "kind": "CLAW",
+       "rotation": 3,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p5",
+      "round": 1
+     },
+     {
+      "action": {
+       "hex": [
+        0,
+        2
+       ],
+       "kind": "GENTLE_CURVE",
+       "rotation": 1,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 1
+     },
+     {
+      "action": {
+       "hex": [
+        -1,
+        7
+       ],
+       "kind": "SHARP_CURVE",
+       "rotation": 1,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p3",
+      "round": 2
+     },
+     {
+      "action": {
+       "hex": [
+        -2,
+        7
+       ],
+       "kind": "STRAIGHT",
+       "rotation": 1,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p4",
+      "round": 2
+     },
+     {
+      "action": {
+       "hex": [
+        0,
+        6
+       ],
+       "kind": "STRAIGHT",
+       "rotation": 1,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p5",
+      "round": 2
+     },
+     {
+      "action": {
+       "hex": [
+        1,
+        0
+       ],
+       "kind": "STRAIGHT",
+       "rotation": 1,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 2
+     },
+     {
+      "action": {
+       "hex": [
+        -6,
+        15
+       ],
+       "kind": "SHARP_CURVE",
+       "rotation": 2,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 2
+     },
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "DROUGHT",
+      "player": "p2",
+      "round": 3
+     },
+     {
+      "action": {
+       "hex": [
+        -3,
+        8
+       ],
+       "kind": "GENTLE_CURVE",
+       "rotation": 0,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p4",
+      "round": 3
+     },
+     {
+      "action": {
+       "hex": [
+        -1,
+        5
+       ],
+       "kind": "STRAIGHT",
+       "rotation": 0,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p5",
+      "round": 3
+     },
+     {
+      "action": {
+       "hex": [
+        -5,
+        13
+       ],
+       "kind": "CLAW",
+       "rotation": 2,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 3
+     },
+     {
+      "action": {
+       "hex": [
+        -1,
+        4
+       ],
+       "kind": "GENTLE_CURVE",
+       "rotation": 1,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 3
+     },
+     {
+      "action": {
+       "hex": [
+        0,
+        5
+       ],
+       "kind": "STRAIGHT",
+       "rotation": 0,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p3",
+      "round": 3
+     },
+     {
+      "action": {
+       "hex": [
+        1,
+        1
+       ],
+       "kind": "STRAIGHT",
+       "rotation": 0,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p5",
+      "round": 4
+     },
+     {
+      "action": {
+       "hex": [
+        -6,
+        14
+       ],
+       "kind": "STRAIGHT",
+       "rotation": 2,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 4
+     },
+     {
+      "action": {
+       "hex": [
+        -7,
+        17
+       ],
+       "kind": "STRAIGHT",
+       "rotation": 0,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 4
+     },
+     {
+      "action": {
+       "hex": [
+        2,
+        1
+       ],
+       "kind": "STRAIGHT",
+       "rotation": 0,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p3",
+      "round": 4
+     },
+     {
+      "action": {
+       "hex": [
+        -4,
+        10
+       ],
+       "kind": "SHARP_CURVE",
+       "rotation": 1,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p4",
+      "round": 4
+     },
+     {
+      "action": {
+       "hex": [
+        -3,
+        9
+       ],
+       "kind": "GENTLE_CURVE",
+       "rotation": 2,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 5
+     },
+     {
+      "action": {
+       "hex": [
+        -6,
+        17
+       ],
+       "kind": "SHARP_CURVE",
+       "rotation": 3,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 5
+     },
+     {
+      "action": {
+       "hex": [
+        -4,
+        12
+       ],
+       "kind": "STRAIGHT",
+       "rotation": 0,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p3",
+      "round": 5
+     },
+     {
+      "action": {
+       "hex": [
+        -3,
+        12
+       ],
+       "kind": "GENTLE_CURVE",
+       "rotation": 3,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p4",
+      "round": 5
+     },
+     {
+      "action": {
+       "hex": [
+        -3,
+        13
+       ],
+       "kind": "SHARP_CURVE",
+       "rotation": 2,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p5",
+      "round": 5
+     },
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "GOOD_SEASON",
+      "player": "p3",
+      "round": 6
+     },
+     {
+      "action": {
+       "hex": [
+        -4,
+        13
+       ],
+       "kind": "GENTLE_CURVE",
+       "rotation": 0,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 6
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p3",
+      "round": 6
+     },
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "GOOD_SEASON",
+      "player": "p4",
+      "round": 6
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p5",
+      "round": 6
+     },
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "RESOW",
+      "player": "p1",
+      "round": 6
+     },
+     {
+      "action": {
+       "type": "DeclineFace"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 6
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p3",
+      "round": 7
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p4",
+      "round": 7
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p5",
+      "round": 7
+     },
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "RELEASE",
+      "player": "p1",
+      "round": 7
+     },
+     {
+      "action": {
+       "type": "DeclineFace"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 7
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 7
+     },
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "RESOW",
+      "player": "p4",
+      "round": 8
+     },
+     {
+      "action": {
+       "type": "DeclineFace"
+      },
+      "face": null,
+      "player": "p4",
+      "round": 8
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p5",
+      "round": 8
+     },
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "RESOW",
+      "player": "p1",
+      "round": 8
+     },
+     {
+      "action": {
+       "type": "DeclineFace"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 8
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 8
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p3",
+      "round": 8
+     },
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "DROUGHT",
+      "player": "p4",
+      "round": 9
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p5",
+      "round": 9
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 9
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 9
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p3",
+      "round": 9
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p4",
+      "round": 9
+     },
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "RESOW",
+      "player": "p1",
+      "round": 10
+     },
+     {
+      "action": {
+       "type": "DeclineFace"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 10
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 10
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p3",
+      "round": 10
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p4",
+      "round": 10
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p5",
+      "round": 10
+     }
+    ],
+    "scores": {
+     "p1": {
+      "bodega": 0,
+      "bodegas": 0,
+      "debt": 4,
+      "drought": 6,
+      "player": "p1",
+      "rights_collected": 0,
+      "rights_paid": 0,
+      "season": 12,
+      "seat": 1,
+      "seat_bonus": 0,
+      "total": 2,
+      "vineyards": 0,
+      "watered": 0,
+      "watered_vineyards": []
+     },
+     "p2": {
+      "bodega": 0,
+      "bodegas": 0,
+      "debt": 0,
+      "drought": 6,
+      "player": "p2",
+      "rights_collected": 0,
+      "rights_paid": 0,
+      "season": 12,
+      "seat": 2,
+      "seat_bonus": 0,
+      "total": 6,
+      "vineyards": 0,
+      "watered": 0,
+      "watered_vineyards": []
+     },
+     "p3": {
+      "bodega": 0,
+      "bodegas": 0,
+      "debt": 0,
+      "drought": 6,
+      "player": "p3",
+      "rights_collected": 0,
+      "rights_paid": 0,
+      "season": 12,
+      "seat": 3,
+      "seat_bonus": 0,
+      "total": 6,
+      "vineyards": 0,
+      "watered": 0,
+      "watered_vineyards": []
+     },
+     "p4": {
+      "bodega": 0,
+      "bodegas": 0,
+      "debt": 2,
+      "drought": 6,
+      "player": "p4",
+      "rights_collected": 0,
+      "rights_paid": 0,
+      "season": 12,
+      "seat": 4,
+      "seat_bonus": 0,
+      "total": 4,
+      "vineyards": 0,
+      "watered": 0,
+      "watered_vineyards": []
+     },
+     "p5": {
+      "bodega": 0,
+      "bodegas": 0,
+      "debt": 0,
+      "drought": 6,
+      "player": "p5",
+      "rights_collected": 0,
+      "rights_paid": 0,
+      "season": 12,
+      "seat": 5,
+      "seat_bonus": 0,
+      "total": 6,
+      "vineyards": 0,
+      "watered": 0,
+      "watered_vineyards": []
+     }
+    },
+    "water": [],
+    "winners": [
+     "p2",
+     "p3",
+     "p5"
+    ]
+   }
+  ],
+  "n": 1,
+  "seed": 12604,
+  "simulate_game": {
+   "actions_per_game": {
+    "bribe": 0.0,
+    "canal": 26.0,
+    "decline": 5.0,
+    "die": 9.0,
+    "floodgate": 0.0,
+    "pass": 18.0,
+    "release": 0.0,
+    "resow": 0.0
+   },
+   "bodega_rate": 0.0,
+   "die_faces_per_game": {
+    "drought": 2.0,
+    "floodgate": 0.0,
+    "good_season": 2.0,
+    "release": 1.0,
+    "resow": 4.0
+   },
+   "die_use_rate": 0.4444444444444444,
+   "games_with_bribe": 0.0,
+   "games_with_die": 1.0,
+   "games_with_floodgate": 0.0,
+   "mean_total_by_position": [
+    6.0,
+    6.0,
+    4.0,
+    6.0,
+    2.0
+   ],
+   "mode": "normal",
+   "n": 1,
+   "players": 5,
+   "policies": [
+    "random",
+    "score_aware",
+    "greedy",
+    "random",
+    "saboteur"
+   ],
+   "preset": {
+    "action_die": [
+     "floodgate",
+     "release",
+     "resow",
+     "resow",
+     "good_season",
+     "drought"
+    ],
+    "action_die_cost": 1,
+    "bag_mix": {
+     "claw": 5,
+     "floodgate": 0,
+     "gentle_curve": 22,
+     "sharp_curve": 17,
+     "straight": 44,
+     "symmetric_y": 6,
+     "t_branch": 6
+    },
+    "bodega_points": 6,
+    "bodega_varietals": 3,
+    "bribe_rules": "action_die",
+    "die_faces": 6,
+    "drought_points": null,
+    "grape_clusters_per_player": null,
+    "hexes_per_player": 18,
+    "market_size": 4,
+    "mode": "normal",
+    "multiple_bodegas": true,
+    "roulette": [
+     "malbec",
+     "malbec",
+     "cabernet_sauvignon",
+     "cabernet_sauvignon",
+     "syrah",
+     "syrah",
+     "merlot",
+     "merlot",
+     "torrontes",
+     "torrontes",
+     "chardonnay",
+     "chardonnay",
+     "bonarda",
+     "cabernet_franc"
+    ],
+    "rounds": {
+     "2": 10,
+     "3": 15,
+     "4": 12,
+     "5": 10
+    },
+    "season_points": null,
+    "season_roll_every": 3,
+    "season_roll_personal_faces": false,
+    "seat_bonus": {},
+    "stone_share": 10,
+    "varietal_points": {
+     "bonarda": 7,
+     "cabernet_franc": 7,
+     "cabernet_sauvignon": 6,
+     "chardonnay": 6,
+     "malbec": 6,
+     "merlot": 6,
+     "syrah": 6,
+     "torrontes": 6
+    },
+    "varietal_rules": "roulette",
+    "vineyard_distance": [
+     4,
+     4
+    ],
+    "vineyards_per_player": 2,
+    "water_right_points": 3
+   },
+   "score_terms": {
+    "bodega": {
+     "mean": 0.0,
+     "stdev": 0.0
+    },
+    "debt": {
+     "mean": 1.2,
+     "stdev": 1.6
+    },
+    "drought": {
+     "mean": 6.0,
+     "stdev": 0.0
+    },
+    "rights_collected": {
+     "mean": 0.0,
+     "stdev": 0.0
+    },
+    "rights_paid": {
+     "mean": 0.0,
+     "stdev": 0.0
+    },
+    "season": {
+     "mean": 12.0,
+     "stdev": 0.0
+    },
+    "total": {
+     "mean": 4.8,
+     "stdev": 1.6
+    },
+    "vineyards": {
+     "mean": 0.0,
+     "stdev": 0.0
+    }
+   },
+   "seed": 12604,
+   "shared_win_rate": 1.0,
+   "turn_order_advantage": 1.0,
+   "turns_per_game": 58.0,
+   "win_rate_bribers": null,
+   "win_rate_by_policy": {
+    "greedy": 0.3333333333333333,
+    "random": 0.0,
+    "saboteur": 0.3333333333333333,
+    "score_aware": 0.3333333333333333
+   },
+   "win_rate_by_position": [
+    0.3333333333333333,
+    0.3333333333333333,
+    0.0,
+    0.3333333333333333,
+    0.0
+   ],
+   "win_rate_by_seat": [
+    0.0,
+    0.3333333333333333,
+    0.3333333333333333,
+    0.0,
+    0.3333333333333333
+   ],
+   "win_rate_non_bribers": 0.2,
+   "winner_varietal_rate": {
+    "bonarda": 0.0,
+    "cabernet_franc": 0.0,
+    "cabernet_sauvignon": 0.0,
+    "chardonnay": 0.0,
+    "malbec": 0.0,
+    "merlot": 0.0,
+    "syrah": 0.0,
+    "torrontes": 0.0
+   },
+   "winning_score": {
+    "mean": 6.0,
+    "stdev": 0.0
+   }
+  }
+ },
+ "S5": {
+  "games": [
+   {
+    "final": {
+     "bag": [
+      "STRAIGHT",
+      "SHARP_CURVE",
+      "GENTLE_CURVE",
+      "GENTLE_CURVE",
+      "STRAIGHT",
+      "STRAIGHT",
+      "STRAIGHT",
+      "T_BRANCH"
+     ],
+     "canals": [
+      {
+       "hex": [
+        -1,
+        4
+       ],
+       "kind": "STRAIGHT",
+       "owner": "p1",
+       "rotation": 2
+      },
+      {
+       "hex": [
+        0,
+        2
+       ],
+       "kind": "STRAIGHT",
+       "owner": "p2",
+       "rotation": 1
+      },
+      {
+       "hex": [
+        0,
+        3
+       ],
+       "kind": "CLAW",
+       "owner": "p1",
+       "rotation": 1
+      },
+      {
+       "hex": [
+        1,
+        0
+       ],
+       "kind": "SHARP_CURVE",
+       "owner": "p2",
+       "rotation": 2
+      },
+      {
+       "hex": [
+        1,
+        1
+       ],
+       "kind": "STRAIGHT",
+       "owner": "p2",
+       "rotation": 0
+      },
+      {
+       "hex": [
+        1,
+        2
+       ],
+       "kind": "SHARP_CURVE",
+       "owner": "p1",
+       "rotation": 4
+      },
+      {
+       "hex": [
+        1,
+        3
+       ],
+       "kind": "SHARP_CURVE",
+       "owner": "p2",
+       "rotation": 2
+      },
+      {
+       "hex": [
+        2,
+        1
+       ],
+       "kind": "STRAIGHT",
+       "owner": "p1",
+       "rotation": 0
+      },
+      {
+       "hex": [
+        3,
+        1
+       ],
+       "kind": "SYMMETRIC_Y",
+       "owner": "p2",
+       "rotation": 1
+      }
+     ],
+     "claims": [
+      [
+       [
+        3,
+        2
+       ],
+       "p2"
+      ],
+      [
+       [
+        4,
+        0
+       ],
+       "p2"
+      ]
+     ],
+     "current_player": "p2",
+     "floodgates": [],
+     "market": [
+      "GENTLE_CURVE",
+      "GENTLE_CURVE",
+      "GENTLE_CURVE",
+      "STRAIGHT"
+     ],
+     "pending_face": null,
+     "plantings": [
+      [
+       [
+        3,
+        2
+       ],
+       "CABERNET_FRANC"
+      ],
+      [
+       [
+        4,
+        0
+       ],
+       "MERLOT"
+      ]
+     ],
+     "players": [
+      {
+       "debt": 0,
+       "drought": 0,
+       "id": "p1",
+       "season": 0,
+       "seat": 1
+      },
+      {
+       "debt": 0,
+       "drought": 0,
+       "id": "p2",
+       "season": 0,
+       "seat": 2
+      }
+     ],
+     "round": 7,
+     "season_roll": null,
+     "start_player": "p2"
+    },
+    "game_seed": 8937526369774097399,
+    "log": [
+     {
+      "action": {
+       "hex": [
+        1,
+        1
+       ],
+       "kind": "STRAIGHT",
+       "rotation": 0,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 1
+     },
+     {
+      "action": {
+       "hex": [
+        -1,
+        4
+       ],
+       "kind": "STRAIGHT",
+       "rotation": 2,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 1
+     },
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "RESOW",
+      "player": "p2",
+      "round": 2
+     },
+     {
+      "action": {
+       "hex": [
+        2,
+        1
+       ],
+       "kind": "STRAIGHT",
+       "rotation": 0,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 2
+     },
+     {
+      "action": {
+       "hex": [
+        3,
+        1
+       ],
+       "kind": "SYMMETRIC_Y",
+       "rotation": 1,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 2
+     },
+     {
+      "action": {
+       "hex": [
+        1,
+        0
+       ],
+       "kind": "SHARP_CURVE",
+       "rotation": 2,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 3
+     },
+     {
+      "action": {
+       "hex": [
+        0,
+        3
+       ],
+       "kind": "CLAW",
+       "rotation": 1,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 3
+     },
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "RESOW",
+      "player": "p1",
+      "round": 4
+     },
+     {
+      "action": {
+       "hex": [
+        1,
+        2
+       ],
+       "kind": "SHARP_CURVE",
+       "rotation": 4,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 4
+     },
+     {
+      "action": {
+       "hex": [
+        0,
+        2
+       ],
+       "kind": "STRAIGHT",
+       "rotation": 1,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 4
+     },
+     {
+      "action": {
+       "hex": [
+        1,
+        3
+       ],
+       "kind": "SHARP_CURVE",
+       "rotation": 2,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 5
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 5
+     },
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "RESOW",
+      "player": "p2",
+      "round": 6
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 6
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 6
+     }
+    ],
+    "scores": {
+     "p1": {
+      "bodega": 0,
+      "bodegas": 0,
+      "debt": 0,
+      "drought": 0,
+      "player": "p1",
+      "rights_collected": 6,
+      "rights_paid": 0,
+      "season": 0,
+      "seat": 1,
+      "seat_bonus": 0,
+      "total": 6,
+      "vineyards": 0,
+      "watered": 0,
+      "watered_vineyards": []
+     },
+     "p2": {
+      "bodega": 0,
+      "bodegas": 0,
+      "debt": 0,
+      "drought": 0,
+      "player": "p2",
+      "rights_collected": 0,
+      "rights_paid": 6,
+      "season": 0,
+      "seat": 2,
+      "seat_bonus": 0,
+      "total": 7,
+      "vineyards": 13,
+      "watered": 2,
+      "watered_vineyards": [
+       {
+        "hex": [
+         3,
+         2
+        ],
+        "path": {
+         "canals": [
+          [
+           1,
+           1
+          ],
+          [
+           2,
+           1
+          ],
+          [
+           3,
+           1
+          ]
+         ],
+         "owners": [
+          "p1",
+          "p2"
+         ]
+        },
+        "pays": [
+         "p1"
+        ],
+        "varietal": "CABERNET_FRANC"
+       },
+       {
+        "hex": [
+         4,
+         0
+        ],
+        "path": {
+         "canals": [
+          [
+           1,
+           1
+          ],
+          [
+           2,
+           1
+          ],
+          [
+           3,
+           1
+          ]
+         ],
+         "owners": [
+          "p1",
+          "p2"
+         ]
+        },
+        "pays": [
+         "p1"
+        ],
+        "varietal": "MERLOT"
+       }
+      ]
+     }
+    },
+    "water": [
+     {
+      "canals": [
+       [
+        1,
+        1
+       ],
+       [
+        2,
+        1
+       ],
+       [
+        3,
+        1
+       ]
+      ],
+      "owners": [
+       "p1",
+       "p2"
+      ],
+      "vineyard": [
+       3,
+       2
+      ]
+     },
+     {
+      "canals": [
+       [
+        1,
+        1
+       ],
+       [
+        2,
+        1
+       ],
+       [
+        3,
+        1
+       ]
+      ],
+      "owners": [
+       "p1",
+       "p2"
+      ],
+      "vineyard": [
+       4,
+       0
+      ]
+     }
+    ],
+    "winners": [
+     "p2"
+    ]
+   },
+   {
+    "final": {
+     "bag": [
+      "STRAIGHT",
+      "SHARP_CURVE",
+      "GENTLE_CURVE",
+      "STRAIGHT",
+      "GENTLE_CURVE",
+      "GENTLE_CURVE",
+      "GENTLE_CURVE",
+      "STRAIGHT",
+      "STRAIGHT",
+      "T_BRANCH",
+      "SHARP_CURVE"
+     ],
+     "canals": [
+      {
+       "hex": [
+        -1,
+        3
+       ],
+       "kind": "SYMMETRIC_Y",
+       "owner": "p2",
+       "rotation": 1
+      },
+      {
+       "hex": [
+        -1,
+        4
+       ],
+       "kind": "CLAW",
+       "owner": "p1",
+       "rotation": 3
+      },
+      {
+       "hex": [
+        0,
+        2
+       ],
+       "kind": "STRAIGHT",
+       "owner": "p1",
+       "rotation": 1
+      },
+      {
+       "hex": [
+        1,
+        0
+       ],
+       "kind": "STRAIGHT",
+       "owner": "p2",
+       "rotation": 0
+      },
+      {
+       "hex": [
+        1,
+        1
+       ],
+       "kind": "STRAIGHT",
+       "owner": "p2",
+       "rotation": 1
+      },
+      {
+       "hex": [
+        2,
+        0
+       ],
+       "kind": "SHARP_CURVE",
+       "owner": "p1",
+       "rotation": 2
+      }
+     ],
+     "claims": [],
+     "current_player": "p1",
+     "floodgates": [],
+     "market": [
+      "STRAIGHT",
+      "STRAIGHT",
+      "GENTLE_CURVE",
+      "SHARP_CURVE"
+     ],
+     "pending_face": null,
+     "plantings": [],
+     "players": [
+      {
+       "debt": 0,
+       "drought": 0,
+       "id": "p1",
+       "season": 6,
+       "seat": 1
+      },
+      {
+       "debt": 0,
+       "drought": 0,
+       "id": "p2",
+       "season": 6,
+       "seat": 2
+      }
+     ],
+     "round": 7,
+     "season_roll": null,
+     "start_player": "p1"
+    },
+    "game_seed": 63754369118220298,
+    "log": [
+     {
+      "action": {
+       "hex": [
+        -1,
+        4
+       ],
+       "kind": "CLAW",
+       "rotation": 3,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 1
+     },
+     {
+      "action": {
+       "hex": [
+        1,
+        0
+       ],
+       "kind": "STRAIGHT",
+       "rotation": 0,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 1
+     },
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "RELEASE",
+      "player": "p1",
+      "round": 2
+     },
+     {
+      "action": {
+       "hex": [
+        -1,
+        3
+       ],
+       "kind": "SYMMETRIC_Y",
+       "rotation": 1,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 2
+     },
+     {
+      "action": {
+       "hex": [
+        2,
+        0
+       ],
+       "kind": "SHARP_CURVE",
+       "rotation": 2,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 2
+     },
+     {
+      "action": {
+       "hex": [
+        0,
+        2
+       ],
+       "kind": "STRAIGHT",
+       "rotation": 1,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 3
+     },
+     {
+      "action": {
+       "hex": [
+        1,
+        1
+       ],
+       "kind": "STRAIGHT",
+       "rotation": 1,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 3
+     },
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "RESOW",
+      "player": "p2",
+      "round": 4
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 4
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 4
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 5
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 5
+     },
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "GOOD_SEASON",
+      "player": "p1",
+      "round": 6
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 6
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 6
+     }
+    ],
+    "scores": {
+     "p1": {
+      "bodega": 0,
+      "bodegas": 0,
+      "debt": 0,
+      "drought": 0,
+      "player": "p1",
+      "rights_collected": 0,
+      "rights_paid": 0,
+      "season": 6,
+      "seat": 1,
+      "seat_bonus": 0,
+      "total": 6,
+      "vineyards": 0,
+      "watered": 0,
+      "watered_vineyards": []
+     },
+     "p2": {
+      "bodega": 0,
+      "bodegas": 0,
+      "debt": 0,
+      "drought": 0,
+      "player": "p2",
+      "rights_collected": 0,
+      "rights_paid": 0,
+      "season": 6,
+      "seat": 2,
+      "seat_bonus": 0,
+      "total": 6,
+      "vineyards": 0,
+      "watered": 0,
+      "watered_vineyards": []
+     }
+    },
+    "water": [],
+    "winners": [
+     "p1",
+     "p2"
+    ]
+   },
+   {
+    "final": {
+     "bag": [
+      "STRAIGHT",
+      "STRAIGHT",
+      "SHARP_CURVE",
+      "SHARP_CURVE",
+      "GENTLE_CURVE",
+      "STRAIGHT",
+      "SHARP_CURVE",
+      "SHARP_CURVE",
+      "SYMMETRIC_Y",
+      "STRAIGHT",
+      "GENTLE_CURVE",
+      "GENTLE_CURVE",
+      "STRAIGHT",
+      "STRAIGHT"
+     ],
+     "canals": [
+      {
+       "hex": [
+        -1,
+        4
+       ],
+       "kind": "GENTLE_CURVE",
+       "owner": "p1",
+       "rotation": 3
+      },
+      {
+       "hex": [
+        0,
+        2
+       ],
+       "kind": "CLAW",
+       "owner": "p2",
+       "rotation": 2
+      },
+      {
+       "hex": [
+        1,
+        0
+       ],
+       "kind": "GENTLE_CURVE",
+       "owner": "p1",
+       "rotation": 1
+      }
+     ],
+     "claims": [],
+     "current_player": "p2",
+     "floodgates": [],
+     "market": [
+      "STRAIGHT",
+      "STRAIGHT",
+      "STRAIGHT",
+      "T_BRANCH"
+     ],
+     "pending_face": null,
+     "plantings": [],
+     "players": [
+      {
+       "debt": 0,
+       "drought": 3,
+       "id": "p1",
+       "season": 0,
+       "seat": 1
+      },
+      {
+       "debt": 0,
+       "drought": 3,
+       "id": "p2",
+       "season": 0,
+       "seat": 2
+      }
+     ],
+     "round": 7,
+     "season_roll": null,
+     "start_player": "p2"
+    },
+    "game_seed": 1974972254335842166,
+    "log": [
+     {
+      "action": {
+       "hex": [
+        0,
+        2
+       ],
+       "kind": "CLAW",
+       "rotation": 2,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 1
+     },
+     {
+      "action": {
+       "hex": [
+        -1,
+        4
+       ],
+       "kind": "GENTLE_CURVE",
+       "rotation": 3,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 1
+     },
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "RESOW",
+      "player": "p2",
+      "round": 2
+     },
+     {
+      "action": {
+       "hex": [
+        1,
+        0
+       ],
+       "kind": "GENTLE_CURVE",
+       "rotation": 1,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 2
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 2
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 3
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 3
+     },
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "DROUGHT",
+      "player": "p1",
+      "round": 4
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 4
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 4
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 5
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 5
+     },
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "RESOW",
+      "player": "p2",
+      "round": 6
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 6
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 6
+     }
+    ],
+    "scores": {
+     "p1": {
+      "bodega": 0,
+      "bodegas": 0,
+      "debt": 0,
+      "drought": 0,
+      "player": "p1",
+      "rights_collected": 0,
+      "rights_paid": 0,
+      "season": 0,
+      "seat": 1,
+      "seat_bonus": 0,
+      "total": 0,
+      "vineyards": 0,
+      "watered": 0,
+      "watered_vineyards": []
+     },
+     "p2": {
+      "bodega": 0,
+      "bodegas": 0,
+      "debt": 0,
+      "drought": 0,
+      "player": "p2",
+      "rights_collected": 0,
+      "rights_paid": 0,
+      "season": 0,
+      "seat": 2,
+      "seat_bonus": 0,
+      "total": 0,
+      "vineyards": 0,
+      "watered": 0,
+      "watered_vineyards": []
+     }
+    },
+    "water": [],
+    "winners": [
+     "p1",
+     "p2"
+    ]
+   }
+  ],
+  "n": 3,
+  "seed": 12605,
+  "simulate_game": {
+   "actions_per_game": {
+    "bribe": 0.0,
+    "canal": 6.0,
+    "decline": 0.0,
+    "die": 3.0,
+    "floodgate": 0.0,
+    "pass": 6.0,
+    "release": 0.0,
+    "resow": 0.0
+   },
+   "bodega_rate": 0.0,
+   "die_faces_per_game": {
+    "drought": 0.3333333333333333,
+    "floodgate": 0.0,
+    "good_season": 0.3333333333333333,
+    "release": 0.3333333333333333,
+    "resow": 2.0
+   },
+   "die_use_rate": 1.0,
+   "games_with_bribe": 0.0,
+   "games_with_die": 1.0,
+   "games_with_floodgate": 0.0,
+   "mean_total_by_position": [
+    4.333333333333333,
+    4.0
+   ],
+   "mode": "flash",
+   "n": 3,
+   "players": 2,
+   "policies": [
+    "score_aware",
+    "score_aware"
+   ],
+   "preset": {
+    "action_die": [
+     "floodgate",
+     "release",
+     "resow",
+     "resow",
+     "good_season",
+     "drought"
+    ],
+    "action_die_cost": 1,
+    "bag_mix": {
+     "claw": 5,
+     "floodgate": 0,
+     "gentle_curve": 22,
+     "sharp_curve": 17,
+     "straight": 44,
+     "symmetric_y": 6,
+     "t_branch": 6
+    },
+    "bodega_points": 3,
+    "bodega_varietals": 3,
+    "bribe_rules": "action_die",
+    "die_faces": 6,
+    "drought_points": null,
+    "grape_clusters_per_player": null,
+    "hexes_per_player": 14,
+    "market_size": 4,
+    "mode": "flash",
+    "multiple_bodegas": true,
+    "roulette": [
+     "malbec",
+     "malbec",
+     "cabernet_sauvignon",
+     "cabernet_sauvignon",
+     "syrah",
+     "syrah",
+     "merlot",
+     "merlot",
+     "torrontes",
+     "torrontes",
+     "chardonnay",
+     "chardonnay",
+     "bonarda",
+     "cabernet_franc"
+    ],
+    "rounds": {
+     "2": 6,
+     "3": 6
+    },
+    "season_points": null,
+    "season_roll_every": 2,
+    "season_roll_personal_faces": false,
+    "seat_bonus": {},
+    "stone_share": 10,
+    "varietal_points": {
+     "bonarda": 7,
+     "cabernet_franc": 7,
+     "cabernet_sauvignon": 6,
+     "chardonnay": 6,
+     "malbec": 6,
+     "merlot": 6,
+     "syrah": 6,
+     "torrontes": 6
+    },
+    "varietal_rules": "roulette",
+    "vineyard_distance": [
+     4,
+     4
+    ],
+    "vineyards_per_player": 2,
+    "water_right_points": 3
+   },
+   "score_terms": {
+    "bodega": {
+     "mean": 0.0,
+     "stdev": 0.0
+    },
+    "debt": {
+     "mean": 0.0,
+     "stdev": 0.0
+    },
+    "drought": {
+     "mean": 0.0,
+     "stdev": 0.0
+    },
+    "rights_collected": {
+     "mean": 1.0,
+     "stdev": 2.23606797749979
+    },
+    "rights_paid": {
+     "mean": 1.0,
+     "stdev": 2.23606797749979
+    },
+    "season": {
+     "mean": 2.0,
+     "stdev": 2.8284271247461903
+    },
+    "total": {
+     "mean": 4.166666666666667,
+     "stdev": 2.9674156357941426
+    },
+    "vineyards": {
+     "mean": 2.1666666666666665,
+     "stdev": 4.844813951249544
+    }
+   },
+   "seed": 12605,
+   "shared_win_rate": 0.6666666666666666,
+   "turn_order_advantage": 0.33333333333333337,
+   "turns_per_game": 15.0,
+   "win_rate_bribers": null,
+   "win_rate_by_policy": {
+    "score_aware": 1.0
+   },
+   "win_rate_by_position": [
+    0.6666666666666666,
+    0.3333333333333333
+   ],
+   "win_rate_by_seat": [
+    0.3333333333333333,
+    0.6666666666666666
+   ],
+   "win_rate_non_bribers": 0.5,
+   "winner_varietal_rate": {
+    "bonarda": 0.0,
+    "cabernet_franc": 0.3333333333333333,
+    "cabernet_sauvignon": 0.0,
+    "chardonnay": 0.0,
+    "malbec": 0.0,
+    "merlot": 0.3333333333333333,
+    "syrah": 0.0,
+    "torrontes": 0.0
+   },
+   "winning_score": {
+    "mean": 4.333333333333333,
+    "stdev": 3.0912061651652345
+   }
+  }
+ },
+ "S6": {
+  "games": [
+   {
+    "final": {
+     "bag": [
+      "STRAIGHT",
+      "GENTLE_CURVE",
+      "GENTLE_CURVE",
+      "SHARP_CURVE",
+      "STRAIGHT",
+      "STRAIGHT",
+      "GENTLE_CURVE",
+      "STRAIGHT",
+      "SHARP_CURVE",
+      "SHARP_CURVE",
+      "SYMMETRIC_Y",
+      "STRAIGHT",
+      "T_BRANCH",
+      "SYMMETRIC_Y"
+     ],
+     "canals": [
+      {
+       "hex": [
+        -3,
+        7
+       ],
+       "kind": "GENTLE_CURVE",
+       "owner": "p3",
+       "rotation": 1
+      },
+      {
+       "hex": [
+        -2,
+        5
+       ],
+       "kind": "STRAIGHT",
+       "owner": "p2",
+       "rotation": 2
+      },
+      {
+       "hex": [
+        -2,
+        6
+       ],
+       "kind": "GENTLE_CURVE",
+       "owner": "p1",
+       "rotation": 0
+      },
+      {
+       "hex": [
+        -1,
+        3
+       ],
+       "kind": "STRAIGHT",
+       "owner": "p2",
+       "rotation": 2
+      },
+      {
+       "hex": [
+        -1,
+        4
+       ],
+       "kind": "GENTLE_CURVE",
+       "owner": "p3",
+       "rotation": 2
+      },
+      {
+       "hex": [
+        -1,
+        6
+       ],
+       "kind": "T_BRANCH",
+       "owner": "p3",
+       "rotation": 0
+      },
+      {
+       "hex": [
+        0,
+        1
+       ],
+       "kind": "CLAW",
+       "owner": "p1",
+       "rotation": 3
+      },
+      {
+       "hex": [
+        0,
+        5
+       ],
+       "kind": "SHARP_CURVE",
+       "owner": "p3",
+       "rotation": 4
+      },
+      {
+       "hex": [
+        0,
+        6
+       ],
+       "kind": "STRAIGHT",
+       "owner": "p2",
+       "rotation": 0
+      },
+      {
+       "hex": [
+        1,
+        0
+       ],
+       "kind": "STRAIGHT",
+       "owner": "p3",
+       "rotation": 0
+      },
+      {
+       "hex": [
+        2,
+        0
+       ],
+       "kind": "GENTLE_CURVE",
+       "owner": "p1",
+       "rotation": 3
+      },
+      {
+       "hex": [
+        2,
+        1
+       ],
+       "kind": "STRAIGHT",
+       "owner": "p2",
+       "rotation": 2
+      },
+      {
+       "hex": [
+        2,
+        2
+       ],
+       "kind": "STRAIGHT",
+       "owner": "p2",
+       "rotation": 2
+      }
+     ],
+     "claims": [
+      [
+       [
+        1,
+        6
+       ],
+       "p2"
+      ],
+      [
+       [
+        2,
+        3
+       ],
+       "p2"
+      ]
+     ],
+     "current_player": "p1",
+     "floodgates": [
+      {
+       "direction": "NE",
+       "hex": [
+        -3,
+        7
+       ]
+      }
+     ],
+     "market": [
+      "STRAIGHT",
+      "STRAIGHT",
+      "SHARP_CURVE",
+      "STRAIGHT"
+     ],
+     "pending_face": null,
+     "plantings": [
+      [
+       [
+        1,
+        6
+       ],
+       "TORRONTES"
+      ],
+      [
+       [
+        2,
+        3
+       ],
+       "MALBEC"
+      ]
+     ],
+     "players": [
+      {
+       "debt": 2,
+       "drought": 0,
+       "id": "p1",
+       "season": 0,
+       "seat": 1
+      },
+      {
+       "debt": 0,
+       "drought": 0,
+       "id": "p2",
+       "season": 0,
+       "seat": 2
+      },
+      {
+       "debt": 0,
+       "drought": 0,
+       "id": "p3",
+       "season": 0,
+       "seat": 3
+      }
+     ],
+     "round": 7,
+     "season_roll": null,
+     "start_player": "p1"
+    },
+    "game_seed": 4199149304503841920,
+    "log": [
+     {
+      "action": {
+       "hex": [
+        0,
+        1
+       ],
+       "kind": "CLAW",
+       "rotation": 3,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 1
+     },
+     {
+      "action": {
+       "hex": [
+        -2,
+        5
+       ],
+       "kind": "STRAIGHT",
+       "rotation": 2,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 1
+     },
+     {
+      "action": {
+       "hex": [
+        -3,
+        7
+       ],
+       "kind": "GENTLE_CURVE",
+       "rotation": 1,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p3",
+      "round": 1
+     },
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "RELEASE",
+      "player": "p1",
+      "round": 2
+     },
+     {
+      "action": {
+       "hex": [
+        -1,
+        3
+       ],
+       "kind": "STRAIGHT",
+       "rotation": 2,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 2
+     },
+     {
+      "action": {
+       "hex": [
+        -1,
+        4
+       ],
+       "kind": "GENTLE_CURVE",
+       "rotation": 2,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p3",
+      "round": 2
+     },
+     {
+      "action": {
+       "hex": [
+        -2,
+        6
+       ],
+       "kind": "GENTLE_CURVE",
+       "rotation": 0,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 2
+     },
+     {
+      "action": {
+       "hex": [
+        1,
+        0
+       ],
+       "kind": "STRAIGHT",
+       "rotation": 0,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p3",
+      "round": 3
+     },
+     {
+      "action": {
+       "hex": [
+        2,
+        0
+       ],
+       "kind": "GENTLE_CURVE",
+       "rotation": 3,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 3
+     },
+     {
+      "action": {
+       "hex": [
+        2,
+        1
+       ],
+       "kind": "STRAIGHT",
+       "rotation": 2,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 3
+     },
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "RESOW",
+      "player": "p2",
+      "round": 4
+     },
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "FLOODGATE",
+      "player": "p1",
+      "round": 4
+     },
+     {
+      "action": {
+       "direction": "NE",
+       "hex": [
+        -3,
+        7
+       ],
+       "type": "PlaceFloodgate"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 4
+     },
+     {
+      "action": {
+       "hex": [
+        2,
+        2
+       ],
+       "kind": "STRAIGHT",
+       "rotation": 2,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 4
+     },
+     {
+      "action": {
+       "hex": [
+        -1,
+        6
+       ],
+       "kind": "T_BRANCH",
+       "rotation": 0,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p3",
+      "round": 4
+     },
+     {
+      "action": {
+       "hex": [
+        0,
+        6
+       ],
+       "kind": "STRAIGHT",
+       "rotation": 0,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 5
+     },
+     {
+      "action": {
+       "hex": [
+        0,
+        5
+       ],
+       "kind": "SHARP_CURVE",
+       "rotation": 4,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p3",
+      "round": 5
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 5
+     },
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "RESOW",
+      "player": "p3",
+      "round": 6
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p3",
+      "round": 6
+     },
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "RESOW",
+      "player": "p1",
+      "round": 6
+     },
+     {
+      "action": {
+       "hex": [
+        1,
+        6
+       ],
+       "type": "Resow"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 6
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 6
+     }
+    ],
+    "scores": {
+     "p1": {
+      "bodega": 0,
+      "bodegas": 0,
+      "debt": 2,
+      "drought": 0,
+      "player": "p1",
+      "rights_collected": 6,
+      "rights_paid": 0,
+      "season": 0,
+      "seat": 1,
+      "seat_bonus": 0,
+      "total": 4,
+      "vineyards": 0,
+      "watered": 0,
+      "watered_vineyards": []
+     },
+     "p2": {
+      "bodega": 0,
+      "bodegas": 0,
+      "debt": 0,
+      "drought": 0,
+      "player": "p2",
+      "rights_collected": 0,
+      "rights_paid": 12,
+      "season": 0,
+      "seat": 2,
+      "seat_bonus": 0,
+      "total": 0,
+      "vineyards": 12,
+      "watered": 2,
+      "watered_vineyards": [
+       {
+        "hex": [
+         1,
+         6
+        ],
+        "path": {
+         "canals": [
+          [
+           -2,
+           5
+          ],
+          [
+           -2,
+           6
+          ],
+          [
+           -1,
+           6
+          ],
+          [
+           0,
+           6
+          ]
+         ],
+         "owners": [
+          "p1",
+          "p2",
+          "p3"
+         ]
+        },
+        "pays": [
+         "p1",
+         "p3"
+        ],
+        "varietal": "TORRONTES"
+       },
+       {
+        "hex": [
+         2,
+         3
+        ],
+        "path": {
+         "canals": [
+          [
+           1,
+           0
+          ],
+          [
+           2,
+           0
+          ],
+          [
+           2,
+           1
+          ],
+          [
+           2,
+           2
+          ]
+         ],
+         "owners": [
+          "p1",
+          "p2",
+          "p3"
+         ]
+        },
+        "pays": [
+         "p1",
+         "p3"
+        ],
+        "varietal": "MALBEC"
+       }
+      ]
+     },
+     "p3": {
+      "bodega": 0,
+      "bodegas": 0,
+      "debt": 0,
+      "drought": 0,
+      "player": "p3",
+      "rights_collected": 6,
+      "rights_paid": 0,
+      "season": 0,
+      "seat": 3,
+      "seat_bonus": 0,
+      "total": 6,
+      "vineyards": 0,
+      "watered": 0,
+      "watered_vineyards": []
+     }
+    },
+    "water": [
+     {
+      "canals": [
+       [
+        -2,
+        5
+       ],
+       [
+        -2,
+        6
+       ],
+       [
+        -1,
+        6
+       ],
+       [
+        0,
+        6
+       ]
+      ],
+      "owners": [
+       "p1",
+       "p2",
+       "p3"
+      ],
+      "vineyard": [
+       1,
+       6
+      ]
+     },
+     {
+      "canals": [
+       [
+        1,
+        0
+       ],
+       [
+        2,
+        0
+       ],
+       [
+        2,
+        1
+       ],
+       [
+        2,
+        2
+       ]
+      ],
+      "owners": [
+       "p1",
+       "p2",
+       "p3"
+      ],
+      "vineyard": [
+       2,
+       3
+      ]
+     }
+    ],
+    "winners": [
+     "p3"
+    ]
+   },
+   {
+    "final": {
+     "bag": [
+      "GENTLE_CURVE",
+      "STRAIGHT",
+      "STRAIGHT",
+      "SHARP_CURVE",
+      "CLAW",
+      "STRAIGHT",
+      "STRAIGHT",
+      "SHARP_CURVE",
+      "STRAIGHT",
+      "STRAIGHT",
+      "STRAIGHT"
+     ],
+     "canals": [
+      {
+       "hex": [
+        -3,
+        7
+       ],
+       "kind": "STRAIGHT",
+       "owner": "p2",
+       "rotation": 0
+      },
+      {
+       "hex": [
+        -2,
+        5
+       ],
+       "kind": "STRAIGHT",
+       "owner": "p1",
+       "rotation": 0
+      },
+      {
+       "hex": [
+        -2,
+        6
+       ],
+       "kind": "GENTLE_CURVE",
+       "owner": "p2",
+       "rotation": 1
+      },
+      {
+       "hex": [
+        -2,
+        7
+       ],
+       "kind": "GENTLE_CURVE",
+       "owner": "p3",
+       "rotation": 3
+      },
+      {
+       "hex": [
+        -1,
+        3
+       ],
+       "kind": "SYMMETRIC_Y",
+       "owner": "p1",
+       "rotation": 1
+      },
+      {
+       "hex": [
+        -1,
+        4
+       ],
+       "kind": "STRAIGHT",
+       "owner": "p2",
+       "rotation": 0
+      },
+      {
+       "hex": [
+        -1,
+        5
+       ],
+       "kind": "GENTLE_CURVE",
+       "owner": "p1",
+       "rotation": 3
+      },
+      {
+       "hex": [
+        -1,
+        6
+       ],
+       "kind": "STRAIGHT",
+       "owner": "p3",
+       "rotation": 2
+      },
+      {
+       "hex": [
+        -1,
+        7
+       ],
+       "kind": "T_BRANCH",
+       "owner": "p2",
+       "rotation": 5
+      },
+      {
+       "hex": [
+        0,
+        1
+       ],
+       "kind": "T_BRANCH",
+       "owner": "p3",
+       "rotation": 0
+      },
+      {
+       "hex": [
+        0,
+        2
+       ],
+       "kind": "SHARP_CURVE",
+       "owner": "p3",
+       "rotation": 2
+      },
+      {
+       "hex": [
+        0,
+        4
+       ],
+       "kind": "GENTLE_CURVE",
+       "owner": "p2",
+       "rotation": 3
+      },
+      {
+       "hex": [
+        0,
+        5
+       ],
+       "kind": "GENTLE_CURVE",
+       "owner": "p3",
+       "rotation": 0
+      },
+      {
+       "hex": [
+        1,
+        0
+       ],
+       "kind": "SHARP_CURVE",
+       "owner": "p1",
+       "rotation": 4
+      },
+      {
+       "hex": [
+        1,
+        1
+       ],
+       "kind": "GENTLE_CURVE",
+       "owner": "p3",
+       "rotation": 1
+      },
+      {
+       "hex": [
+        2,
+        0
+       ],
+       "kind": "STRAIGHT",
+       "owner": "p2",
+       "rotation": 1
+      }
+     ],
+     "claims": [
+      [
+       [
+        0,
+        7
+       ],
+       "p2"
+      ],
+      [
+       [
+        1,
+        5
+       ],
+       "p3"
+      ]
+     ],
+     "current_player": "p1",
+     "floodgates": [],
+     "market": [
+      "SYMMETRIC_Y",
+      "STRAIGHT",
+      "SHARP_CURVE",
+      "STRAIGHT"
+     ],
+     "pending_face": null,
+     "plantings": [
+      [
+       [
+        0,
+        7
+       ],
+       "MERLOT"
+      ],
+      [
+       [
+        1,
+        5
+       ],
+       "BONARDA"
+      ]
+     ],
+     "players": [
+      {
+       "debt": 2,
+       "drought": 6,
+       "id": "p1",
+       "season": 0,
+       "seat": 1
+      },
+      {
+       "debt": 0,
+       "drought": 6,
+       "id": "p2",
+       "season": 0,
+       "seat": 2
+      },
+      {
+       "debt": 0,
+       "drought": 6,
+       "id": "p3",
+       "season": 0,
+       "seat": 3
+      }
+     ],
+     "round": 7,
+     "season_roll": null,
+     "start_player": "p1"
+    },
+    "game_seed": 8079566442542464984,
+    "log": [
+     {
+      "action": {
+       "hex": [
+        -1,
+        3
+       ],
+       "kind": "SYMMETRIC_Y",
+       "rotation": 1,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 1
+     },
+     {
+      "action": {
+       "hex": [
+        -1,
+        4
+       ],
+       "kind": "STRAIGHT",
+       "rotation": 0,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 1
+     },
+     {
+      "action": {
+       "hex": [
+        0,
+        1
+       ],
+       "kind": "T_BRANCH",
+       "rotation": 0,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p3",
+      "round": 1
+     },
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "DROUGHT",
+      "player": "p1",
+      "round": 2
+     },
+     {
+      "action": {
+       "hex": [
+        0,
+        4
+       ],
+       "kind": "GENTLE_CURVE",
+       "rotation": 3,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 2
+     },
+     {
+      "action": {
+       "hex": [
+        0,
+        5
+       ],
+       "kind": "GENTLE_CURVE",
+       "rotation": 0,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p3",
+      "round": 2
+     },
+     {
+      "action": {
+       "hex": [
+        -2,
+        5
+       ],
+       "kind": "STRAIGHT",
+       "rotation": 0,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 2
+     },
+     {
+      "action": {
+       "hex": [
+        0,
+        2
+       ],
+       "kind": "SHARP_CURVE",
+       "rotation": 2,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p3",
+      "round": 3
+     },
+     {
+      "action": {
+       "hex": [
+        1,
+        0
+       ],
+       "kind": "SHARP_CURVE",
+       "rotation": 4,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 3
+     },
+     {
+      "action": {
+       "hex": [
+        -2,
+        6
+       ],
+       "kind": "GENTLE_CURVE",
+       "rotation": 1,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 3
+     },
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "RELEASE",
+      "player": "p2",
+      "round": 4
+     },
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "RESOW",
+      "player": "p1",
+      "round": 4
+     },
+     {
+      "action": {
+       "type": "DeclineFace"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 4
+     },
+     {
+      "action": {
+       "hex": [
+        -3,
+        7
+       ],
+       "kind": "STRAIGHT",
+       "rotation": 0,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 4
+     },
+     {
+      "action": {
+       "hex": [
+        1,
+        1
+       ],
+       "kind": "GENTLE_CURVE",
+       "rotation": 1,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p3",
+      "round": 4
+     },
+     {
+      "action": {
+       "hex": [
+        2,
+        0
+       ],
+       "kind": "STRAIGHT",
+       "rotation": 1,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 5
+     },
+     {
+      "action": {
+       "hex": [
+        -2,
+        7
+       ],
+       "kind": "GENTLE_CURVE",
+       "rotation": 3,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p3",
+      "round": 5
+     },
+     {
+      "action": {
+       "hex": [
+        -1,
+        5
+       ],
+       "kind": "GENTLE_CURVE",
+       "rotation": 3,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 5
+     },
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "RESOW",
+      "player": "p3",
+      "round": 6
+     },
+     {
+      "action": {
+       "hex": [
+        -1,
+        6
+       ],
+       "kind": "STRAIGHT",
+       "rotation": 2,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p3",
+      "round": 6
+     },
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "DROUGHT",
+      "player": "p1",
+      "round": 6
+     },
+     {
+      "action": {
+       "hex": [
+        -1,
+        7
+       ],
+       "kind": "T_BRANCH",
+       "rotation": 5,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 6
+     }
+    ],
+    "scores": {
+     "p1": {
+      "bodega": 0,
+      "bodegas": 0,
+      "debt": 2,
+      "drought": 1,
+      "player": "p1",
+      "rights_collected": 3,
+      "rights_paid": 0,
+      "season": 0,
+      "seat": 1,
+      "seat_bonus": 0,
+      "total": 0,
+      "vineyards": 0,
+      "watered": 0,
+      "watered_vineyards": []
+     },
+     "p2": {
+      "bodega": 0,
+      "bodegas": 0,
+      "debt": 0,
+      "drought": 3,
+      "player": "p2",
+      "rights_collected": 3,
+      "rights_paid": 6,
+      "season": 0,
+      "seat": 2,
+      "seat_bonus": 0,
+      "total": 0,
+      "vineyards": 6,
+      "watered": 1,
+      "watered_vineyards": [
+       {
+        "hex": [
+         0,
+         7
+        ],
+        "path": {
+         "canals": [
+          [
+           -2,
+           5
+          ],
+          [
+           -1,
+           5
+          ],
+          [
+           -1,
+           6
+          ],
+          [
+           -1,
+           7
+          ]
+         ],
+         "owners": [
+          "p1",
+          "p2",
+          "p3"
+         ]
+        },
+        "pays": [
+         "p1",
+         "p3"
+        ],
+        "varietal": "MERLOT"
+       }
+      ]
+     },
+     "p3": {
+      "bodega": 0,
+      "bodegas": 0,
+      "debt": 0,
+      "drought": 6,
+      "player": "p3",
+      "rights_collected": 3,
+      "rights_paid": 3,
+      "season": 0,
+      "seat": 3,
+      "seat_bonus": 0,
+      "total": 1,
+      "vineyards": 7,
+      "watered": 1,
+      "watered_vineyards": [
+       {
+        "hex": [
+         1,
+         5
+        ],
+        "path": {
+         "canals": [
+          [
+           -1,
+           4
+          ],
+          [
+           0,
+           4
+          ],
+          [
+           0,
+           5
+          ]
+         ],
+         "owners": [
+          "p2",
+          "p3"
+         ]
+        },
+        "pays": [
+         "p2"
+        ],
+        "varietal": "BONARDA"
+       }
+      ]
+     }
+    },
+    "water": [
+     {
+      "canals": [
+       [
+        -2,
+        5
+       ],
+       [
+        -1,
+        5
+       ],
+       [
+        -1,
+        6
+       ],
+       [
+        -1,
+        7
+       ]
+      ],
+      "owners": [
+       "p1",
+       "p2",
+       "p3"
+      ],
+      "vineyard": [
+       0,
+       7
+      ]
+     },
+     {
+      "canals": [
+       [
+        -1,
+        4
+       ],
+       [
+        0,
+        4
+       ],
+       [
+        0,
+        5
+       ]
+      ],
+      "owners": [
+       "p2",
+       "p3"
+      ],
+      "vineyard": [
+       1,
+       5
+      ]
+     }
+    ],
+    "winners": [
+     "p3"
+    ]
+   },
+   {
+    "final": {
+     "bag": [
+      "GENTLE_CURVE",
+      "GENTLE_CURVE",
+      "SYMMETRIC_Y",
+      "GENTLE_CURVE",
+      "T_BRANCH",
+      "STRAIGHT",
+      "STRAIGHT",
+      "SHARP_CURVE",
+      "STRAIGHT",
+      "STRAIGHT",
+      "GENTLE_CURVE",
+      "STRAIGHT",
+      "SHARP_CURVE",
+      "GENTLE_CURVE"
+     ],
+     "canals": [
+      {
+       "hex": [
+        -3,
+        7
+       ],
+       "kind": "SYMMETRIC_Y",
+       "owner": "p2",
+       "rotation": 1
+      },
+      {
+       "hex": [
+        -2,
+        5
+       ],
+       "kind": "CLAW",
+       "owner": "p1",
+       "rotation": 0
+      },
+      {
+       "hex": [
+        -2,
+        6
+       ],
+       "kind": "STRAIGHT",
+       "owner": "p3",
+       "rotation": 1
+      },
+      {
+       "hex": [
+        -1,
+        3
+       ],
+       "kind": "STRAIGHT",
+       "owner": "p2",
+       "rotation": 1
+      },
+      {
+       "hex": [
+        -1,
+        4
+       ],
+       "kind": "STRAIGHT",
+       "owner": "p3",
+       "rotation": 1
+      },
+      {
+       "hex": [
+        -1,
+        5
+       ],
+       "kind": "T_BRANCH",
+       "owner": "p1",
+       "rotation": 1
+      },
+      {
+       "hex": [
+        0,
+        1
+       ],
+       "kind": "GENTLE_CURVE",
+       "owner": "p1",
+       "rotation": 4
+      },
+      {
+       "hex": [
+        0,
+        2
+       ],
+       "kind": "SHARP_CURVE",
+       "owner": "p3",
+       "rotation": 2
+      },
+      {
+       "hex": [
+        0,
+        3
+       ],
+       "kind": "GENTLE_CURVE",
+       "owner": "p2",
+       "rotation": 2
+      },
+      {
+       "hex": [
+        0,
+        4
+       ],
+       "kind": "STRAIGHT",
+       "owner": "p2",
+       "rotation": 1
+      },
+      {
+       "hex": [
+        1,
+        1
+       ],
+       "kind": "SHARP_CURVE",
+       "owner": "p1",
+       "rotation": 3
+      },
+      {
+       "hex": [
+        1,
+        3
+       ],
+       "kind": "STRAIGHT",
+       "owner": "p3",
+       "rotation": 1
+      },
+      {
+       "hex": [
+        2,
+        2
+       ],
+       "kind": "SHARP_CURVE",
+       "owner": "p2",
+       "rotation": 4
+      }
+     ],
+     "claims": [
+      [
+       [
+        2,
+        3
+       ],
+       "p2"
+      ]
+     ],
+     "current_player": "p1",
+     "floodgates": [],
+     "market": [
+      "STRAIGHT",
+      "STRAIGHT",
+      "STRAIGHT",
+      "STRAIGHT"
+     ],
+     "pending_face": null,
+     "plantings": [
+      [
+       [
+        2,
+        3
+       ],
+       "MALBEC"
+      ]
+     ],
+     "players": [
+      {
+       "debt": 1,
+       "drought": 0,
+       "id": "p1",
+       "season": 6,
+       "seat": 1
+      },
+      {
+       "debt": 0,
+       "drought": 0,
+       "id": "p2",
+       "season": 6,
+       "seat": 2
+      },
+      {
+       "debt": 0,
+       "drought": 0,
+       "id": "p3",
+       "season": 6,
+       "seat": 3
+      }
+     ],
+     "round": 7,
+     "season_roll": null,
+     "start_player": "p1"
+    },
+    "game_seed": 3504603675816393008,
+    "log": [
+     {
+      "action": {
+       "hex": [
+        -2,
+        5
+       ],
+       "kind": "CLAW",
+       "rotation": 0,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 1
+     },
+     {
+      "action": {
+       "hex": [
+        -3,
+        7
+       ],
+       "kind": "SYMMETRIC_Y",
+       "rotation": 1,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 1
+     },
+     {
+      "action": {
+       "hex": [
+        -1,
+        4
+       ],
+       "kind": "STRAIGHT",
+       "rotation": 1,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p3",
+      "round": 1
+     },
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "GOOD_SEASON",
+      "player": "p1",
+      "round": 2
+     },
+     {
+      "action": {
+       "hex": [
+        0,
+        3
+       ],
+       "kind": "GENTLE_CURVE",
+       "rotation": 2,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 2
+     },
+     {
+      "action": {
+       "hex": [
+        0,
+        2
+       ],
+       "kind": "SHARP_CURVE",
+       "rotation": 2,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p3",
+      "round": 2
+     },
+     {
+      "action": {
+       "hex": [
+        0,
+        1
+       ],
+       "kind": "GENTLE_CURVE",
+       "rotation": 4,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 2
+     },
+     {
+      "action": {
+       "hex": [
+        -2,
+        6
+       ],
+       "kind": "STRAIGHT",
+       "rotation": 1,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p3",
+      "round": 3
+     },
+     {
+      "action": {
+       "hex": [
+        1,
+        1
+       ],
+       "kind": "SHARP_CURVE",
+       "rotation": 3,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 3
+     },
+     {
+      "action": {
+       "hex": [
+        -1,
+        3
+       ],
+       "kind": "STRAIGHT",
+       "rotation": 1,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 3
+     },
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "RELEASE",
+      "player": "p2",
+      "round": 4
+     },
+     {
+      "action": {
+       "hex": [
+        -1,
+        5
+       ],
+       "kind": "T_BRANCH",
+       "rotation": 1,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 4
+     },
+     {
+      "action": {
+       "hex": [
+        0,
+        4
+       ],
+       "kind": "STRAIGHT",
+       "rotation": 1,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 4
+     },
+     {
+      "action": {
+       "hex": [
+        1,
+        3
+       ],
+       "kind": "STRAIGHT",
+       "rotation": 1,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p3",
+      "round": 4
+     },
+     {
+      "action": {
+       "hex": [
+        2,
+        2
+       ],
+       "kind": "SHARP_CURVE",
+       "rotation": 4,
+       "type": "PlaceCanal"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 5
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p3",
+      "round": 5
+     },
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "RESOW",
+      "player": "p1",
+      "round": 5
+     },
+     {
+      "action": {
+       "hex": [
+        2,
+        3
+       ],
+       "type": "Resow"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 5
+     },
+     {
+      "action": {
+       "type": "RollActionDie"
+      },
+      "face": "RESOW",
+      "player": "p3",
+      "round": 6
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p3",
+      "round": 6
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p1",
+      "round": 6
+     },
+     {
+      "action": {
+       "type": "Pass"
+      },
+      "face": null,
+      "player": "p2",
+      "round": 6
+     }
+    ],
+    "scores": {
+     "p1": {
+      "bodega": 0,
+      "bodegas": 0,
+      "debt": 1,
+      "drought": 0,
+      "player": "p1",
+      "rights_collected": 3,
+      "rights_paid": 0,
+      "season": 6,
+      "seat": 1,
+      "seat_bonus": 0,
+      "total": 8,
+      "vineyards": 0,
+      "watered": 0,
+      "watered_vineyards": []
+     },
+     "p2": {
+      "bodega": 0,
+      "bodegas": 0,
+      "debt": 0,
+      "drought": 0,
+      "player": "p2",
+      "rights_collected": 0,
+      "rights_paid": 6,
+      "season": 6,
+      "seat": 2,
+      "seat_bonus": 0,
+      "total": 6,
+      "vineyards": 6,
+      "watered": 1,
+      "watered_vineyards": [
+       {
+        "hex": [
+         2,
+         3
+        ],
+        "path": {
+         "canals": [
+          [
+           -3,
+           7
+          ],
+          [
+           -2,
+           6
+          ],
+          [
+           -1,
+           5
+          ],
+          [
+           0,
+           4
+          ],
+          [
+           1,
+           3
+          ],
+          [
+           2,
+           2
+          ]
+         ],
+         "owners": [
+          "p1",
+          "p2",
+          "p3"
+         ]
+        },
+        "pays": [
+         "p1",
+         "p3"
+        ],
+        "varietal": "MALBEC"
+       }
+      ]
+     },
+     "p3": {
+      "bodega": 0,
+      "bodegas": 0,
+      "debt": 0,
+      "drought": 0,
+      "player": "p3",
+      "rights_collected": 3,
+      "rights_paid": 0,
+      "season": 6,
+      "seat": 3,
+      "seat_bonus": 0,
+      "total": 9,
+      "vineyards": 0,
+      "watered": 0,
+      "watered_vineyards": []
+     }
+    },
+    "water": [
+     {
+      "canals": [
+       [
+        -3,
+        7
+       ],
+       [
+        -2,
+        6
+       ],
+       [
+        -1,
+        5
+       ],
+       [
+        0,
+        4
+       ],
+       [
+        1,
+        3
+       ],
+       [
+        2,
+        2
+       ]
+      ],
+      "owners": [
+       "p1",
+       "p2",
+       "p3"
+      ],
+      "vineyard": [
+       2,
+       3
+      ]
+     }
+    ],
+    "winners": [
+     "p3"
+    ]
+   }
+  ],
+  "n": 3,
+  "seed": 12606,
+  "simulate_game": {
+   "actions_per_game": {
+    "bribe": 0.0,
+    "canal": 14.0,
+    "decline": 0.3333333333333333,
+    "die": 4.666666666666667,
+    "floodgate": 0.3333333333333333,
+    "pass": 2.3333333333333335,
+    "release": 0.0,
+    "resow": 0.6666666666666666
+   },
+   "bodega_rate": 0.0,
+   "die_faces_per_game": {
+    "drought": 0.6666666666666666,
+    "floodgate": 0.3333333333333333,
+    "good_season": 0.3333333333333333,
+    "release": 1.0,
+    "resow": 2.3333333333333335
+   },
+   "die_use_rate": 0.9285714285714286,
+   "games_with_bribe": 0.0,
+   "games_with_die": 1.0,
+   "games_with_floodgate": 0.3333333333333333,
+   "mean_total_by_position": [
+    4.0,
+    2.0,
+    5.333333333333333
+   ],
+   "mode": "flash",
+   "n": 3,
+   "players": 3,
+   "policies": [
+    "random",
+    "greedy",
+    "score_aware"
+   ],
+   "preset": {
+    "action_die": [
+     "floodgate",
+     "release",
+     "resow",
+     "resow",
+     "good_season",
+     "drought"
+    ],
+    "action_die_cost": 1,
+    "bag_mix": {
+     "claw": 5,
+     "floodgate": 0,
+     "gentle_curve": 22,
+     "sharp_curve": 17,
+     "straight": 44,
+     "symmetric_y": 6,
+     "t_branch": 6
+    },
+    "bodega_points": 3,
+    "bodega_varietals": 3,
+    "bribe_rules": "action_die",
+    "die_faces": 6,
+    "drought_points": null,
+    "grape_clusters_per_player": null,
+    "hexes_per_player": 14,
+    "market_size": 4,
+    "mode": "flash",
+    "multiple_bodegas": true,
+    "roulette": [
+     "malbec",
+     "malbec",
+     "cabernet_sauvignon",
+     "cabernet_sauvignon",
+     "syrah",
+     "syrah",
+     "merlot",
+     "merlot",
+     "torrontes",
+     "torrontes",
+     "chardonnay",
+     "chardonnay",
+     "bonarda",
+     "cabernet_franc"
+    ],
+    "rounds": {
+     "2": 6,
+     "3": 6
+    },
+    "season_points": null,
+    "season_roll_every": 2,
+    "season_roll_personal_faces": false,
+    "seat_bonus": {},
+    "stone_share": 10,
+    "varietal_points": {
+     "bonarda": 7,
+     "cabernet_franc": 7,
+     "cabernet_sauvignon": 6,
+     "chardonnay": 6,
+     "malbec": 6,
+     "merlot": 6,
+     "syrah": 6,
+     "torrontes": 6
+    },
+    "varietal_rules": "roulette",
+    "vineyard_distance": [
+     4,
+     4
+    ],
+    "vineyards_per_player": 2,
+    "water_right_points": 3
+   },
+   "score_terms": {
+    "bodega": {
+     "mean": 0.0,
+     "stdev": 0.0
+    },
+    "debt": {
+     "mean": 0.5555555555555556,
+     "stdev": 0.8314794192830981
+    },
+    "drought": {
+     "mean": 1.1111111111111112,
+     "stdev": 1.9688939051854835
+    },
+    "rights_collected": {
+     "mean": 3.0,
+     "stdev": 2.0
+    },
+    "rights_paid": {
+     "mean": 3.0,
+     "stdev": 4.0
+    },
+    "season": {
+     "mean": 2.0,
+     "stdev": 2.8284271247461903
+    },
+    "total": {
+     "mean": 3.7777777777777777,
+     "stdev": 3.4246744460938756
+    },
+    "vineyards": {
+     "mean": 3.4444444444444446,
+     "stdev": 4.192880503136268
+    }
+   },
+   "seed": 12606,
+   "shared_win_rate": 0.0,
+   "turn_order_advantage": 2.0,
+   "turns_per_game": 22.333333333333332,
+   "win_rate_bribers": null,
+   "win_rate_by_policy": {
+    "greedy": 0.0,
+    "random": 0.0,
+    "score_aware": 1.0
+   },
+   "win_rate_by_position": [
+    0.0,
+    0.0,
+    1.0
+   ],
+   "win_rate_by_seat": [
+    0.0,
+    0.0,
+    1.0
+   ],
+   "win_rate_non_bribers": 0.3333333333333333,
+   "winner_varietal_rate": {
+    "bonarda": 0.3333333333333333,
+    "cabernet_franc": 0.0,
+    "cabernet_sauvignon": 0.0,
+    "chardonnay": 0.0,
+    "malbec": 0.0,
+    "merlot": 0.0,
+    "syrah": 0.0,
+    "torrontes": 0.0
+   },
+   "winning_score": {
+    "mean": 5.333333333333333,
+    "stdev": 3.2998316455372216
+   }
+  }
+ }
+}
