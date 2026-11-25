@@ -57,6 +57,20 @@ class BribeRules(Enum):
     ACTION_DIE = "action_die"
 
 
+class PlantingRules(Enum):
+    """Where vineyards grow.
+
+    ``HEXES``: on vineyard tiles the board generator places (Rules v1 and
+    v2, the shipped game). ``VERTICES``: on hex vertices, like Catan
+    settlements (Rules v3, #149): the board has no vineyard tiles, every
+    vertex touching a non-river hex is a planting spot, and a player plants
+    one next to their own watered canal. Needs roulette varietal rules.
+    """
+
+    HEXES = "hexes"
+    VERTICES = "vertices"
+
+
 ACTION_DIE_FACES: tuple[DieFace, ...] = (
     DieFace.FLOODGATE,
     DieFace.FLOODGATE,
@@ -193,6 +207,12 @@ class Preset:
     has one int >= 0 per player. The bonus is a term
     of the final score (``acequias.scoring``). It is read-only, keyed in
     player count order.
+
+    ``planting`` (``HEXES`` by default and in the shipped presets) says
+    where vineyards grow: on vineyard tiles, or on vertices (Rules v3,
+    opt-in). Under ``VERTICES`` the board has no vineyard tiles, so
+    ``vineyards_per_player`` and ``vineyard_distance`` place nothing, and
+    roulette varietal rules are required.
     """
 
     mode: Mode
@@ -220,6 +240,7 @@ class Preset:
     multiple_bodegas: bool = False
     season_roll_personal_faces: bool = True
     seat_bonus: Mapping[int, tuple[int, ...]] = field(default_factory=lambda: MappingProxyType({}))
+    planting: PlantingRules = PlantingRules.HEXES
 
     def __post_init__(self) -> None:
         _check_type("mode", self.mode, Mode)
@@ -254,6 +275,12 @@ class Preset:
         _check_type("multiple_bodegas", self.multiple_bodegas, bool)
         _check_type("season_roll_personal_faces", self.season_roll_personal_faces, bool)
         _set(self, "seat_bonus", _seat_bonus(self.seat_bonus, self.player_counts))
+        _check_type("planting", self.planting, PlantingRules)
+        if (
+            self.planting is PlantingRules.VERTICES
+            and self.varietal_rules is not VarietalRules.ROULETTE
+        ):
+            raise ValueError("vertex planting needs roulette varietal rules")
         if self.season_roll_every is not None and self.bribe_rules is not BribeRules.ACTION_DIE:
             raise ValueError("season_roll_every needs action_die bribe rules")
         if self.bribe_rules is BribeRules.ACTION_DIE:
@@ -285,13 +312,20 @@ class Preset:
             )
         for players in self.player_counts:
             hexes = players * self.hexes_per_player
-            vineyards = players * self.vineyards_per_player
+            vineyards = players * self.vineyard_tiles_per_player
             stones = _ceil_share(self.stone_share, hexes)
             if vineyards + stones >= hexes:
                 raise ValueError(
                     f"with {players} players, {vineyards} vineyards and {stones} stone hexes "
                     f"leave no empty hex out of {hexes}"
                 )
+
+    @property
+    def vineyard_tiles_per_player(self) -> int:
+        """Vineyard tiles per player on the board: ``vineyards_per_player``, or 0 under vertex planting."""
+        if self.planting is PlantingRules.VERTICES:
+            return 0
+        return self.vineyards_per_player
 
     @property
     def season_gain(self) -> int:

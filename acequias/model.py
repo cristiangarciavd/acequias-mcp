@@ -22,7 +22,7 @@ from types import MappingProxyType
 from collections.abc import Iterable, Mapping
 from typing import TYPE_CHECKING
 
-from acequias.hex import Direction, Hex
+from acequias.hex import Direction, Hex, Vertex
 
 if TYPE_CHECKING:
     from acequias.config import Preset
@@ -240,6 +240,24 @@ def _edge(hex: Hex, direction: Direction) -> frozenset[tuple[Hex, Direction]]:
     return frozenset({(hex, direction), (hex.neighbor(direction), direction.opposite())})
 
 
+@dataclass(frozen=True, slots=True)
+class PlantedVineyard:
+    """A vineyard planted on a vertex (Rules v3): its spot, its owner, and its varietal.
+
+    Planting makes the vineyard its planter's at once, with the varietal
+    the roulette gave it; there is no separate claim.
+    """
+
+    vertex: Vertex
+    owner: str
+    varietal: Varietal
+
+    def __post_init__(self) -> None:
+        _check_type("PlantedVineyard.vertex", self.vertex, Vertex)
+        _check_type("PlantedVineyard.owner", self.owner, str)
+        _check_type("PlantedVineyard.varietal", self.varietal, Varietal)
+
+
 # --- Board -----------------------------------------------------------------
 
 
@@ -252,6 +270,15 @@ class Board:
     vineyard whose tile has no varietal with the varietal the roulette
     planted there. The board checks where pieces may sit, not who owns
     them: ``GameState`` checks owners against its players.
+
+    Rules v3 (``PlantingRules.VERTICES``) plants vineyards on vertices
+    instead. ``planted`` holds those vineyards, at most one per vertex, each
+    on a vertex that touches a non-river tile. ``spots`` lists the planting
+    spots the generator dealt (every vertex touching a non-river tile); it
+    describes the printed board only: where a player may plant is worked out
+    from the placed canals (``acequias.flow.can_plant``), never from
+    ``spots``, so the same rules work on a board without fixed bounds. Both
+    are empty on a board of hex vineyards.
     """
 
     tiles: tuple[Tile, ...] = ()
@@ -259,11 +286,17 @@ class Board:
     floodgates: tuple[Floodgate, ...] = ()
     claims: tuple[tuple[Hex, str], ...] = ()
     plantings: tuple[tuple[Hex, Varietal], ...] = ()
+    spots: tuple[Vertex, ...] = ()
+    planted: tuple[PlantedVineyard, ...] = ()
 
     _tile_index: Mapping[Hex, Tile] = field(init=False, repr=False, compare=False)
     _canal_index: Mapping[Hex, PlacedCanal] = field(init=False, repr=False, compare=False)
     _claim_index: Mapping[Hex, str] = field(init=False, repr=False, compare=False)
     _planting_index: Mapping[Hex, Varietal] = field(init=False, repr=False, compare=False)
+    _spot_set: frozenset[Vertex] = field(init=False, repr=False, compare=False)
+    _planted_index: Mapping[Vertex, PlantedVineyard] = field(
+        init=False, repr=False, compare=False
+    )
     _floodgate_index: Mapping[frozenset, Floodgate] = field(
         init=False, repr=False, compare=False
     )
@@ -279,6 +312,8 @@ class Board:
         floodgates = _items("Board.floodgates", self.floodgates, Floodgate)
         claims = _claim_items(self.claims)
         plantings = _planting_items(self.plantings)
+        spots = _items("Board.spots", self.spots, Vertex)
+        planted = _items("Board.planted", self.planted, PlantedVineyard)
 
         tile_index: dict[Hex, Tile] = {}
         for tile in tiles:
@@ -337,11 +372,33 @@ class Board:
                 raise ValueError(f"planting on {hex}, an unclaimed vineyard")
             planting_index[hex] = varietal
 
+        spot_set: set[Vertex] = set()
+        for spot in spots:
+            if spot in spot_set:
+                raise ValueError(f"two planting spots on {spot}")
+            if not _touches_land(spot, tile_index):
+                raise ValueError(f"planting spot {spot} touches no non-river tile")
+            spot_set.add(spot)
+
+        planted_index: dict[Vertex, PlantedVineyard] = {}
+        for vineyard in planted:
+            if not _touches_land(vineyard.vertex, tile_index):
+                raise ValueError(
+                    f"vineyard planted on {vineyard.vertex}, which touches no non-river tile"
+                )
+            if vineyard.vertex in planted_index:
+                raise ValueError(f"two vineyards planted on {vineyard.vertex}")
+            planted_index[vineyard.vertex] = vineyard
+
         _set(self, "tiles", tuple(sorted(tiles, key=lambda t: t.hex)))
         _set(self, "canals", tuple(sorted(canals, key=lambda c: c.hex)))
         _set(self, "floodgates", tuple(sorted(floodgates, key=_floodgate_key)))
         _set(self, "claims", tuple(sorted(claims)))
         _set(self, "plantings", tuple(sorted(plantings, key=_planting_order)))
+        _set(self, "spots", tuple(sorted(spot_set)))
+        _set(self, "planted", tuple(sorted(planted, key=_planted_order)))
+        _set(self, "_spot_set", frozenset(spot_set))
+        _set(self, "_planted_index", MappingProxyType(planted_index))
         _set(self, "_tile_index", MappingProxyType(tile_index))
         _set(self, "_canal_index", MappingProxyType(canal_index))
         _set(self, "_claim_index", MappingProxyType(claim_index))
@@ -366,6 +423,19 @@ class Board:
         if tile is not None and tile.varietal is not None:
             return tile.varietal
         return self._planting_index.get(hex)
+
+    def is_spot(self, vertex: Vertex) -> bool:
+        """Whether ``vertex`` is a planting spot (Rules v3)."""
+        return vertex in self._spot_set
+
+    def planted_at(self, vertex: Vertex) -> PlantedVineyard | None:
+        """The vineyard planted on ``vertex``, or None."""
+        return self._planted_index.get(vertex)
+
+    def vertex_tiles(self, vertex: Vertex) -> tuple[Tile, ...]:
+        """The tiles ``vertex`` touches, in hex order: 3, or fewer on the edge of the board."""
+        index = self._tile_index
+        return tuple(index[h] for h in vertex.hexes if h in index)
 
     def floodgate_at(self, hex: Hex, direction: Direction) -> Floodgate | None:
         """The floodgate on the edge of ``hex`` facing ``direction``, from either side, or None."""
@@ -392,6 +462,7 @@ class Board:
         floodgates: tuple[Floodgate, ...] | None = None,
         claims: tuple[tuple[Hex, str], ...] | None = None,
         plantings: tuple[tuple[Hex, Varietal], ...] | None = None,
+        planted: tuple[PlantedVineyard, ...] | None = None,
     ) -> Board:
         """This board with some collections replaced, for callers that checked every piece.
 
@@ -431,6 +502,15 @@ class Board:
             plantings = tuple(sorted(plantings, key=_planting_order))
             _set(new, "plantings", plantings)
             _set(new, "_planting_index", MappingProxyType(dict(plantings)))
+        _set(new, "spots", self.spots)
+        _set(new, "_spot_set", self._spot_set)
+        if planted is None:
+            _set(new, "planted", self.planted)
+            _set(new, "_planted_index", self._planted_index)
+        else:
+            planted = tuple(sorted(planted, key=_planted_order))
+            _set(new, "planted", planted)
+            _set(new, "_planted_index", MappingProxyType({v.vertex: v for v in planted}))
         return new
 
 
@@ -481,6 +561,19 @@ def _canal_order(canal: PlacedCanal) -> Hex:
 
 def _planting_order(planting: tuple[Hex, Varietal]) -> Hex:
     return planting[0]
+
+
+def _touches_land(vertex: Vertex, tile_index: Mapping[Hex, Tile]) -> bool:
+    """Whether ``vertex`` touches at least one non-river tile."""
+    for h in vertex.hexes:
+        tile = tile_index.get(h)
+        if tile is not None and tile.terrain is not Terrain.RIVER:
+            return True
+    return False
+
+
+def _planted_order(vineyard: PlantedVineyard) -> Vertex:
+    return vineyard.vertex
 
 
 def _floodgate_key(gate: Floodgate) -> tuple[Hex, Hex, int, int]:
@@ -598,6 +691,12 @@ class GameState:
         for hex, player_id in self.board.claims:
             if player_id not in known:
                 raise ValueError(f"claim on {hex} by unknown player {player_id!r}")
+        for vineyard in self.board.planted:
+            if vineyard.owner not in known:
+                raise ValueError(
+                    f"vineyard on {vineyard.vertex} planted by unknown player {vineyard.owner!r}"
+                )
+        self._check_planting()
         self._check_varietals()
         self._check_clusters()
         self._check_pending_face()
@@ -638,6 +737,23 @@ class GameState:
                 "season_roll is ROLLED exactly while the season roll's face is pending"
             )
 
+    def _check_planting(self) -> None:
+        """The board's vineyards fit the preset's planting rules.
+
+        Hex planting: no planting spots and nothing planted on a vertex.
+        Vertex planting (Rules v3): no vineyard tiles, so no claims either.
+        """
+        from acequias.config import PlantingRules  # local: config imports this module
+        from acequias.config import preset as shipped_preset
+
+        preset = self.preset if self.preset is not None else shipped_preset(self.mode)
+        board = self.board
+        if preset.planting is PlantingRules.VERTICES:
+            if any(t.terrain is Terrain.VINEYARD for t in board.tiles):
+                raise ValueError("under vertex planting the board has no vineyard tiles")
+        elif board.spots or board.planted:
+            raise ValueError("under hex planting the board has no planting spots or vertex vineyards")
+
     def _check_clusters(self) -> None:
         """With a grape-cluster cap, no player holds more claims than the cap."""
         from acequias.config import preset as shipped_preset  # local: config imports this module
@@ -649,6 +765,8 @@ class GameState:
         held: dict[str, int] = {}
         for _, player_id in self.board.claims:
             held[player_id] = held.get(player_id, 0) + 1
+        for vineyard in self.board.planted:
+            held[vineyard.owner] = held.get(vineyard.owner, 0) + 1
         over = sorted(p for p, n in held.items() if n > cap)
         if over:
             raise ValueError(

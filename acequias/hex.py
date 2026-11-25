@@ -119,6 +119,54 @@ class Hex:
             points.append((cx + size * math.cos(angle), cy - size * math.sin(angle)))
         return tuple(points)
 
+    def vertex(self, corner: int) -> Vertex:
+        """The vertex at corner ``corner`` (0 to 5) of this hex, in ``corners`` order.
+
+        Corner ``i`` sits between the edges facing ``list(Direction)[i - 1]``
+        and ``list(Direction)[i]``, so it touches this hex and those two
+        neighbours.
+        """
+        if not isinstance(corner, int) or isinstance(corner, bool):
+            raise TypeError(f"corner must be an int, got {corner!r}")
+        if not 0 <= corner < 6:
+            raise ValueError(f"corner must be 0 to 5, got {corner}")
+        before, after = _MEMBERS[corner - 1], _MEMBERS[corner]
+        return Vertex((self, self.neighbor(before), self.neighbor(after)))
+
+    def vertices(self) -> tuple[Vertex, ...]:
+        """The 6 vertices of this hex, in ``corners`` order (ESE, ENE, N, WNW, WSW, S)."""
+        return tuple(self.vertex(i) for i in range(6))
+
+
+@dataclass(frozen=True, slots=True, order=True)
+class Vertex:
+    """A hex vertex: the point where 3 mutually adjacent hexes meet.
+
+    It is stored as its 3 hexes in ``Hex`` order, so the same vertex reached
+    from any of its hexes is equal and hashes the same, and vertices sort
+    by that tuple. On the edge of a board some of the 3 hexes may have no
+    tile (``acequias.model.Board.vertex_tiles``).
+    """
+
+    hexes: tuple[Hex, Hex, Hex]
+
+    def __post_init__(self) -> None:
+        hexes = self.hexes
+        if isinstance(hexes, (str, bytes)) or not hasattr(hexes, "__iter__"):
+            raise TypeError(f"Vertex.hexes must be 3 hexes, got {hexes!r}")
+        hexes = tuple(hexes)
+        if len(hexes) != 3 or not all(isinstance(h, Hex) for h in hexes):
+            raise TypeError(f"Vertex.hexes must be 3 hexes, got {self.hexes!r}")
+        a, b, c = sorted(hexes)
+        if a.distance(b) != 1 or a.distance(c) != 1 or b.distance(c) != 1:
+            raise ValueError(f"the hexes of a vertex must be mutually adjacent, got {hexes!r}")
+        object.__setattr__(self, "hexes", (a, b, c))
+
+    def to_pixel(self, size: float) -> tuple[float, float]:
+        """This vertex in the plane of ``Hex.to_pixel``: the mean of its 3 hex centers."""
+        points = [h.to_pixel(size) for h in self.hexes]
+        return (sum(p[0] for p in points) / 3, sum(p[1] for p in points) / 3)
+
 
 class Direction(Enum):
     """The 6 neighbor directions of a pointy-top hex, counterclockwise from east."""
