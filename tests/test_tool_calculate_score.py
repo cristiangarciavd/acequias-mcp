@@ -19,6 +19,9 @@ from server.schemas import (
     players_from_json,
 )
 
+PIN_RULES_V1 = True
+"""``conftest.py``: these tests check the engine under the Rules v1 presets."""
+
 pytestmark = pytest.mark.anyio
 
 KINDS = ["straight", "gentle_curve", "sharp_curve", "symmetric_y", "t_branch", "claw"]

@@ -5,9 +5,14 @@ from pathlib import Path
 import pytest
 
 from acequias.board import generate_board
-from acequias.config import FLASH, NORMAL, PLAYER_COUNTS, preset, with_overrides
+from acequias.config import PLAYER_COUNTS, preset, with_overrides
 from acequias.model import GameState, Mode, PieceKind, Player, Terrain
 from acequias.setup import bag_counts, new_game
+from acequias.config import RULES_V1
+
+PIN_RULES_V1 = True
+"""``conftest.py``: these tests check the engine under the Rules v1 presets."""
+NORMAL, FLASH = RULES_V1[Mode.NORMAL], RULES_V1[Mode.FLASH]
 
 MODES = list(Mode)
 STRAIGHT, GENTLE, SHARP, Y, T, CLAW, GATE = list(PieceKind)

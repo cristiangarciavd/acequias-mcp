@@ -7,14 +7,18 @@ import pytest
 from acequias import config
 from acequias.config import (
     ACTION_DIE_FACES,
+    CONSTRUCTIVE_DIE_FACES,
     FLASH,
     NORMAL,
     ROULETTE_POINTS,
     ROULETTE_SECTORS,
+    RULES_V1,
+    SHIPPED_POINTS,
     BribeRules,
     Preset,
     VarietalRules,
     action_die_rules,
+    players_text,
     preset,
     roulette_rules,
     scaled,
@@ -24,6 +28,8 @@ from acequias.model import MAX_PLAYERS, MIN_PLAYERS, DieFace, Mode, PieceKind, V
 
 PRESETS = [NORMAL, FLASH]
 PLAYER_COUNTS = range(MIN_PLAYERS, MAX_PLAYERS + 1)
+V1 = RULES_V1[Mode.NORMAL]
+"""The Rules v1 Normal preset: fixed varietals and the d6 bribe."""
 COUNT_FIELDS = [
     "hexes_per_player",
     "vineyards_per_player",
@@ -60,7 +66,7 @@ def assert_raises(p, exc, match=None, **changes):
 
 # --- Shipped values (README.md) -------------------------------------------
 
-README_BAG_MIX = {
+V1_BAG_MIX = {
     PieceKind.STRAIGHT: 40,
     PieceKind.GENTLE_CURVE: 20,
     PieceKind.SHARP_CURVE: 15,
@@ -69,38 +75,58 @@ README_BAG_MIX = {
     PieceKind.CLAW: 5,
     PieceKind.FLOODGATE: 10,
 }
+README_BAG_MIX = {
+    PieceKind.STRAIGHT: 44,
+    PieceKind.GENTLE_CURVE: 22,
+    PieceKind.SHARP_CURVE: 17,
+    PieceKind.SYMMETRIC_Y: 6,
+    PieceKind.T_BRANCH: 6,
+    PieceKind.CLAW: 5,
+    PieceKind.FLOODGATE: 0,
+}
 
-README_VARIETAL_POINTS = {Varietal.MALBEC: 3, Varietal.BONARDA: 2, Varietal.TORRONTES: 1}
+V1_VARIETAL_POINTS = {Varietal.MALBEC: 3, Varietal.BONARDA: 2, Varietal.TORRONTES: 1}
+README_VARIETAL_POINTS = {
+    Varietal.MALBEC: 6,
+    Varietal.CABERNET_SAUVIGNON: 6,
+    Varietal.CABERNET_FRANC: 7,
+    Varietal.SYRAH: 6,
+    Varietal.MERLOT: 6,
+    Varietal.BONARDA: 7,
+    Varietal.TORRONTES: 6,
+    Varietal.CHARDONNAY: 6,
+}
 
+# Rules v2, approved by the owner on #103 and shipped in #126.
 README_VALUES = {
     Mode.NORMAL: dict(
         rounds={2: 10, 3: 15, 4: 12, 5: 10},
-        hexes_per_player=15,
+        hexes_per_player=18,
         vineyards_per_player=2,
         stone_share=10,
         vineyard_distance=(4, 4),
         market_size=4,
         bag_mix=README_BAG_MIX,
         die_faces=6,
-        bodega_points=2,
+        bodega_points=6,
         bodega_varietals=3,
-        water_right_points=1,
-        varietal_rules=VarietalRules.FIXED,
+        water_right_points=3,
+        varietal_rules=VarietalRules.ROULETTE,
         varietal_points=README_VARIETAL_POINTS,
         roulette=ROULETTE_SECTORS,
         grape_clusters_per_player=None,
-        bribe_rules=BribeRules.D6,
-        action_die_cost=2,
-        action_die=ACTION_DIE_FACES,
+        bribe_rules=BribeRules.ACTION_DIE,
+        action_die_cost=1,
+        action_die=CONSTRUCTIVE_DIE_FACES,
         season_points=None,
         drought_points=None,
-        season_roll_every=None,
-        multiple_bodegas=False,
-        season_roll_personal_faces=True,
+        season_roll_every=3,
+        multiple_bodegas=True,
+        season_roll_personal_faces=False,
         seat_bonus={},
     ),
     Mode.FLASH: dict(
-        rounds={2: 6, 3: 6, 4: 4, 5: 4},
+        rounds={2: 6, 3: 6},
         hexes_per_player=14,
         vineyards_per_player=2,
         stone_share=10,
@@ -108,33 +134,77 @@ README_VALUES = {
         market_size=4,
         bag_mix=README_BAG_MIX,
         die_faces=6,
-        bodega_points=1,
+        bodega_points=3,
         bodega_varietals=3,
-        water_right_points=1,
-        varietal_rules=VarietalRules.FIXED,
+        water_right_points=3,
+        varietal_rules=VarietalRules.ROULETTE,
         varietal_points=README_VARIETAL_POINTS,
         roulette=ROULETTE_SECTORS,
         grape_clusters_per_player=None,
-        bribe_rules=BribeRules.D6,
-        action_die_cost=2,
-        action_die=ACTION_DIE_FACES,
+        bribe_rules=BribeRules.ACTION_DIE,
+        action_die_cost=1,
+        action_die=CONSTRUCTIVE_DIE_FACES,
         season_points=None,
         drought_points=None,
-        season_roll_every=None,
-        multiple_bodegas=False,
-        season_roll_personal_faces=True,
+        season_roll_every=2,
+        multiple_bodegas=True,
+        season_roll_personal_faces=False,
         seat_bonus={},
     ),
 }
+
+# Rules v1: shipped from #20 until #126, kept as ``RULES_V1``.
+V1_VALUES = {
+    mode: dict(
+        README_VALUES[mode],
+        rounds=rounds,
+        hexes_per_player=hexes,
+        bag_mix=V1_BAG_MIX,
+        bodega_points=bodega,
+        water_right_points=1,
+        varietal_rules=VarietalRules.FIXED,
+        varietal_points=V1_VARIETAL_POINTS,
+        bribe_rules=BribeRules.D6,
+        action_die_cost=2,
+        action_die=ACTION_DIE_FACES,
+        season_roll_every=None,
+        multiple_bodegas=False,
+        season_roll_personal_faces=True,
+    )
+    for mode, rounds, hexes, bodega in (
+        (Mode.NORMAL, {2: 10, 3: 15, 4: 12, 5: 10}, 15, 2),
+        (Mode.FLASH, {2: 6, 3: 6, 4: 4, 5: 4}, 14, 1),
+    )
+}
+
+
+def plain(p):
+    """``p``'s fields without ``mode``, its mappings as dicts."""
+    return {
+        k: dict(v) if k in ("rounds", "bag_mix", "varietal_points", "seat_bonus") else v
+        for k, v in fields_of(p).items()
+        if k != "mode"
+    }
 
 
 @pytest.mark.parametrize("mode", list(Mode), ids=lambda m: m.name)
 def test_shipped_values_match_readme(mode):
     p = preset(mode)
-    expected = README_VALUES[mode]
-    actual = fields_of(p)
-    assert actual.pop("mode") is mode
-    assert {k: dict(v) if k in ("rounds", "bag_mix", "varietal_points") else v for k, v in actual.items()} == expected
+    assert p.mode is mode
+    assert plain(p) == README_VALUES[mode]
+
+
+@pytest.mark.parametrize("mode", list(Mode), ids=lambda m: m.name)
+def test_rules_v1_keeps_the_values_shipped_before_126(mode):
+    p = RULES_V1[mode]
+    assert p.mode is mode
+    assert plain(p) == V1_VALUES[mode]
+
+
+def test_shipped_points_are_the_roulette_points_at_scale_3_with_rare_plus_1():
+    assert SHIPPED_POINTS == NORMAL.varietal_points == FLASH.varietal_points
+    rare = {Varietal.BONARDA, Varietal.CABERNET_FRANC}
+    assert dict(SHIPPED_POINTS) == {v: 6 + (v in rare) for v in ROULETTE_POINTS}
 
 
 def test_readme_distances_need_the_readme_canal_counts():
@@ -144,7 +214,7 @@ def test_readme_distances_need_the_readme_canal_counts():
 
 
 def test_flash_has_fewer_rounds_for_every_player_count():
-    for players in PLAYER_COUNTS:
+    for players in FLASH.player_counts:
         assert FLASH.rounds_for(players) < NORMAL.rounds_for(players)
 
 
@@ -175,9 +245,9 @@ def test_bag_mix_is_keyed_by_piece_kind(p):
     assert set(p.bag_mix) == set(PieceKind)
 
 
-@ids
-def test_rounds_has_one_value_per_player_count(p):
-    assert set(p.rounds) == set(PLAYER_COUNTS)
+def test_normal_is_for_2_to_5_players_and_flash_for_2_to_3():
+    assert NORMAL.player_counts == (2, 3, 4, 5)
+    assert FLASH.player_counts == (2, 3)
 
 
 # --- preset() --------------------------------------------------------------
@@ -199,15 +269,71 @@ def test_preset_rejects_non_mode(bad):
 
 @ids
 def test_rounds_for_each_player_count(p):
-    for players in PLAYER_COUNTS:
+    for players in p.player_counts:
         assert p.rounds_for(players) == p.rounds[players]
 
 
 @ids
 @pytest.mark.parametrize("players", [0, 1, 6, -2])
 def test_rounds_for_out_of_range(p, players):
-    with pytest.raises(ValueError, match="2 to 5"):
+    with pytest.raises(ValueError, match=f"{p.mode.value} mode is for 2 to"):
         p.rounds_for(players)
+
+
+@pytest.mark.parametrize("players", [4, 5])
+def test_flash_rejects_4_and_5_players_with_a_clear_error(players):
+    with pytest.raises(ValueError, match=f"^flash mode is for 2 to 3 players, got {players}$"):
+        FLASH.check_players(players)
+    with pytest.raises(ValueError, match="flash mode is for 2 to 3 players"):
+        FLASH.rounds_for(players)
+    NORMAL.check_players(players)
+
+
+@ids
+@pytest.mark.parametrize("players", [True, 2.0, "2", None])
+def test_check_players_non_int(p, players):
+    with pytest.raises(TypeError):
+        p.check_players(players)
+
+
+@pytest.mark.parametrize(
+    ("counts", "text"), [((2, 3, 4, 5), "2 to 5"), ((2, 3), "2 to 3"), ((3,), "3"), ((2, 3, 5), "2, 3 or 5")]
+)
+def test_players_text(counts, text):
+    assert players_text(counts) == text
+
+
+def test_rounds_can_cover_some_player_counts_only():
+    p = with_overrides(NORMAL, rounds={5: 9, 2: 7})
+    assert p.player_counts == (2, 5)
+    assert list(p.rounds.items()) == [(2, 7), (5, 9)]
+    with pytest.raises(ValueError, match="normal mode is for 2 or 5 players, got 3"):
+        p.rounds_for(3)
+
+
+def test_flash_can_be_given_4_and_5_players_back_by_overrides():
+    p = with_overrides(FLASH, rounds={2: 6, 3: 6, 4: 4, 5: 4})
+    assert p.rounds_for(5) == 4
+
+
+@ids
+def test_rounds_cannot_be_empty(p):
+    assert_raises(p, ValueError, match="at least one player count", rounds={})
+
+
+def test_board_capacity_is_checked_only_for_the_player_counts_played():
+    # 2 hexes/player, 1 vineyard/player, 26% stone fills a 2-player board
+    # (see test_board_capacity_rounds_stones_up) but not a 5-player one.
+    with pytest.raises(ValueError, match="2 players"):
+        with_overrides(NORMAL, hexes_per_player=2, vineyards_per_player=1, stone_share=26)
+    p = with_overrides(NORMAL, hexes_per_player=2, vineyards_per_player=1, stone_share=26, rounds={5: 4})
+    assert p.player_counts == (5,)
+
+
+def test_seat_bonus_only_for_player_counts_in_rounds():
+    with pytest.raises(ValueError, match=r"seat_bonus gives player counts \[4\]; rounds has only 2 to 3"):
+        with_overrides(FLASH, seat_bonus={4: (1, 1, 1, 0)})
+    assert with_overrides(FLASH, seat_bonus={3: (1, 0, 0)}).seat_bonus[3] == (1, 0, 0)
 
 
 @ids
@@ -247,7 +373,7 @@ def test_bag_mix_cannot_be_changed_in_place(p):
         p.bag_mix[PieceKind.STRAIGHT] = 0
     with pytest.raises(TypeError):
         del p.bag_mix[PieceKind.CLAW]
-    assert p.bag_mix[PieceKind.STRAIGHT] == 40
+    assert p.bag_mix[PieceKind.STRAIGHT] == 44
 
 
 @ids
@@ -262,7 +388,7 @@ def test_mutating_the_input_dicts_does_not_change_the_preset():
     rounds[2] = 1
     mix[PieceKind.STRAIGHT] = 0
     assert p.rounds_for(2) == 9
-    assert p.bag_mix[PieceKind.STRAIGHT] == 40
+    assert p.bag_mix[PieceKind.STRAIGHT] == 44
 
 
 def test_list_distance_is_stored_as_a_tuple():
@@ -286,7 +412,7 @@ def test_with_overrides_returns_a_new_preset_and_leaves_the_original():
     assert p.mode is Mode.NORMAL
     assert p != NORMAL
     assert fields_of(NORMAL) == before
-    assert NORMAL.hexes_per_player == 15
+    assert NORMAL.hexes_per_player == 18
 
 
 def test_with_overrides_unknown_field():
@@ -382,13 +508,6 @@ def test_round_counts_must_be_at_least_one(p, bad):
     rounds = dict(p.rounds)
     rounds[4] = bad
     assert_raises(p, ValueError, match="rounds", rounds=rounds)
-
-
-@ids
-@pytest.mark.parametrize("missing", list(PLAYER_COUNTS))
-def test_rounds_missing_player_count(p, missing):
-    rounds = {n: 5 for n in PLAYER_COUNTS if n != missing}
-    assert_raises(p, ValueError, match=str(missing), rounds=rounds)
 
 
 @ids
@@ -511,10 +630,17 @@ def test_distance_must_be_a_pair(p, bad):
     assert_raises(p, ValueError, vineyard_distance=bad)
 
 
-@ids
 @pytest.mark.parametrize("bad", [4, 10])
-def test_bodega_varietals_at_most_three(p, bad):
+def test_bodega_varietals_at_most_three_under_fixed_rules(bad):
+    assert_raises(V1, ValueError, match="bodega_varietals", bodega_varietals=bad)
+
+
+@ids
+@pytest.mark.parametrize("bad", [9, 10])
+def test_bodega_varietals_at_most_the_roulette_varietals(p, bad):
+    # The shipped roulette has 8 distinct varietals.
     assert_raises(p, ValueError, match="bodega_varietals", bodega_varietals=bad)
+    assert with_overrides(p, bodega_varietals=8).bodega_varietals == 8
 
 
 @ids
@@ -554,12 +680,16 @@ def test_action_die_faces_and_cost():
         DieFace.RELEASE, DieFace.RELEASE,
         DieFace.RESOW, DieFace.RESOW,
     )
-    assert config.ACTION_DIE_COST == 2
+    assert config.ACTION_DIE_COST == 1
+    assert CONSTRUCTIVE_DIE_FACES == (
+        DieFace.FLOODGATE, DieFace.RELEASE, DieFace.RESOW, DieFace.RESOW,
+        DieFace.GOOD_SEASON, DieFace.DROUGHT,
+    )
 
 
 @pytest.mark.parametrize("mode", list(Mode), ids=lambda m: m.name)
 def test_action_die_rules_bag_mix(mode):
-    p = action_die_rules(roulette_rules(preset(mode)))
+    p = action_die_rules(roulette_rules(RULES_V1[mode]))
     assert p.bribe_rules is BribeRules.ACTION_DIE
     assert dict(p.bag_mix) == {
         PieceKind.STRAIGHT: 44,
@@ -571,7 +701,7 @@ def test_action_die_rules_bag_mix(mode):
         PieceKind.FLOODGATE: 0,
     }
     # Everything else is the roulette preset's.
-    base = fields_of(roulette_rules(preset(mode)))
+    base = fields_of(roulette_rules(RULES_V1[mode]))
     for name, value in fields_of(p).items():
         if name not in ("bribe_rules", "bag_mix"):
             assert value == base[name], name
@@ -579,22 +709,23 @@ def test_action_die_rules_bag_mix(mode):
 
 def test_action_die_rules_needs_roulette():
     with pytest.raises(ValueError, match="RESOW"):
-        action_die_rules(NORMAL)
+        action_die_rules(V1)
 
 
 def test_action_die_rules_on_a_die_without_resow_works_under_fixed_rules():
     p = action_die_rules(
-        with_overrides(NORMAL, action_die=(DieFace.FLOODGATE, DieFace.RELEASE))
+        with_overrides(V1, action_die=(DieFace.FLOODGATE, DieFace.RELEASE))
     )
     assert p.bribe_rules is BribeRules.ACTION_DIE
     assert p.varietal_rules is VarietalRules.FIXED
 
 
 def test_action_die_rejections():
-    die = action_die_rules(roulette_rules(NORMAL))
-    assert_raises(die, ValueError, "FLOODGATE", bag_mix=README_BAG_MIX)
+    die = NORMAL
+    assert_raises(die, ValueError, "FLOODGATE", bag_mix=V1_BAG_MIX)
     assert_raises(die, ValueError, "RESOW", varietal_rules=VarietalRules.FIXED,
-                  varietal_points=README_VARIETAL_POINTS)
+                  varietal_points=V1_VARIETAL_POINTS)
+    assert_raises(die, ValueError, "season_roll_every", bribe_rules=BribeRules.D6, bag_mix=V1_BAG_MIX)
     assert_raises(die, ValueError, "at least one face", action_die=())
     assert_raises(die, ValueError, "action_die_cost", action_die_cost=-1)
     assert_raises(die, TypeError, "action_die_cost", action_die_cost=True)
@@ -604,19 +735,19 @@ def test_action_die_rejections():
 
 def test_d6_rules_ignore_the_action_die_checks():
     # Under d6 rules a floodgate share and a RESOW face under fixed rules are fine.
-    assert NORMAL.bag_mix[PieceKind.FLOODGATE] == 10
-    assert DieFace.RESOW in NORMAL.action_die
+    assert V1.bag_mix[PieceKind.FLOODGATE] == 10
+    assert DieFace.RESOW in V1.action_die
     with pytest.raises(ValueError, match="action_die_cost"):
-        with_overrides(NORMAL, action_die_cost=-1)
+        with_overrides(V1, action_die_cost=-1)
 
 
 def test_action_die_cost_zero_is_accepted_and_kept_by_scaled():
     # #128: cost 0 is for testing only; the shipped cost stays at least 1.
-    die = action_die_rules(roulette_rules(NORMAL))
+    die = NORMAL
     assert with_overrides(die, action_die_cost=0).action_die_cost == 0
-    assert with_overrides(NORMAL, action_die_cost=0).action_die_cost == 0
+    assert with_overrides(V1, action_die_cost=0).action_die_cost == 0
     assert scaled(with_overrides(die, action_die_cost=0), 3).action_die_cost == 0
-    assert config.ACTION_DIE_COST == 2
+    assert config.ACTION_DIE_COST == 1
 
 
 # --- Score scale (#111) ------------------------------------------------------
@@ -629,7 +760,7 @@ def test_water_right_points_rejects(bad):
 
 
 def test_scaled_doubles_every_scoring_value():
-    p = scaled(NORMAL, 2)
+    p = scaled(V1, 2)
     assert dict(p.varietal_points) == {
         Varietal.MALBEC: 6,
         Varietal.BONARDA: 4,
@@ -640,19 +771,19 @@ def test_scaled_doubles_every_scoring_value():
     scoring = {"varietal_points", "bodega_points", "water_right_points"}
     for name, value in fields_of(p).items():
         if name not in scoring:
-            assert value == getattr(NORMAL, name), name
+            assert value == getattr(V1, name), name
 
 
 def test_scaled_triples_every_roulette_varietal():
-    p = roulette_rules(NORMAL)
+    p = roulette_rules(V1)
     tripled = scaled(p, 3)
     assert len(tripled.varietal_points) == 8
     assert dict(tripled.varietal_points) == {v: 3 * n for v, n in ROULETTE_POINTS.items()}
 
 
 def test_scaled_keeps_the_action_die_cost():
-    p = scaled(action_die_rules(roulette_rules(NORMAL)), 2)
-    assert p.action_die_cost == 2
+    p = scaled(NORMAL, 2)
+    assert p.action_die_cost == 1
     assert p.die_faces == NORMAL.die_faces
 
 

@@ -43,13 +43,22 @@ of this run. Old chunks are never cleaned up on their own: delete the
 folder (e.g. ``rm -r output/tune-checkpoints``) when a report is done or
 after code changes. ``--smoke`` saves and loads nothing.
 
+Every sweep is defined against the Rules v1 presets (``V1_PRESET``, the
+presets shipped before #126), not the shipped Rules v2 ones, so each command
+in ``_docs/tuning-results.md`` still plays the games it reported: a job's
+overrides are applied over ``V1_OVERRIDES`` (``rules_of``). Sweep
+``shipped`` plays the shipped presets themselves (``--candidate shipped
+"shipped (Rules v2)"`` validates them). A player count a job's preset is not
+for (its ``rounds`` has no entry: shipped Flash is for 2 or 3 players) is
+skipped with a note on stderr; with ``--players`` it is an error.
+
 A *configuration* is a mode, a player count (2 to 5), and a seating:
 ``greedy``, ``score_aware`` or ``lookahead`` (that bot in every seat;
 ``lookahead`` with its ``POLICIES`` defaults), or ``mixed`` (seats
 alternate saboteur and greedy, seat 1 saboteur). Sweeps vary one or two
 parameters around their base with ``SWEEP_GAMES`` games: #20's sweeps
 around ``SWEEP_BASE`` from ``SWEEP_SEED``; #103's Rules v2 sweeps ``b0``
-to ``b5`` and ``b3b`` (score_aware seating) around ``V2_BASE`` (``b0``: the shipped
+to ``b5`` and ``b3b`` (score_aware seating) around ``V2_BASE`` (``b0``: the Rules v1
 presets) from ``V2_SWEEP_SEED``. ``b3``, ``b3b`` (#130: the constructive
 die and the season roll), ``b4`` and ``b5`` (#132: B4's best board with
 the constructive die and the season roll) run at B2's best
@@ -59,7 +68,7 @@ the constructive die and the season roll) run at B2's best
 in every b5 candidate (combinable). ``--seat-bonus`` (#142, e.g.
 ``4=1,1,1,0;5=1,1,1,0,0``) sets ``seat_bonus`` and ``--rounds`` (#142, e.g.
 ``4=5,5=5``) the round count of those player counts (the rest keep the
-mode's shipped rounds) in every b5 candidate, the same way. The final validation runs ``PROPOSED``
+mode's Rules v1 rounds) in every b5 candidate, the same way. The final validation runs ``PROPOSED``
 at ``final_games(players)`` games from ``FINAL_SEED``, a seed no sweep
 uses; ``--candidate SWEEP LABEL`` validates one sweep candidate instead
 (#103 phase D: seed ``V2_FINAL_SEED`` for a Rules v2 sweep):
@@ -107,6 +116,7 @@ import acequias
 from acequias.config import (
     CONSTRUCTIVE_DIE_FACES,
     ROULETTE_POINTS,
+    RULES_V1,
     BribeRules,
     Preset,
     action_die_rules,
@@ -114,6 +124,7 @@ from acequias.config import (
     scaled,
     with_overrides,
 )
+from acequias.config import players_text
 from acequias.config import preset as shipped_preset
 from acequias.model import DieFace, Mode, PieceKind, Varietal
 from acequias.sim import GameRecord, SimRules, game_seed, play_one, summarize
@@ -195,6 +206,24 @@ BAG_VERY_BRANCHY = bag(10, 10, 5, 25, 20, 20, 10)
 BAG_FEWER_GATES = bag(40, 20, 15, 10, 5, 5, 5)
 BAG_MORE_GATES = bag(35, 20, 15, 5, 5, 5, 15)
 
+V1_PRESET: Mapping[Mode, Preset] = RULES_V1
+"""The Rules v1 presets (``acequias.config.RULES_V1``): every sweep's base is defined against them."""
+
+
+def diff_from(base: Preset, p: Preset) -> dict[str, object]:
+    """The fields of ``p`` that differ from ``base`` (the same mode), as overrides."""
+    return {
+        f.name: getattr(p, f.name)
+        for f in dataclasses.fields(Preset)
+        if f.name != "mode" and getattr(p, f.name) != getattr(base, f.name)
+    }
+
+
+V1_OVERRIDES: Mapping[Mode, Mapping[str, object]] = {
+    mode: diff_from(shipped_preset(mode), V1_PRESET[mode]) for mode in Mode
+}
+"""``V1_PRESET`` as overrides of the shipped presets: what ``rules_of`` puts under a job's overrides."""
+
 LOW_ROUNDS = {mode: rounds_for_turns(mode, "low") for mode in Mode}
 HIGH_ROUNDS = {mode: rounds_for_turns(mode, "high") for mode in Mode}
 CURRENT_ROUNDS = {Mode.NORMAL: {p: 12 for p in PLAYER_COUNTS}, Mode.FLASH: {p: 5 for p in PLAYER_COUNTS}}
@@ -222,8 +251,8 @@ SWEEP_BASE: Mapping[Mode, Mapping[str, object]] = {
     },
 }
 """The overrides every sweep starts from (chosen from an exploratory board sweep); each
-sweep changes only the parameters it names. Unnamed fields keep the shipped
-preset's values."""
+sweep changes only the parameters it names. Unnamed fields keep the Rules v1
+preset's values (``V1_PRESET``)."""
 
 OWNER_HEXES = 15
 """Normal hexes per player decided by the owner on #20: at most about 75
@@ -250,19 +279,16 @@ owner's decisions)."""
 
 
 def _diff(p: Preset) -> dict[str, object]:
-    """The fields of ``p`` that differ from its mode's shipped preset, as overrides."""
-    shipped = shipped_preset(p.mode)
-    return {
-        f.name: getattr(p, f.name)
-        for f in dataclasses.fields(Preset)
-        if f.name != "mode" and getattr(p, f.name) != getattr(shipped, f.name)
-    }
+    """The fields of ``p`` that differ from its mode's Rules v1 preset, as overrides."""
+    return diff_from(V1_PRESET[p.mode], p)
 
 
-V2_PRESET: Mapping[Mode, Preset] = {mode: action_die_rules(roulette_rules(shipped_preset(mode))) for mode in Mode}
-"""The shipped preset with ``roulette_rules`` and then ``action_die_rules`` (bag without floodgates)."""
+V2_PRESET: Mapping[Mode, Preset] = {mode: action_die_rules(roulette_rules(V1_PRESET[mode])) for mode in Mode}
+"""The Rules v1 preset with ``roulette_rules`` and then ``action_die_rules`` (bag without floodgates)."""
 V2_BASE: Mapping[Mode, Mapping[str, object]] = {mode: _diff(V2_PRESET[mode]) for mode in Mode}
-"""The overrides every Rules v2 sweep starts from: ``V2_PRESET`` as overrides of the shipped preset."""
+"""The overrides every Rules v2 sweep starts from: ``V2_PRESET`` as overrides of the Rules v1 preset."""
+SHIPPED_V2: Mapping[Mode, Mapping[str, object]] = {mode: _diff(shipped_preset(mode)) for mode in Mode}
+"""The shipped presets (Rules v2, #126) as overrides of the Rules v1 presets."""
 RARE_VARIETALS = (Varietal.BONARDA, Varietal.CABERNET_FRANC)
 """The varietals worth a bit more under roulette rules (owner goal 5 of #103)."""
 COMMON_POINTS = min(ROULETTE_POINTS.values())
@@ -458,7 +484,7 @@ def v2_sweeps(
     (#138, ``--season-global-only``) turns ``season_roll_personal_faces``
     off in every b5 candidate; ``seat_bonus`` (#142, ``--seat-bonus``) sets
     that field, and ``rounds`` (#142, ``--rounds``) the round count of its
-    player counts over the mode's shipped rounds, in every b5 candidate."""
+    player counts over the mode's Rules v1 rounds, in every b5 candidate."""
     best = f"scale {scale}, rare +{rare_bonus}"
     b5_options = {
         **({"multiple_bodegas": True} if multiple_bodegas else {}),
@@ -468,7 +494,7 @@ def v2_sweeps(
         b5_options["seat_bonus"] = dict(seat_bonus)
     b5_base = {
         mode: {**B5_BOARD[mode], **b5_options,
-               **({"rounds": {**shipped_preset(mode).rounds, **rounds}} if rounds else {})}
+               **({"rounds": {**V1_PRESET[mode].rounds, **rounds}} if rounds else {})}
         for mode in Mode
     }
     b5_bodegas = (", multiple bodegas" if multiple_bodegas else "") + (
@@ -485,7 +511,7 @@ def v2_sweeps(
         return f"cost {cost}, faces {'/'.join(map(str, faces))}"
 
     return (
-        Sweep("b0", "Rules v1 baseline: the shipped presets", {mode: (("shipped (Rules v1)", {}),) for mode in Mode},
+        Sweep("b0", "Rules v1 baseline: the Rules v1 presets", {mode: (("shipped (Rules v1)", {}),) for mode in Mode},
               seats, shipped, V2_SWEEP_SEED),
         v2_sweep("b1", "Rules v2 provisional: cost 2, faces 2/2/2, points 2 / rare 3, scale 1, 2 plots, no cap",
                  {mode: (("Rules v2 provisional", {}),) for mode in Mode}),
@@ -536,6 +562,9 @@ def v2_sweeps(
                      for every in B5_SEASON_EVERY[mode]
                  ) + (("no die (no bribe either)", v2(mode, scale, rare_bonus, **b5_base[mode], **NO_DIE)),)
                   for mode in Mode}),
+        Sweep("shipped", "The shipped presets (Rules v2, #126)",
+              {mode: (("shipped (Rules v2)", dict(SHIPPED_V2[mode])),) for mode in Mode},
+              seats, shipped, V2_SWEEP_SEED),
     )
 
 
@@ -671,7 +700,28 @@ copyreg.pickle(MappingProxyType, lambda proxy: (_mapping_proxy, (dict(proxy),)))
 
 
 def rules_of(job: Job) -> SimRules:
-    return SimRules(job.mode, job.players, policies(job.seating, job.players), job.overrides)
+    """The job's ``SimRules``: its overrides over ``V1_OVERRIDES`` (they are relative to ``V1_PRESET``)."""
+    return SimRules(job.mode, job.players, policies(job.seating, job.players),
+                    {**V1_OVERRIDES[job.mode], **job.overrides})
+
+
+def plays(mode: Mode, players: int, overrides: Mapping[str, object]) -> bool:
+    """Whether a job of ``overrides`` (relative to ``V1_PRESET``) is for ``players`` players."""
+    rounds = overrides.get("rounds", V1_PRESET[mode].rounds)
+    return not isinstance(rounds, Mapping) or players in rounds
+
+
+def playable(jobs: list[Job]) -> list[Job]:
+    """``jobs`` without those whose preset is not for their player count, each skip noted on stderr."""
+    kept = []
+    for job in jobs:
+        if plays(job.mode, job.players, job.overrides):
+            kept.append(job)
+        else:
+            counts = tuple(sorted(job.overrides["rounds"]))
+            print(f"skipped {describe_job(job)}: {job.mode.value} is for {players_text(counts)} players here",
+                  file=sys.stderr)
+    return kept
 
 
 # --- Priority ------------------------------------------------------------------
@@ -1149,7 +1199,7 @@ def describe(overrides: Mapping[str, object]) -> str:
     parts = []
     for key, value in overrides.items():
         if key == "rounds":
-            value = "/".join(str(value[p]) for p in PLAYER_COUNTS)
+            value = "/".join(str(value[p]) for p in sorted(value))
         elif key == "bag_mix":
             value = _bag_label(value)
         elif key == "vineyard_distance":
@@ -1170,14 +1220,15 @@ def describe(overrides: Mapping[str, object]) -> str:
 
 
 def sweep_jobs(sweep: Sweep, modes, games: int, players_list=PLAYER_COUNTS, seatings=None) -> list[Job]:
-    """The jobs of ``sweep``: its seatings unless ``seatings`` is given."""
-    return [
+    """The jobs of ``sweep``: its seatings unless ``seatings`` is given; player counts
+    a candidate's preset is not for are skipped (``playable``)."""
+    return playable([
         Job(label, mode, players, seating, {**sweep.base[mode], **changes}, games, sweep.seed)
         for mode in modes
         for label, changes in sweep.candidates.get(mode, ())
         for players in players_list
         for seating in seatings or sweep.seatings
-    ]
+    ])
 
 
 def do_sweeps(sweeps: list[Sweep], run, modes, games: int, players_list=PLAYER_COUNTS, seatings=None,
@@ -1210,16 +1261,16 @@ def do_sweeps(sweeps: list[Sweep], run, modes, games: int, players_list=PLAYER_C
 def do_final(run, values: Mapping[Mode, Mapping[str, object]], players_list, seatings, n: int | None, seed: int,
              label: str = "proposed") -> list[Outcome]:
     """The final validation of ``values`` (overrides per mode; its modes are the ones run)."""
-    jobs = [
+    jobs = playable([
         Job(label, mode, players, seating, values[mode], n or final_games(players), seed)
         for mode in values
         for players in players_list
         for seating in seatings
-    ]
+    ])
     outcomes = run(jobs)
     print(f"## Final validation of {'the proposed values' if label == 'proposed' else f'`{label}`'}\n")
     print(f"Seed {seed}; games per configuration: "
-          + ", ".join(f"{p}p {n or final_games(p)}" for p in players_list)
+          + ", ".join(f"{p}p {n or final_games(p)}" for p in sorted({job.players for job in jobs}))
           + f". {TURNS_NOTE}\n")
     for mode in values:
         print(f"- {mode.value.capitalize()}: {describe(values[mode])}")
@@ -1331,6 +1382,11 @@ def main(argv: list[str] | None = None) -> int:
             candidate = find_candidate(sweeps, *args.candidate, modes)
         except ValueError as error:
             parser.error(str(error))
+        if args.players:
+            for mode, values in candidate[1].items():
+                if not plays(mode, args.players, values):
+                    parser.error(f"{mode.value} mode is for {players_text(tuple(sorted(values['rounds'])))} "
+                                 f"players in candidate {args.candidate[1]!r}, got --players {args.players}")
 
     if args.list:
         for sweep in sweeps:

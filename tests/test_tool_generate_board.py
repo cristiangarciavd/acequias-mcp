@@ -23,6 +23,9 @@ from server.schemas import (
 )
 from server.tools.board import MAX_PICKED_SEED, MAX_SEED
 
+PIN_RULES_V1 = True
+"""``conftest.py``: these tests check the engine under the Rules v1 presets."""
+
 pytestmark = pytest.mark.anyio
 
 CASES = list(itertools.product([2, 5], ["normal", "flash"]))

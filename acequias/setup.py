@@ -20,8 +20,6 @@ from acequias.board import generate_board
 from acequias.config import Preset
 from acequias.config import preset as shipped_preset
 from acequias.model import (
-    MAX_PLAYERS,
-    MIN_PLAYERS,
     GameState,
     Mode,
     PieceKind,
@@ -40,7 +38,8 @@ def new_game(
     simulation); its mode must be ``mode``. The state records the preset
     actually used in ``GameState.preset``. With ``season_roll_every`` 1,
     round 1 is a season round, so the state starts with ``season_roll``
-    ``DUE``. The same arguments always give an equal state.
+    ``DUE``. The same arguments always give an equal state. ``players``
+    must be one of the preset's ``player_counts`` (Flash: 2 or 3).
     """
     _check_int("players", players)
     _check_int("seed", seed)
@@ -50,8 +49,7 @@ def new_game(
         preset = shipped_preset(mode)
     elif not isinstance(preset, Preset):
         raise TypeError(f"preset must be a Preset, got {preset!r}")
-    if not MIN_PLAYERS <= players <= MAX_PLAYERS:
-        raise ValueError(f"players must be {MIN_PLAYERS} to {MAX_PLAYERS}, got {players}")
+    preset.check_players(players)
     if preset.mode is not mode:
         raise ValueError(f"preset is for mode {preset.mode.name}, but mode is {mode.name}")
 

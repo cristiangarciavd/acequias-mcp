@@ -2,9 +2,9 @@
 
 [![Tests](https://github.com/cristiangarciavd/acequias-mcp/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/cristiangarciavd/acequias-mcp/actions/workflows/tests.yml?query=branch%3Amain)
 
-Acequias is a competitive board game for 2 to 5 players with 3D-printed hex pieces. Players build canals to carry water from the mountains to the vineyards of Mendoza. This repo holds an MCP server that generates balanced boards, scores games, simulates them with bots to tune the rules, and outputs printable STL pieces for a Bambu Lab A1.
+Acequias is a competitive board game for 2 to 5 players (Flash: 2 or 3) with 3D-printed hex pieces. Players build canals to carry water from the mountains to the vineyards of Mendoza. This repo holds an MCP server that generates balanced boards, scores games, simulates them with bots to tune the rules, and outputs printable STL pieces for a Bambu Lab A1.
 
-> **Status:** the MVP (milestones 1 to 5) is done: the game logic, the MCP server with all 5 tools, the simulation that tuned the rules (#20, [results](#tuning-results)), every MVP piece as STL, and A1 plates as 3MF, confirmed by the first test print (#34, [report](_docs/test-print-1.md)). After the MVP, the `score_aware` and `lookahead` bots (#67, #42) and a parallel, resumable `scripts/tune.py` (#43) are done. The remaining work is milestone 6, After the MVP: Rules v2 (#114) adds opt-in rule options (varietal roulette, more plots, grape-cluster cap, action die, larger score scale) to the engine, off in the shipped presets until the re-tuning in #103; its pieces are #113. Progress is tracked in the [GitHub issues](../../issues) and [milestones](../../milestones).
+> **Status:** the MVP (milestones 1 to 5) is done: the game logic, the MCP server with all 5 tools, the simulation that tuned the rules (#20, [results](#tuning-results)), every MVP piece as STL, and A1 plates as 3MF, confirmed by the first test print (#34, [report](_docs/test-print-1.md)). After the MVP, the `score_aware` and `lookahead` bots (#67, #42) and a parallel, resumable `scripts/tune.py` (#43) are done. The remaining work is milestone 6, After the MVP. Rules v2 (#114) is the shipped game since #126: the varietal roulette, the constructive action die with a season roll, a larger score scale, and multiple bodegas, re-tuned in #103 with Flash limited to 2 or 3 players; its pieces are #113. The Rules v1 values stay in the engine as options (`RULES_V1`). Progress is tracked in the [GitHub issues](../../issues) and [milestones](../../milestones).
 
 This README is the project's specification: game rules, design decisions, architecture, and roadmap. Task details live in the GitHub issues.
 
@@ -12,39 +12,41 @@ Project goals: practice MCP with a real use case (a portfolio project toward AI 
 
 ## Game rules
 
-Whoever scores the most points when the harvest ends, after a fixed number of rounds, wins. There are two length modes, **Normal** and **Flash**, with the same rules and engine.
+Whoever scores the most points when the harvest ends, after a fixed number of rounds, wins. There are two length modes, **Normal** (2 to 5 players) and **Flash** (2 or 3 players), with the same rules and engine.
 
 ### Components
 
 | Component | Detail |
 | --- | --- |
 | Terrain hexes | River, vineyard, stone, empty |
-| Vineyards | Neutral, valued by varietal: Malbec 3 pts, Bonarda 2 pts, Torrontés 1 pt (the default fixed rules; the [varietal roulette](#varietal-roulette) variant plants 8 varietals on claim instead) |
+| Vineyards | Neutral blank plots, planted with one of 8 varietals by the [varietal roulette](#varietal-roulette) when claimed: 6 pts each, 7 for the rarer Bonarda and Cabernet Franc |
 | Canal pieces (neutral) | Six shapes: straight, gentle curve, sharp curve, symmetric Y, T branch, claw (see [Water flow](#water-flow)) |
-| Floodgates | Small gates that close one opening of a canal piece (see [Floodgate](#floodgate)) |
+| Floodgates | Small gates that close one opening of a canal piece; they come only from the action die (see [Floodgate](#floodgate)) |
 | Owner tokens | One per placed canal, in each player's color |
 | Grape clusters | Mark a claimed vineyard, in each player's color |
-| Debt tokens | Track each player's accumulated bribe debt |
-| Die (external) | One standard d6, provided by the players, used by the bribe action |
+| Debt tokens | Track each player's debt from action die rolls |
+| Action die | Six faces: floodgate, release, resow, resow, good season, drought (see [Action die](#action-die); its printed piece is #113) |
+| Season die | A marker for the player who makes the next free [season roll](#season-roll) |
+| Roulette | 14 sectors that plant a claimed vineyard (see [Varietal roulette](#varietal-roulette); its printed piece is #113) |
 
 ### Setup
 
 1. The MCP generates a balanced map for the number of players and the mode. No vineyard is ever next to the river: each needs at least one canal to be watered.
 2. The west edge is the river (the mountains); all water flows from there.
-3. The bag holds one piece per empty hex (the board's canalizable capacity), split by the bag mix. It is shuffled and four pieces are placed face up: the market. There is no redraw, even if the market holds only floodgates.
-4. A start player is chosen; the start player rotates each round.
+3. The bag holds one canal piece per empty hex (the board's canalizable capacity), split by the bag mix (no floodgates: they come from the action die). It is shuffled and four pieces are placed face up: the market. There is no redraw.
+4. A start player is chosen; the start player rotates each round. The start player also takes the season die.
 
 ### Turn
 
 On your turn you take **one action**:
 
-- **A. Place a piece.** Take a piece from the market (it is refilled from the bag; when the bag is empty the market shrinks).
-  - A **canal** goes on an empty hex, with your owner token. At least one of its openings must line up with the river or with an opening of any canal already on the board, even a dry one or one closed by a floodgate. Its other openings may face anything: dead ends are allowed.
-  - A **floodgate** goes on any open opening of any canal on the board, yours or a rival's (see [Floodgate](#floodgate)).
-- **B. Bribe (_coima_).** See [Bribe](#bribe-coima).
-- **Pass**, only when you have nothing you can place. Bribing is never forced.
+- **A. Place a canal.** Take a canal from the market (it is refilled from the bag; when the bag is empty the market shrinks). It goes on an empty hex, with your owner token. At least one of its openings must line up with the river or with an opening of any canal already on the board, even a dry one or one closed by a floodgate. Its other openings may face anything: dead ends are allowed.
+- **B. Roll the action die.** Add 1 to your debt and resolve the face (see [Action die](#action-die)).
+- **Pass**, only when you have nothing you can place. Rolling is never forced.
 
-Rules note: a small board can lock up. Once every canal opening faces another canal, stone, a vineyard, or the board edge, no canal can be placed anywhere; if no floodgate can be placed or bribed either, **Pass** is the only legal action for the rest of the game. This follows the rules as written; the round loop still ends at its round count.
+Every few rounds a free [season roll](#season-roll) comes before the round's first turn.
+
+Rules note: a small board can lock up. Once every canal opening faces another canal, stone, a vineyard, or the board edge, no canal can be placed anywhere, and you may only roll the die or **Pass** for the rest of the game. This follows the rules as written; the round loop still ends at its round count.
 
 ### Water flow
 
@@ -66,9 +68,9 @@ Canal shapes, by the hex edges they open (pointy-top hexes, so the edges face E,
 
 ### Claims and watering
 
-After **any** action (a placement or a bribe), the acting player claims **every** unclaimed vineyard that is now watered. A claim is permanent: once your grape cluster is on a vineyard, nobody else can claim it, even if its water is later cut off. But a vineyard only scores if it is **watered** (connected to the river) on the final board. A claimed vineyard that ends dry scores 0 and pays no water rights. Its owner can water it again by reconnecting it, or by bribing away the floodgate that blocks it.
+After **any** action (a placement or a used die face), the acting player claims **every** unclaimed vineyard that is now watered, and spins the [roulette](#varietal-roulette) for each to plant it. A claim is permanent: once your grape cluster is on a vineyard, nobody else can claim it, even if its water is later cut off. But a vineyard only scores if it is **watered** (connected to the river) on the final board. A claimed vineyard that ends dry scores 0 and pays no water rights. Its owner can water it again by reconnecting it, or by releasing the floodgate that blocks it.
 
-With the [grape-cluster cap](#variants-under-evaluation) (a preset option, off in the shipped game), each player has a limited number of grape clusters. The acting player claims the newly watered vineyards in ascending hex order until their clusters run out; the rest stay unclaimed and watered, and the next player who places a piece or bribes (not a pass) and still has clusters claims them. Claims are never given up or moved.
+With the [grape-cluster cap](#variants-under-evaluation) (a preset option, off in the shipped game), each player has a limited number of grape clusters. The acting player claims the newly watered vineyards in ascending hex order until their clusters run out; the rest stay unclaimed and watered, and the next player who places a piece or uses a die face (not a pass) and still has clusters claims them. Claims are never given up or moved.
 
 ### Turn order (_turnos de riego_)
 
@@ -76,7 +78,7 @@ Each round, every player takes one turn in seat order, starting with the start p
 
 ### Water rights
 
-If the water reaching your vineyard passes through other players' canals, you pay **1 point to each distinct other player** whose canals are on that path (not per canal). Each vineyard pays separately: two of your vineyards fed through the same rival pay that rival 2. Water rights are settled **at the end of the game**, from the final board. The 1 point is the shipped preset value `water_right_points`; a larger score scale (#111, `scaled`) raises it with the other points.
+If the water reaching your vineyard passes through other players' canals, you pay **3 points to each distinct other player** whose canals are on that path (not per canal). Each vineyard pays separately: two of your vineyards fed through the same rival pay that rival 6. Water rights are settled **at the end of the game**, from the final board. The 3 points are the shipped preset value `water_right_points` (Rules v1's 1 point at the score scale of 3, #111).
 
 When a vineyard can be reached by more than one path, the water takes the **cheapest path for the vineyard's owner**:
 
@@ -94,94 +96,87 @@ The attack-and-defense piece. A floodgate is a small gate placed on **one openin
 - On one **exit**, it blocks only that way onward; the piece's other exits keep flowing.
 - On an opening facing the river it closes that intake; on one facing a vineyard it cuts that vineyard off.
 
-Only one floodgate fits on an edge. Once placed, it can be removed or moved only by a bribe.
+A floodgate is placed with the action die's **Floodgate** face, on any open opening of any canal on the board, yours or a rival's. Only one floodgate fits on an edge. Once placed, it can be removed only with the **Release** face; it is never moved.
 
-### Bribe (coima)
+### Action die
 
-Instead of placing a piece, you may bribe to remove or move one floodgate on the board, yours or an opponent's:
+On your turn, instead of placing a piece, you may **roll the action die**: add its fixed cost, **1**, to your public **debt**, then roll. Debt is subtracted from your final score. The die has 6 faces: **Floodgate**, **Release**, 2 x **Resow**, **Good season**, **Drought**.
 
-1. Roll the d6 and add the result to your public **debt**.
-2. **Remove** the floodgate (it leaves the game for good) or **move** it to another open edge of a canal.
-3. Water re-flows immediately.
+The first three are personal: resolve the face in the same turn, or decline it.
 
-Debt is subtracted from your final score, so a bribe is a gamble (it costs 1 to 6), and the growing cost keeps floodgate wars in check.
+- **Floodgate:** place a floodgate on any open canal edge (see [Floodgate](#floodgate)).
+- **Release:** remove one floodgate from the board, anyone's. It leaves the game for good.
+- **Resow:** pick any claimed vineyard, yours or a rival's, watered or dry; spin the [roulette](#varietal-roulette) again and replant it. The same varietal may come out again, and the claim does not change.
 
-The bribe is the default rule. The [action die](#action-die) variant replaces it (a preset option, off in the shipped game).
+A face you cannot use (Release with no floodgate on the board) or do not want is lost, and so is its cost: no refund, no re-roll. As after any action, you then claim every newly watered vineyard (a Release can water some).
+
+The season faces apply at once, to every player, and end the roll:
+
+- **Good season:** every player gains one common vineyard plot's value, **6** points.
+- **Drought:** every player loses half of that, **3** points. A drought never takes a score below 0: a player at 0 or less loses nothing, and one with fewer points than the loss ends at 0 (applied at final scoring, where the losses are tallied).
+
+### Season roll
+
+At the start of every 3rd round in Normal (rounds 3, 6, 9, ...) and every 2nd round in Flash (rounds 2, 4, 6), before the start player's turn, the holder of the season die rolls the action die for free, without spending their own turn or adding debt. Only a season face counts: a good season or a drought applies to everyone as above, and a floodgate, release or resow face does nothing. Then the round goes on as usual from its start player. The game's first start player holds the season die for the first season roll, and it passes to the left (the next seat) after each season roll, so every seat makes the same number of season rolls, within one.
 
 ### Bodega bonus
 
-A player whose watered vineyards include **each** varietal (Malbec, Bonarda, Torrontés) earns **+2**: a winery wants its blend. In Flash it is **+1**, still for all three. These are the default fixed rules; under the [varietal roulette](#varietal-roulette) the bonus needs watered vineyards of any 3 **different** varietals (two Malbecs count once).
+A player whose watered vineyards include 3 **different** varietals (two Malbecs count once) earns a bodega: **+6** in Normal, **+3** in Flash. A winery wants its blend.
 
-**Multiple bodegas** (Rules v2 option, `multiple_bodegas`, off in the shipped game; #135): a player earns the bonus once per bodega, and each bodega needs its own 3 watered vineyards of 3 different varietals; no vineyard counts toward two bodegas. The count is the largest number of such disjoint groups: Malbec, Malbec, Bonarda, Bonarda, Torrontés, Torrontés make 2 bodegas, but Malbec ×3, Bonarda ×2, Torrontés make only 1 (there is a single Torrontés). Dry vineyards never count. Under the [action die](#action-die), Resow can target any claimed vineyard, yours or a rival's: replanting a rival's vineyard can break one of their bodegas, and replanting your own can complete one of yours.
+A player earns the bonus once per bodega (**multiple bodegas**, `multiple_bodegas`, #135), and each bodega needs its own 3 watered vineyards of 3 different varietals; no vineyard counts toward two bodegas. The count is the largest number of such disjoint groups: Malbec, Malbec, Bonarda, Bonarda, Torrontés, Torrontés make 2 bodegas, but Malbec ×3, Bonarda ×2, Torrontés make only 1 (there is a single Torrontés). Dry vineyards never count. Resow can target any claimed vineyard, yours or a rival's: replanting a rival's vineyard can break one of their bodegas, and replanting your own can complete one of yours.
 
 ### Game modes
 
-| Mode | Rounds | Board | Target time |
-| --- | --- | --- | --- |
-| **Normal** | 2p 10 · 3p 15 · 4p 12 · 5p 10 | 15 hexes/player (2p 30 · 3p 45 · 4p 60 · 5p 75) | ~45–60 min (2p ~20 min) |
-| **Flash** | 2p 6 · 3p 6 · 4p 4 · 5p 4 | 14 hexes/player (2p 28 · 3p 42 · 4p 56 · 5p 70) | ~10–20 min |
+| Mode | Players | Rounds | Season roll | Board | Bodega | Target time |
+| --- | --- | --- | --- | --- | --- | --- |
+| **Normal** | 2 to 5 | 2p 10 · 3p 15 · 4p 12 · 5p 10 | every 3rd round | 18 hexes/player (2p 36 · 3p 54 · 4p 72 · 5p 90) | +6 | ~45–60 min (2p ~20 min) |
+| **Flash** | 2 or 3 | 2p 6 · 3p 6 | every 2nd round | 14 hexes/player (2p 28 · 3p 42) | +3 | ~10–20 min |
 
-Flash is shorter because it has fewer rounds. In both modes every vineyard sits 4 hexes from the river, so it connects in 3 pieces: closer vineyards hand the first player most of the wins. Flash's bodega bonus is reduced to +1. Both modes start with 2 vineyards per player and 10% stone hexes. A 2-player Normal game is shorter (about 20 turns) because its board is full by then and more rounds would only add passes. The values were tuned by the simulation (#20, [results](#tuning-results)); they live in `acequias/config.py` (see [Game config](#game-config)).
+Flash is shorter because it has fewer rounds. It is for 2 or 3 players only: with 4 or 5 its 4 rounds were biased toward the last seats and ended in too many ties, and no turn-order fix worked (#103, phases E and F of the [tuning results](#tuning-results)); the engine, the MCP tools, and `scripts/tune.py` reject or skip those counts with a clear error. In both modes every vineyard sits 4 hexes from the river, so it connects in 3 pieces: closer vineyards hand the first player most of the wins. Both modes start with 2 vineyards per player and 10% stone hexes. A 2-player Normal game is shorter (about 20 turns) because its board is full by then and more rounds would only add passes. Rounds were tuned in #20 and the rest in #103 ([results](#tuning-results)); the values live in `acequias/config.py` (see [Game config](#game-config)).
 
 ### End and scoring
 
 After the last round, each player scores:
 
-**vineyard values + bodega bonus − water rights paid + water rights collected − bribe debt**
+**vineyard values + bodega bonuses − water rights paid + water rights collected − die debt + good seasons − droughts**
 
-Only watered vineyards count toward vineyard values, the bodega bonus, and water rights.
+Only watered vineyards count toward vineyard values, the bodega bonuses, and water rights. Droughts never take a total below 0 (see [Action die](#action-die)).
 
 The highest score wins. On a tie, the tied player with more watered vineyards wins; if that is tied too, the win is shared.
 
 ### Variants (under evaluation)
 
-Optional rules, off by default, kept only if the simulation shows they help. The rules above are the shipped game. Flash race end and drought are not implemented yet (#35, #23). The other options are Rules v2 (#114): implemented as preset options (see [Game config](#game-config)), while the shipped Normal and Flash presets keep the rules above until #103.
+Optional rules, kept only if the simulation shows they help. The rules above are the shipped game (Rules v2, #114, shipped in #126). Flash race end and drought rounds are not implemented yet (#35, #23). The others are preset options (see [Game config](#game-config)), off in the shipped presets.
 
 - **Flash race end:** the first player to claim a 2nd vineyard ends the round; then score.
-- **Drought (_sequía_):** in some mid-game rounds part of the river runs dry. It never falls on the last round, so final scoring always uses the full river.
-- **Varietal roulette:** vineyards start as blank plots and are planted by a roulette spin when claimed (below). It is implemented as a preset option (`varietal_rules = roulette`, see [Game config](#game-config)); the shipped Normal and Flash presets keep the fixed rules until #103.
-- **More vineyard plots:** more plots per player put more points in play and more routes to block or reopen. `vineyards_per_player` (today 2) is raised through `with_overrides`; at `vineyard_distance` (4, 4) each row holds one plot, so Normal's 15 hexes per player fit at most 3 plots per player, and more plots also need more hexes per player (e.g. 4 plots with 20 hexes) or a wider distance. Values to be tuned in #103.
-- **Grape-cluster cap:** each player has only `grape_clusters_per_player` grape clusters (claims); see [Claims and watering](#claims-and-watering). The shipped presets have no cap (`None`); the cap is to be tuned in #103. Under the roulette, only the vineyards actually claimed get a spin.
-- **Action die:** replaces the [bribe](#bribe-coima) with a custom die that everyone can use to get back into the game (below). It is a preset option (`bribe_rules = action_die`, see [Game config](#game-config)) and needs the varietal roulette for its Resow face; the shipped presets keep the bribe until #103.
+- **Drought rounds (_sequía_):** in some mid-game rounds part of the river runs dry. It never falls on the last round, so final scoring always uses the full river. (Not the die's Drought face.)
+- **More vineyard plots:** more plots per player put more points in play and more routes to block or reopen. `vineyards_per_player` (shipped 2) is raised through `with_overrides`; at `vineyard_distance` (4, 4) each row holds one plot. #103 tried 3 plots (sweep `b4`) and kept 2.
+- **Grape-cluster cap:** each player has only `grape_clusters_per_player` grape clusters (claims); see [Claims and watering](#claims-and-watering). The shipped presets have no cap (`None`); #103 tried a cap of 2 (sweep `b4`). Only the vineyards actually claimed get a roulette spin.
+- **Seat bonus** (`seat_bonus`, #142): bonus points by round 1 position. #103 tried it for Flash 4-5 players and it overshot (phases E and F).
+- **Rules v1** (`RULES_V1`, the presets shipped from #20 until #126): vineyards dealt on the board with fixed varietals (Malbec 3, Bonarda 2, Torrontés 1; `varietal_rules = fixed`), floodgates in the market bag (10%), and the **bribe** instead of the action die (`bribe_rules = d6`): instead of placing a piece, roll a d6, add the roll to your debt, and remove or move one floodgate. One bodega at most, +2 in Normal and +1 in Flash, for all three varietals; water rights 1 point; 15 hexes per player in Normal; Flash for 2 to 5 players (4 rounds at 4p and 5p); no season roll. The other action die options also stay: the 2/2/2 die (`ACTION_DIE_FACES`: 2 x Floodgate, 2 x Release, 2 x Resow), any `action_die_cost` (0 for testing only), explicit `season_points` and `drought_points`, and a season roll whose personal face is the holder's to use (`season_roll_personal_faces = True`).
 
-#### Action die
+Gains and losses show in the score as the `season` and `drought` terms (`total = vineyards + bodega - rights_paid + rights_collected - debt + season + seat_bonus - drought`), in `Player.season` and `Player.drought` during the game, and in the MCP player and score JSON. `acequias.game.next_season_roll` gives the round of the next season roll and its holder.
 
-On your turn, instead of placing a piece, you may **roll the action die**: add its fixed cost to your debt, then roll. The cost is **2** for now, to be tuned in #103 (2 or 3). The die has 6 faces: 2 x **Floodgate**, 2 x **Release**, 2 x **Resow**. Resolve the face in the same turn:
+#### Tuning sweeps of the die
 
-- **Floodgate:** place a floodgate on any open canal edge (the same edges as a market floodgate). It comes from the die, not the market.
-- **Release:** remove one floodgate from the board, anyone's. It is only removed, never moved.
-- **Resow:** pick any claimed vineyard, yours or a rival's, watered or dry; spin the [roulette](#varietal-roulette) again and replant it. The same varietal may come out again, and the claim does not change.
-
-You may **decline** the face. A face you cannot use (Release with no floodgate on the board) or do not want is lost, and so is its cost: no refund, no re-roll. As after any action, you then claim every newly watered vineyard (a Release can water some). Under these rules **floodgates come only from the die**: they leave the market bag, and the other pieces share the bag (`action_die_rules` rescales the shipped mix to straight 44, gentle curve 22, sharp curve 17, symmetric Y 6, T branch 6, claw 5). There is no bribe action.
-
-#### Constructive die and season roll
-
-Two more opt-in options of the action die (#130), off in the shipped presets; values to be tuned in #126 after #103.
-
-- **Constructive die** (`action_die = CONSTRUCTIVE_DIE_FACES`): 1 x Floodgate, 1 x Release, 2 x Resow, 1 x **Good season**, 1 x **Drought**. The 2/2/2 die (`ACTION_DIE_FACES`) stays the default. Floodgate, Release and Resow are personal, as above: you may decline them, and an unusable one does nothing. Good season and drought always apply, to every player, as soon as they are rolled, and end the roll:
-  - **Good season:** every player gains `season_points` (default: one common vineyard plot's value, the most frequent plot value, 2 under the roulette; it follows `scaled()`).
-  - **Drought:** every player loses `drought_points` (default: half of the good season gain, rounded down, at least 1). A drought never takes a score below 0: a player at 0 or less loses nothing, and one with fewer points than the loss ends at 0 (applied at final scoring, where the losses are tallied).
-- **Season roll** (`season_roll_every = X`, default off): at the start of every X-th round, before the start player's turn, the holder of the season die rolls the action die for free, without spending their own turn. A season face applies to everyone as above; a personal face is the holder's to use or decline, and an unusable or declined one does nothing. Then the round goes on as usual from its start player. The game's first start player holds the season die for the first season roll, and it passes to the left (the next seat) after each season roll, so the k-th season roll is made by the seat k-1 places after the first start player and every seat makes the same number of season rolls, within one, whatever X and the player count. `acequias.game.next_season_roll` gives the round of the next season roll and its holder.
-- **Season faces only** (`season_roll_personal_faces`, default on; #138): turned off, a season roll applies only a good season or a drought. A floodgate, release or resow face on the season roll does nothing: it is not offered, nothing is pending, and no turn or cost is involved; the round goes on from its start player. Voluntary rolls keep every face. Since the personal face is what gives the holder an edge, this keeps seats even when a game has fewer season rolls than players.
-
-A voluntary roll is unchanged: it costs `action_die_cost` and the turn, and a declined or unusable face loses the cost. Gains and losses show in the score as the `season` and `drought` terms (`total = vineyards + bodega - rights_paid + rights_collected - debt + season - drought`), in `Player.season` and `Player.drought` during the game, and in the MCP player and score JSON. `scripts/tune.py --sweep b3b` compares the constructive die at cost 1 and 2 with a season roll every 2, 3 or 4 rounds (Normal) or 2 (Flash), against no die. `--sweep b5` does the same on B4's best board (Normal: 2 plots, 18 hexes/player, distance 4; Flash: its default board) with a season roll every 3 or 4 rounds (Normal) or 2 or 3 (Flash). `--multiple-bodegas` turns on [multiple bodegas](#bodega-bonus) in every b5 candidate (for #103 phase D), and `--season-global-only` turns off `season_roll_personal_faces` in every b5 candidate (combinable with `--multiple-bodegas`).
+`scripts/tune.py --sweep b3b` compares the constructive die at cost 1 and 2 with a season roll every 2, 3 or 4 rounds (Normal) or 2 (Flash), against no die. `--sweep b5` does the same on B4's best board (Normal: 2 plots, 18 hexes/player, distance 4; Flash: its default board) with a season roll every 3 or 4 rounds (Normal) or 2 or 3 (Flash). `--multiple-bodegas` turns on [multiple bodegas](#bodega-bonus) in every b5 candidate (for #103 phase D), and `--season-global-only` turns off `season_roll_personal_faces` in every b5 candidate (combinable with `--multiple-bodegas`). The shipped presets are its candidate "constructive die, cost 1, season roll every 3" (Normal) and "... every 2" (Flash) with `--scale 3 --rare-bonus 1 --multiple-bodegas --season-global-only`, with Flash limited to 2-3 players; `--sweep shipped` runs the shipped presets themselves. Every sweep is defined against the Rules v1 presets, so the commands in the tuning report still play the same games.
 
 #### Varietal roulette
 
 The board's vineyards have no varietal. When a player claims a vineyard, they spin the roulette and that varietal is planted there for the rest of the game. The roulette has 14 equal sectors:
 
-| Varietal | Sectors | Points (provisional, to be tuned in #103) |
+| Varietal | Sectors | Points |
 | --- | --- | --- |
-| Malbec | 2 | 2 |
-| Cabernet Sauvignon | 2 | 2 |
-| Cabernet Franc | 1 | 3 |
-| Syrah | 2 | 2 |
-| Merlot | 2 | 2 |
-| Bonarda | 1 | 3 |
-| Torrontés | 2 | 2 |
-| Chardonnay | 2 | 2 |
+| Malbec | 2 | 6 |
+| Cabernet Sauvignon | 2 | 6 |
+| Cabernet Franc | 1 | 7 |
+| Syrah | 2 | 6 |
+| Merlot | 2 | 6 |
+| Bonarda | 1 | 7 |
+| Torrontés | 2 | 6 |
+| Chardonnay | 2 | 6 |
 
-The rarer Bonarda and Cabernet Franc are worth a bit more; a spin is worth 30/14, about 2.14 points, on average. The bodega bonus needs watered vineyards of 3 **different** varietals. The point values are provisional until the re-tuning in #103 (with the scale from #111).
+The rarer Bonarda and Cabernet Franc are worth a bit more; a spin is worth 86/14, about 6.14 points, on average. The bodega bonus needs watered vineyards of 3 **different** varietals. The points are the scale-1 `ROULETTE_POINTS` (2, rare 3) at the score scale of 3 (#111), with a rare bonus of +1 instead of +3, picked in #103 (`SHIPPED_POINTS`).
 
 The varietals, for the printed roulette and the rules sheet (research notes, figures and sources in [`_docs/varietals.md`](_docs/varietals.md)):
 
@@ -196,7 +191,7 @@ The varietals, for the printed roulette and the rules sheet (research notes, fig
 
 ## Physical pieces
 
-All pieces are parametric build123d models printed on the Bambu Lab A1 (256 × 256 mm plate, 0.4 mm nozzle, PLA). The d6 is not printed.
+All pieces are parametric build123d models printed on the Bambu Lab A1 (256 × 256 mm plate, 0.4 mm nozzle, PLA). The Rules v2 pieces (action die, season die, roulette) are #113.
 
 - **Terrain hexes:** hexagonal prism, with relief depending on type
 - **Canal pieces:** hexagon with a groove; neutral, single-color
@@ -274,7 +269,7 @@ A Python server built on `MCPServer` from the official `mcp` SDK (formerly FastM
 
 ### Game config
 
-`acequias/config.py`: every number the game needs, as one immutable `Preset` per mode, fetched with `preset(mode)`. Board generation, setup, scoring, the round loop, and the simulation read their values from it and hard-code none. Tuning changes the shipped values there; experiments build variants with `with_overrides`, which validates them like the shipped presets. Shares (stone hexes, bag mix) are whole-number percentages, and rounds are set per player count (they differ since #20). `varietal_rules` is `VarietalRules.FIXED` (the shipped default: the generator deals the varietals of `varietal_points` onto the board) or `ROULETTE` (blank plots, planted on claim from the `roulette` sectors). `varietal_points` maps each varietal in play to its points (shipped: Malbec 3, Bonarda 2, Torrontés 1); `roulette` lists the sectors in order (`ROULETTE_SECTORS`). `roulette_rules(p)` switches a preset to roulette rules with the provisional `ROULETTE_POINTS`. Validation: under fixed rules `bodega_varietals` is at most the number of varietals in `varietal_points`; under roulette rules every sector needs points, and `bodega_varietals` is at most the number of distinct sector varietals. `vineyards_per_player` is the number of vineyard plots per player. `grape_clusters_per_player` caps each player's claims: `None` (the shipped value) is no cap, otherwise an int of 1 or more. `bribe_rules` is `BribeRules.D6` (the shipped bribe; `die_faces` is its die) or `ACTION_DIE`; `action_die_cost` (0 or more; 0 is for testing only; shipped `ACTION_DIE_COST = 2`, provisional until #103) and `action_die` (the faces in order, not empty; shipped `ACTION_DIE_FACES`, two of each) are used only under action die rules, which also need a floodgate share of 0 in `bag_mix` and, for a `RESOW` face, roulette rules. `action_die_rules(p)` switches a preset to the action die and sets the floodgate share to 0, rescaling the other shares to 100 by largest remainder (ties in `PieceKind` order); call it on a roulette preset, `action_die_rules(roulette_rules(preset(mode)))`. `water_right_points` (1 or more; shipped 1) is the points a watered claimed vineyard pays each distinct rival on its water path. `season_roll_personal_faces` (a bool; shipped `True`) lets a season roll's personal face apply; `False` keeps only its season faces ([Action die](#action-die)). `multiple_bodegas` (a bool; shipped `False`) lets a player earn the bodega bonus once per disjoint group of `bodega_varietals` distinct watered varietals ([Bodega bonus](#bodega-bonus)). `scaled(p, factor)` multiplies every scoring value, each `varietal_points` value, `bodega_points` and `water_right_points`, by an int `factor` of at least 1 and keeps everything else; debt is not scaled (the bribe d6 and `action_die_cost` stay as they are; #103 picks them against the scale).
+`acequias/config.py`: every number the game needs, as one immutable `Preset` per mode, fetched with `preset(mode)`. Board generation, setup, scoring, the round loop, and the simulation read their values from it and hard-code none. Tuning changes the shipped values there; experiments build variants with `with_overrides`, which validates them like the shipped presets. `RULES_V1` holds the Rules v1 presets (shipped until #126), which the tuning sweeps and the engine tests of those rules pin. Shares (stone hexes, bag mix) are whole-number percentages, and rounds are set per player count (they differ since #20). `rounds` also says which player counts a mode is for: its keys (shipped Normal 2 to 5, Flash 2 and 3). `Preset.player_counts` lists them and `check_players(players)` raises `ValueError` for any other count, e.g. "flash mode is for 2 to 3 players, got 4"; `generate_board`, `new_game`, the simulation, and `calculate_score` call it, and `seat_bonus` may list only those counts. `varietal_rules` is `VarietalRules.ROULETTE` (shipped: blank plots, planted on claim from the `roulette` sectors) or `FIXED` (Rules v1: the generator deals the varietals of `varietal_points` onto the board). `varietal_points` maps each varietal in play to its points (shipped `SHIPPED_POINTS`: 6, Bonarda and Cabernet Franc 7); `roulette` lists the sectors in order (`ROULETTE_SECTORS`). `roulette_rules(p)` switches a preset to roulette rules with the scale-1 `ROULETTE_POINTS` (2, rare 3). Validation: under fixed rules `bodega_varietals` is at most the number of varietals in `varietal_points`; under roulette rules every sector needs points, and `bodega_varietals` is at most the number of distinct sector varietals. `vineyards_per_player` is the number of vineyard plots per player. `grape_clusters_per_player` caps each player's claims: `None` (the shipped value) is no cap, otherwise an int of 1 or more. `bribe_rules` is `BribeRules.ACTION_DIE` (shipped) or `D6` (the Rules v1 bribe; `die_faces` is its die); `action_die_cost` (0 or more; 0 is for testing only; shipped `ACTION_DIE_COST = 1`) and `action_die` (the faces in order, not empty; shipped `CONSTRUCTIVE_DIE_FACES`; `ACTION_DIE_FACES` is the 2/2/2 die) are used only under action die rules, which also need a floodgate share of 0 in `bag_mix` and, for a `RESOW` face, roulette rules. `action_die_rules(p)` switches a preset to the action die and sets the floodgate share to 0, rescaling the other shares to 100 by largest remainder (ties in `PieceKind` order); call it on a roulette preset, `action_die_rules(roulette_rules(preset(mode)))`. `water_right_points` (1 or more; shipped 3) is the points a watered claimed vineyard pays each distinct rival on its water path. `season_roll_every` (shipped 3 in Normal, 2 in Flash; `None` is off) starts every X-th round with a [season roll](#season-roll). `season_roll_personal_faces` (a bool; shipped `False`) lets a season roll's personal face apply when `True`; `False` keeps only its season faces. `season_points` and `drought_points` (shipped `None`: one common plot's value, 6, and half of it, 3) are the good season gain and the drought loss. `multiple_bodegas` (a bool; shipped `True`) lets a player earn the bodega bonus once per disjoint group of `bodega_varietals` distinct watered varietals ([Bodega bonus](#bodega-bonus)). `scaled(p, factor)` multiplies every scoring value, each `varietal_points` value, `bodega_points` and `water_right_points`, by an int `factor` of at least 1 and keeps everything else; debt is not scaled (the bribe d6 and `action_die_cost` stay as they are; #103 picks them against the scale).
 
 ### Water reach
 
@@ -316,11 +311,11 @@ Under [action die](#action-die) rules there are four more actions: `RollActionDi
 
 ### Simulation
 
-`acequias/sim.py`: `simulate_game(rules, n, seed)` plays `n` bot games of one mode and returns a `SimResult`. `SimRules` holds `mode`, `players`, `policies` (`policies[k]` plays seat `k + 1`, whatever the start player), and `overrides` for `with_overrides`; the resulting preset is passed only to `new_game`, and every later step reads it from `state.preset`. Game `i` uses `game_seed(seed, i)`, and `play_one(rules, game_seed)` replays any single game of a run. A board the preset cannot satisfy raises `ValueError` naming the game index and seed, with no partial result. A shared win among `k` players gives each `1/k` win credit, so each game hands out exactly 1. Position `j` is the place in round 1's turn order, and `turn_order_advantage` is `max_j |win_rate_by_position[j] − 1/P| × P` (0.10 means a position wins 10% more or less than its fair share). Each statistic is defined in its field's docstring; `SimResult.to_json()` gives plain JSON with the names of `server/schemas.py`. `winner_varietal_rate` has a key only for each varietal in play: those of `varietal_points` under fixed rules (3 keys for the shipped presets), the roulette's 8 under roulette rules. `actions_per_game` also counts `"die"` (rolls), `"release"`, `"resow"`, and `"decline"`; a die floodgate counts as `"floodgate"`, and the counts still add up to `turns_per_game`, which counts log records (a die turn is two). `games_with_die` is the share of games with a roll, `die_faces_per_game` the mean rolls per game of each face, and `die_use_rate` the share of rolls resolved with a use rather than declined (`None` with no rolls).
+`acequias/sim.py`: `simulate_game(rules, n, seed)` plays `n` bot games of one mode and returns a `SimResult`. `SimRules` holds `mode`, `players`, `policies` (`policies[k]` plays seat `k + 1`, whatever the start player), and `overrides` for `with_overrides` (`players` must be one of the resulting preset's `player_counts`); the resulting preset is passed only to `new_game`, and every later step reads it from `state.preset`. Game `i` uses `game_seed(seed, i)`, and `play_one(rules, game_seed)` replays any single game of a run. A board the preset cannot satisfy raises `ValueError` naming the game index and seed, with no partial result. A shared win among `k` players gives each `1/k` win credit, so each game hands out exactly 1. Position `j` is the place in round 1's turn order, and `turn_order_advantage` is `max_j |win_rate_by_position[j] − 1/P| × P` (0.10 means a position wins 10% more or less than its fair share). Each statistic is defined in its field's docstring; `SimResult.to_json()` gives plain JSON with the names of `server/schemas.py`. `winner_varietal_rate` has a key only for each varietal in play: those of `varietal_points` under fixed rules (3 keys for Rules v1), the roulette's 8 under roulette rules (the shipped presets). `actions_per_game` also counts `"die"` (rolls), `"release"`, `"resow"`, and `"decline"`; a die floodgate counts as `"floodgate"`, and the counts still add up to `turns_per_game`, which counts log records (a die turn is two). `games_with_die` is the share of games with a roll, `die_faces_per_game` the mean rolls per game of each face, and `die_use_rate` the share of rolls resolved with a use rather than declined (`None` with no rolls).
 
 ### Performance
 
-The engine and the bots take fast paths (precomputed tables, boards derived without re-validation) whose results must equal the plain rules. `tests/test_golden_games.py` replays fixed simulation runs against `tests/data/golden_games.json`, recorded before the speed-up, so any change in a log, a final state, a path, or a score fails; re-record it only when the rules change on purpose. `uv run python scripts/bench_sim.py` prints the best wall time of fixed 5-player runs and a SHA-256 of each result (equal digests mean nothing moved); `--profile` lists the hottest functions.
+The engine and the bots take fast paths (precomputed tables, boards derived without re-validation) whose results must equal the plain rules. `tests/test_golden_games.py` replays fixed simulation runs against `tests/data/golden_games.json`, recorded before the speed-up, so any change in a log, a final state, a path, or a score fails; re-record it only when the rules change on purpose. The runs pin every Rules v1 value they were recorded with as overrides, so shipping new values (#20, #126) does not change them. `uv run python scripts/bench_sim.py` prints the best wall time of fixed 5-player runs and a SHA-256 of each result (equal digests mean nothing moved); `--profile` lists the hottest functions.
 
 ### CAD pieces
 
@@ -328,7 +323,7 @@ The engine and the bots take fast paths (precomputed tables, boards derived with
 
 ### Board JSON
 
-`server/schemas.py`: the JSON shapes every tool shares, so a board means the same JSON everywhere. A hex is `q`, `r`, `terrain`, and `varietal` (null except on vineyards, and null on a blank vineyard under roulette rules). Enum strings are lowercase ASCII: terrain `"river"`, `"vineyard"`, `"stone"`, `"empty"`; varietal `"malbec"`, `"cabernet_sauvignon"`, `"cabernet_franc"`, `"syrah"`, `"merlot"`, `"bonarda"`, `"torrontes"`, `"chardonnay"`; varietal rules `"fixed"`, `"roulette"`; canal `kind` `"straight"`, `"gentle_curve"`, `"sharp_curve"`, `"symmetric_y"`, `"t_branch"`, `"claw"` (the floodgate is not a kind). Directions are the case-sensitive names `"E"`, `"NE"`, `"NW"`, `"W"`, `"SW"`, `"SE"`. A canal is `q`, `r`, `kind`, `rotation` (0 to 5), `owner`; a floodgate is the canal's `q`, `r` and the `direction` it closes; a claim is `q`, `r`, `player`, and an optional `varietal` (default null): the varietal the roulette planted there, which becomes a `Board.plantings` entry; a player is `id` and `debt`, and the list order gives seats 1 to N. The preset shape (`simulate_game`'s result `preset`, and `overrides` without `mode` in both `simulate_game` and `calculate_score`) adds `water_right_points`, `varietal_rules`, `varietal_points` keyed by varietal name, `roulette` as a list of names, `grape_clusters_per_player` as an int or null (null means no cap; in `overrides`, null sets no cap and leaving the key out keeps the shipped value), `bribe_rules` (`"d6"` or `"action_die"`), `action_die_cost`, and `action_die` as a list of faces (`"floodgate"`, `"release"`, `"resow"`); `simulate_game` with `overrides={"varietal_rules": "roulette", "varietal_points": {...}, "bribe_rules": "action_die", "bag_mix": {..., "floodgate": 0}}` simulates the action die; `calculate_score` with `overrides={"varietal_rules": "roulette", "varietal_points": {...}}` scores a roulette board with planted claims, `overrides={"water_right_points": 2}` doubles the rights terms (every score term is in points), and without `overrides` uses the shipped preset. From a `generate_board` result only `mode` and `hexes` carry over to `calculate_score`: its `players` is a count, not a list, and `seed` and `assembly` are not inputs. Inputs are strict (`"3"`, `3.0`, or `true` is not an int), and the server only maps JSON to `acequias` types; every check comes from the model.
+`server/schemas.py`: the JSON shapes every tool shares, so a board means the same JSON everywhere. A hex is `q`, `r`, `terrain`, and `varietal` (null except on vineyards, and null on a blank vineyard under roulette rules). Enum strings are lowercase ASCII: terrain `"river"`, `"vineyard"`, `"stone"`, `"empty"`; varietal `"malbec"`, `"cabernet_sauvignon"`, `"cabernet_franc"`, `"syrah"`, `"merlot"`, `"bonarda"`, `"torrontes"`, `"chardonnay"`; varietal rules `"fixed"`, `"roulette"`; canal `kind` `"straight"`, `"gentle_curve"`, `"sharp_curve"`, `"symmetric_y"`, `"t_branch"`, `"claw"` (the floodgate is not a kind). Directions are the case-sensitive names `"E"`, `"NE"`, `"NW"`, `"W"`, `"SW"`, `"SE"`. A canal is `q`, `r`, `kind`, `rotation` (0 to 5), `owner`; a floodgate is the canal's `q`, `r` and the `direction` it closes; a claim is `q`, `r`, `player`, and an optional `varietal` (default null): the varietal the roulette planted there, which becomes a `Board.plantings` entry; a player is `id` and `debt`, and the list order gives seats 1 to N. The preset shape (`simulate_game`'s result `preset`, and `overrides` without `mode` in both `simulate_game` and `calculate_score`) adds `water_right_points`, `varietal_rules`, `varietal_points` keyed by varietal name, `roulette` as a list of names, `grape_clusters_per_player` as an int or null (null means no cap; in `overrides`, null sets no cap and leaving the key out keeps the shipped value), `bribe_rules` (`"d6"` or `"action_die"`), `action_die_cost`, and `action_die` as a list of faces (`"floodgate"`, `"release"`, `"resow"`); `simulate_game` with `overrides={"varietal_rules": "fixed", "varietal_points": {...}, "bribe_rules": "d6", "bag_mix": {..., "floodgate": 10}, "season_roll_every": null}` simulates the Rules v1 bribe; `calculate_score` with `overrides={"water_right_points": 6}` doubles the rights terms (every score term is in points), and without `overrides` uses the shipped preset (roulette rules, so claims give the planted `varietal`). The `players` input of `generate_board` and `simulate_game` describes the counts each mode is for, and a count the preset is not for (Flash with 4 or 5 players) comes back as a tool error with the library's message; `overrides.rounds` sets the counts, e.g. `{"2": 6, "3": 6, "4": 4}` gives Flash a 4-player game for experiments. From a `generate_board` result only `mode` and `hexes` carry over to `calculate_score`: its `players` is a count, not a list, and `seed` and `assembly` are not inputs. Inputs are strict (`"3"`, `3.0`, or `true` is not an int), and the server only maps JSON to `acequias` types; every check comes from the model.
 
 ### Tech stack
 
@@ -374,8 +369,8 @@ It is done when:
 | --- | --- |
 | Looks | Height-map relief #16, real elevation relief #32, Blender shapes #36 |
 | Rule variants | Drought #23 and its marker #40, Flash race end #35 |
-| Rules v2 (#114) | Varietal roulette #85, floodgate plate with grip #109, more plots and grape-cluster cap #110, larger score scale #111, action die #112, their pieces #113 |
-| Balance | Re-check with smarter bots #103, seat compensation #104 |
+| Rules v2 (#114) | Varietal roulette #85, floodgate plate with grip #109, more plots and grape-cluster cap #110, larger score scale #111, action die #112, shipped values #126 (done), their pieces #113 |
+| Balance | Re-check with smarter bots #103 (done), seat compensation #104 |
 | Tooling | STEP/3MF per piece #37, board picture #39, faster simulation #43 (done), lookahead bot #42 (done), score-aware bot #67 (done) |
 | Product | Full game-set piece list #38, rulebook, packaging, and cost #41 |
 
@@ -385,13 +380,26 @@ MVP pieces are plain and functional; the decorative layer below comes after the 
 
 - [x] Each tool has unit tests with pytest
 - [x] Every generated board has at least one reachable vineyard per player
-- [ ] Turn-order advantage is at most 10%, in Normal and in Flash separately: met in 10 of 16 simulated configurations; missed by all-greedy tables at Normal 4–5p and Flash 3–5p, and by Flash 5p with saboteurs (follow-ups #103, #104)
+- [ ] Turn-order advantage is at most 10%, in Normal and in Flash separately: with the shipped Rules v2 and `score_aware` bots, met at Normal 2–4p and Flash 2–3p; Normal 5p is 0.114 ± 0.049, accepted by the owner as within the margin (#103). Flash is limited to 2–3 players because 4–5p failed (follow-up #104)
 - [ ] A Normal game takes about 45–60 min and a Flash game 10–20 min, estimated at 1 minute per turn: met at every player count except 2-player Normal, which takes about 20 min by the owner's choice (more rounds would only add passes)
 - [x] Each STL is a closed solid and fits with the other pieces
 
 ### Tuning results
 
-The values above were tuned in #20 with `scripts/tune.py`; the full report, with the method, every sweep, and the owner's decisions, is [`_docs/tuning-results.md`](_docs/tuning-results.md). Final validation, seed 20002, 2,000 / 3,200 / 4,800 / 6,400 games for 2 / 3 / 4 / 5 players (95% margin on the advantage at most ±0.05). Seatings: all `greedy` bots, or `saboteur` and `greedy` alternating (mixed). Minutes assume 1 minute per turn.
+The shipped values (Rules v2) were tuned in #103 with `scripts/tune.py`, on top of the rounds and board of #20; the full report, with the method, every sweep, and the owner's decisions, is [`_docs/tuning-results.md`](_docs/tuning-results.md). The owner approved candidate B (phases C to F): the constructive die at cost 1, a season roll every 3 rounds (Normal) or 2 (Flash) that applies only season faces, scale 3 with rare +1, multiple bodegas, and Normal's board at 18 hexes per player. Final validation (phase D re-run), seed 103002, 2,000 / 3,200 / 4,800 / 6,400 games for 2 / 3 / 4 / 5 players with `score_aware` and `greedy` (95% margin at most ±0.05), 500 with `lookahead` (±0.09 / 0.12 / 0.15 / 0.18):
+
+| Mode | Players | Advantage (score_aware / greedy / lookahead) |
+| --- | --- | --- |
+| Normal | 2 | 0.022 / 0.024 / 0.032 |
+| Normal | 3 | 0.011 / 0.061 / 0.284 |
+| Normal | 4 | 0.054 / 0.107 / 0.177 |
+| Normal | 5 | 0.114 / 0.106 / 0.107 |
+| Flash | 2 | 0.026 / 0.016 / 0.160 |
+| Flash | 3 | 0.081 / 0.063 / 0.114 |
+
+Winning scores run 5.3–9.3 in Normal and 4.1–7.1 in Flash; about a third to a half of the games still end in a shared win. Flash with 4 or 5 players stayed at 0.14–0.38 with every bot and every fix tried (5 rounds, a seat bonus, a tiebreak), so Flash ships for 2 or 3 players only. Normal 5p (0.114 ± 0.049) is accepted as within the margin.
+
+The Rules v1 values were tuned in #20. Final validation, seed 20002, 2,000 / 3,200 / 4,800 / 6,400 games for 2 / 3 / 4 / 5 players (95% margin on the advantage at most ±0.05). Seatings: all `greedy` bots, or `saboteur` and `greedy` alternating (mixed). Minutes assume 1 minute per turn.
 
 | Mode | Players | Advantage (greedy / mixed) | Turns (minutes) | Average winning score (greedy / mixed) |
 | --- | --- | --- | --- | --- |
@@ -404,21 +412,23 @@ The values above were tuned in #20 with `scripts/tune.py`; the full report, with
 | Flash | 4 | **0.18** / 0.07 | 16 | 1.58 / 0.51 |
 | Flash | 5 | **0.29** / **0.15** | 20 | 2.06 / 0.60 |
 
-Bold marks a miss of the 0.10 target. With these one-move-ahead bots scores are very low and about half of the games (more with saboteurs) end in a shared win; #103 re-measures balance with the stronger bots (#42, #67) before any rule change (#104).
+Bold marks a miss of the 0.10 target. With these one-move-ahead bots scores were very low and about half of the games (more with saboteurs) ended in a shared win, which led to Rules v2 and its re-tuning in #103.
 
 ### Open questions
 
-Provisional defaults let work start; the simulation (or CAD, for physical values) settles them. The game values were settled in #20 ([results](#tuning-results)).
+Provisional defaults let work start; the simulation (or CAD, for physical values) settles them. The game values were settled in #20 and, for Rules v2, in #103 ([results](#tuning-results)).
 
-- [x] Normal rounds: 10 / 15 / 12 / 10 for 2 / 3 / 4 / 5 players
-- [x] Flash rounds per player count: 6 / 6 / 4 / 4 for 2 / 3 / 4 / 5 players
-- [x] Hexes per player: Normal 15, Flash 14
-- [x] Bag mix: straight 40% · gentle curve 20% · sharp curve 15% · symmetric Y 5% · T branch 5% · claw 5% · floodgate 10%, sized to board capacity (kept)
-- [x] Vineyards per player: 2, both modes (kept)
+- [x] Normal rounds: 10 / 15 / 12 / 10 for 2 / 3 / 4 / 5 players (#20)
+- [x] Flash rounds: 6 / 6 for 2 / 3 players; Flash is for 2 or 3 players only (#20, #103)
+- [x] Hexes per player: Normal 18 (#103), Flash 14 (#20)
+- [x] Bag mix: straight 44% · gentle curve 22% · sharp curve 17% · symmetric Y 6% · T branch 6% · claw 5%, no floodgates (they come from the action die), sized to board capacity (#103)
+- [x] Vineyards per player: 2, both modes; no grape-cluster cap (#103)
 - [x] Stone hexes: 10% of the non-river hexes (kept)
 - [x] Vineyard distance from the river: 4 hexes (3 canals) in both modes
-- [x] Die: the d6 is kept (a d4 makes bribes common, a d8 nearly removes them); a success threshold waits for smarter bots (#42, #67)
-- [x] Flash bodega bonus: +1 for all three varietals (kept)
+- [x] Score scale: 3, with a rare bonus of +1: varietals 6, Bonarda and Cabernet Franc 7; water rights 3 (#103)
+- [x] Action die: the constructive die (floodgate, release, resow x2, good season, drought) at cost 1; good season +6, drought −3 (#103)
+- [x] Season roll: every 3 rounds in Normal, every 2 in Flash; season faces only (#103, #138)
+- [x] Bodega bonus: +6 Normal, +3 Flash, once per bodega (multiple bodegas) (#103, #135)
 - [x] Hex side: 16 mm, settled by test print 1 (#34, D1); the 18 mm fallback is not needed
 - [ ] Flash race-end variant: evaluate in the simulation before committing (see [Variants](#variants-under-evaluation))
 
@@ -434,7 +444,7 @@ Without the `cad` extra the CAD tests are skipped; CI installs it, so they run t
 
 ### Tuning
 
-`uv run python scripts/tune.py` runs the final validation, `--sweep <name>` one sweep, and `--list` lists them (see [Tuning results](#tuning-results)). Games run in chunks on `--workers` processes (default 3) at below-normal priority, with progress and an ETA on stderr. Each finished chunk is saved under `output/tune-checkpoints/` (`--checkpoint-dir`), so running the same command again resumes a stopped run; `--fresh` ignores the saved chunks. Neither the worker count nor the chunk size changes any number.
+`uv run python scripts/tune.py` runs #20's final validation, `--sweep <name>` one sweep, `--candidate <sweep> <label>` the final validation of one candidate (e.g. `--candidate shipped "shipped (Rules v2)"` for the shipped presets), and `--list` lists them (see [Tuning results](#tuning-results)). A player count a candidate's preset is not for is skipped with a note on stderr, and with `--players` it is an argument error. Games run in chunks on `--workers` processes (default 3) at below-normal priority, with progress and an ETA on stderr. Each finished chunk is saved under `output/tune-checkpoints/` (`--checkpoint-dir`), so running the same command again resumes a stopped run; `--fresh` ignores the saved chunks. Neither the worker count nor the chunk size changes any number.
 
 ### Running the MCP server
 

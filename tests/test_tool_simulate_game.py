@@ -16,6 +16,9 @@ from server.schemas import overrides_from_json
 from server.tools.board import MAX_PICKED_SEED, MAX_SEED
 from server.tools.simulate import DEFAULT_GAMES, MAX_GAMES
 
+PIN_RULES_V1 = True
+"""``conftest.py``: these tests check the engine under the Rules v1 presets."""
+
 pytestmark = pytest.mark.anyio
 
 MODES = {"normal": Mode.NORMAL, "flash": Mode.FLASH}
@@ -270,7 +273,7 @@ async def test_bad_input_is_a_tool_error_naming_the_field(changes, expected):
             "bag_mix shares must add up to exactly 100, got 90",
         ),
         ({"vineyard_distance": [1, 3]}, "vineyard_distance must start at 2 or more"),
-        ({"rounds": {"2": 5, "3": 5, "4": 5}}, "rounds has no value for player counts [5]"),
+        ({"rounds": {}}, "rounds must give at least one player count"),
     ],
 )
 async def test_values_preset_rejects_come_back_with_its_message(overrides, message):

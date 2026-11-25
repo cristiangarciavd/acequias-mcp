@@ -1,8 +1,8 @@
 """The Normal and Flash presets: every number the game needs, in one place.
 
-Values are the ones in ``README.md`` (Game modes, Setup, Bodega bonus),
-tuned by the simulation in #20 (``scripts/tune.py``,
-``_docs/tuning-results.md``). Board
+Values are the ones in ``README.md`` (Game modes, Setup, Bodega bonus):
+Rules v2, tuned by the simulation in #20 and #103 (``scripts/tune.py``,
+``_docs/tuning-results.md``) and approved by the owner on #103. Board
 generation, setup, scoring, the round loop, and the simulation read them
 from here instead of hard-coding them.
 
@@ -35,8 +35,9 @@ class VarietalRules(Enum):
     """How vineyards get their varietal.
 
     ``FIXED``: the board generator puts a varietal from ``varietal_points``
-    on every vineyard tile (the shipped game). ``ROULETTE``: vineyard tiles
-    are blank, and a player who claims one spins the roulette to plant it.
+    on every vineyard tile (Rules v1). ``ROULETTE``: vineyard tiles are
+    blank, and a player who claims one spins the roulette to plant it (the
+    shipped game).
     """
 
     FIXED = "fixed"
@@ -47,9 +48,9 @@ class BribeRules(Enum):
     """What the bribe action is.
 
     ``D6``: roll the bribe die, add the roll to your debt, and remove or
-    move a floodgate (the shipped game). ``ACTION_DIE``: pay a fixed cost
-    in debt, roll the action die, and use its face (floodgate, release, or
-    resow); floodgates come only from the die.
+    move a floodgate (Rules v1). ``ACTION_DIE``: pay a fixed cost in debt,
+    roll the action die, and use its face; floodgates come only from the
+    die (the shipped game).
     """
 
     D6 = "d6"
@@ -64,7 +65,7 @@ ACTION_DIE_FACES: tuple[DieFace, ...] = (
     DieFace.RESOW,
     DieFace.RESOW,
 )
-"""The action die's 6 faces, in order: two of each."""
+"""An action die of 6 faces, in order: two of each (#103's first draft, kept for tuning)."""
 
 CONSTRUCTIVE_DIE_FACES: tuple[DieFace, ...] = (
     DieFace.FLOODGATE,
@@ -75,12 +76,10 @@ CONSTRUCTIVE_DIE_FACES: tuple[DieFace, ...] = (
     DieFace.DROUGHT,
 )
 """The constructive action die (#130), in order: floodgate, release, two
-resows, good season, drought. An opt-in ``action_die``; ``ACTION_DIE_FACES``
-stays the default."""
+resows, good season, drought: the shipped ``action_die`` (#103)."""
 
-# Provisional: the debt a roll of the action die costs. The owner's range is
-# 2 or 3; the final value is tuned in #103.
-ACTION_DIE_COST = 2
+ACTION_DIE_COST = 1
+"""The debt a roll of the action die costs (#103)."""
 
 
 ROULETTE_SECTORS: tuple[Varietal, ...] = (
@@ -102,8 +101,9 @@ ROULETTE_SECTORS: tuple[Varietal, ...] = (
 """The roulette's 14 equal sectors, in order: Bonarda and Cabernet Franc
 have one each, every other varietal two."""
 
-# Provisional points under roulette rules: Bonarda and Cabernet Franc are
-# worth a bit more. The final values are tuned in #103 (with #111's scale).
+# Points under roulette rules at scale 1: Bonarda and Cabernet Franc are
+# worth a bit more. ``roulette_rules`` uses them; the shipped presets use
+# ``SHIPPED_POINTS`` (#103).
 ROULETTE_POINTS: Mapping[Varietal, int] = MappingProxyType(
     {
         Varietal.MALBEC: 2,
@@ -117,18 +117,36 @@ ROULETTE_POINTS: Mapping[Varietal, int] = MappingProxyType(
     }
 )
 
+SHIPPED_POINTS: Mapping[Varietal, int] = MappingProxyType(
+    {
+        Varietal.MALBEC: 6,
+        Varietal.CABERNET_SAUVIGNON: 6,
+        Varietal.CABERNET_FRANC: 7,
+        Varietal.SYRAH: 6,
+        Varietal.MERLOT: 6,
+        Varietal.BONARDA: 7,
+        Varietal.TORRONTES: 6,
+        Varietal.CHARDONNAY: 6,
+    }
+)
+"""The shipped points of a watered vineyard (#103): ``ROULETTE_POINTS`` at
+scale 3 with a rare bonus of 1, so 6 for a common varietal and 7 for the
+rare Bonarda and Cabernet Franc."""
+
 
 @dataclass(frozen=True, slots=True)
 class Preset:
     """The numbers for one game mode.
 
-    ``rounds`` maps each player count (2 to 5) to its round count.
+    ``rounds`` maps each player count the mode is for (some or all of 2
+    to 5) to its round count; a player count it does not list cannot be
+    played (``player_counts``, ``check_players``).
     ``vineyard_distance`` is the ``(low, high)`` range, in hexes, of a
     vineyard's distance from the river. ``stone_share`` is the percentage of
     non-river hexes that are stone, and ``bag_mix`` the percentage of the bag
     for each ``PieceKind``. A player whose watered vineyards include
     ``bodega_varietals`` distinct varietals earns ``bodega_points``. With
-    ``multiple_bodegas`` (off by default) a player earns it once per
+    ``multiple_bodegas`` (off by default, on in the shipped presets) a player earns it once per
     disjoint group of ``bodega_varietals`` watered vineyards of distinct
     varietals (``acequias.scoring.bodega_count``).
     ``water_right_points`` is what a watered claimed vineyard pays each
@@ -146,8 +164,8 @@ class Preset:
     the board. ``grape_clusters_per_player`` caps the claims each player can
     hold; ``None`` means no cap (the shipped game).
 
-    ``bribe_rules`` says what the bribe action is: the d6 bribe (shipped)
-    or the action die. ``action_die_cost`` is the debt one roll of the
+    ``bribe_rules`` says what the bribe action is: the d6 bribe (Rules v1)
+    or the action die (shipped). ``action_die_cost`` is the debt one roll of the
     action die costs, and ``action_die`` its faces in order; both are used
     only under ``action_die`` rules, where the bag has no floodgates
     (``bag_mix`` gives them 0) and a ``RESOW`` face needs roulette rules.
@@ -160,18 +178,19 @@ class Preset:
     (the default) derives them: ``season_gain`` is one common vineyard
     plot's value (``common_vineyard_points``), and ``drought_loss`` half
     of ``season_gain``, rounded down, at least 1. ``season_roll_every``
-    (``None``: off, the default) starts every X-th round with a free roll
+    (``None``: off, the default; on in the shipped presets) starts every X-th round with a free roll
     of the action die by the season die's holder, which passes to the
     next seat after each season roll (``acequias.game.season_holder``);
     it needs action die rules. With ``season_roll_personal_faces`` off
-    (on by default), a season roll applies only a season face: a
+    (on by default, off in the shipped presets), a season roll applies only a season face: a
     personal face it rolls does nothing (voluntary rolls are unchanged).
 
     ``seat_bonus`` (empty by default: off) maps a player count to each
     seat's bonus points at the start, in round 1's turn order: entry 0 is
     the first start player's, entry 1 the next seat's, and so on (the
     "position" of ``acequias.sim``). A player count it does not list gets
-    no bonus. Each tuple has one int >= 0 per player. The bonus is a term
+    no bonus; only player counts in ``rounds`` may be listed. Each tuple
+    has one int >= 0 per player. The bonus is a term
     of the final score (``acequias.scoring``). It is read-only, keyed in
     player count order.
     """
@@ -234,7 +253,7 @@ class Preset:
                 _check_count(name, getattr(self, name))
         _check_type("multiple_bodegas", self.multiple_bodegas, bool)
         _check_type("season_roll_personal_faces", self.season_roll_personal_faces, bool)
-        _set(self, "seat_bonus", _seat_bonus(self.seat_bonus))
+        _set(self, "seat_bonus", _seat_bonus(self.seat_bonus, self.player_counts))
         if self.season_roll_every is not None and self.bribe_rules is not BribeRules.ACTION_DIE:
             raise ValueError("season_roll_every needs action_die bribe rules")
         if self.bribe_rules is BribeRules.ACTION_DIE:
@@ -264,7 +283,7 @@ class Preset:
                 f"bodega_varietals must be 1 to {in_play} (the distinct varietals in "
                 f"{where} under {self.varietal_rules.value} rules), got {self.bodega_varietals}"
             )
-        for players in PLAYER_COUNTS:
+        for players in self.player_counts:
             hexes = players * self.hexes_per_player
             vineyards = players * self.vineyards_per_player
             stones = _ceil_share(self.stone_share, hexes)
@@ -292,14 +311,37 @@ class Preset:
         """Whether ``round`` starts with a free season roll: every ``season_roll_every``-th round."""
         return self.season_roll_every is not None and round % self.season_roll_every == 0
 
-    def rounds_for(self, players: int) -> int:
-        """The round count for a game of ``players`` players (2 to 5)."""
+    @property
+    def player_counts(self) -> tuple[int, ...]:
+        """The player counts this preset is for, in order: the keys of ``rounds``."""
+        return tuple(self.rounds)
+
+    def check_players(self, players: object) -> None:
+        """Raise ``ValueError`` unless ``players`` is one of ``player_counts``.
+
+        ``TypeError`` if it is not an int. The message names the mode and
+        its player counts, e.g. "flash mode is for 2 to 3 players, got 4".
+        """
         _check_int("players", players)
         if players not in self.rounds:
             raise ValueError(
-                f"players must be {MIN_PLAYERS} to {MAX_PLAYERS}, got {players}"
+                f"{self.mode.value} mode is for {players_text(self.player_counts)} players, "
+                f"got {players}"
             )
+
+    def rounds_for(self, players: int) -> int:
+        """The round count for a game of ``players`` players (one of ``player_counts``)."""
+        self.check_players(players)
         return self.rounds[players]
+
+
+def players_text(counts: tuple[int, ...]) -> str:
+    """``counts`` in words: "2 to 5" for consecutive counts, "2, 3 or 5" otherwise."""
+    if len(counts) == 1:
+        return str(counts[0])
+    if list(counts) == list(range(counts[0], counts[-1] + 1)):
+        return f"{counts[0]} to {counts[-1]}"
+    return ", ".join(map(str, counts[:-1])) + f" or {counts[-1]}"
 
 
 def common_vineyard_points(p: Preset) -> int:
@@ -360,28 +402,30 @@ def _ceil_share(share: int, total: int) -> int:
 
 def _rounds(value: object) -> Mapping[int, int]:
     _check_type("rounds", value, Mapping)
-    missing = [n for n in PLAYER_COUNTS if n not in value]
-    if missing:
-        raise ValueError(f"rounds has no value for player counts {missing}")
-    extra = [n for n in value if n not in PLAYER_COUNTS]
+    if not value:
+        raise ValueError(
+            f"rounds must give at least one player count ({MIN_PLAYERS} to {MAX_PLAYERS})"
+        )
+    extra = [n for n in value if n not in PLAYER_COUNTS or isinstance(n, bool)]
     if extra:
         raise ValueError(
             f"rounds gives player counts {extra}; only {MIN_PLAYERS} to {MAX_PLAYERS} are allowed"
         )
-    for players in PLAYER_COUNTS:
+    counts = [players for players in PLAYER_COUNTS if players in value]
+    for players in counts:
         _check_count(f"rounds[{players}]", value[players])
-    return MappingProxyType({players: value[players] for players in PLAYER_COUNTS})
+    return MappingProxyType({players: value[players] for players in counts})
 
 
-def _seat_bonus(value: object) -> Mapping[int, tuple[int, ...]]:
+def _seat_bonus(value: object, counts: tuple[int, ...]) -> Mapping[int, tuple[int, ...]]:
     _check_type("seat_bonus", value, Mapping)
-    extra = [n for n in value if n not in PLAYER_COUNTS or isinstance(n, bool)]
+    extra = [n for n in value if n not in counts or isinstance(n, bool)]
     if extra:
         raise ValueError(
-            f"seat_bonus gives player counts {extra}; only {MIN_PLAYERS} to {MAX_PLAYERS} are allowed"
+            f"seat_bonus gives player counts {extra}; rounds has only {players_text(counts)}"
         )
     bonus: dict[int, tuple[int, ...]] = {}
-    for players in PLAYER_COUNTS:
+    for players in counts:
         if players not in value:
             continue
         points = value[players]
@@ -470,39 +514,47 @@ def _action_die(value: object) -> tuple[DieFace, ...]:
 # --- Presets and access ----------------------------------------------------
 
 
+# Rules v2, approved by the owner on #103 (candidate B, phases D-F of
+# ``_docs/tuning-results.md``). ``die_faces`` (the d6 bribe) is unused under
+# action die rules.
 NORMAL = Preset(
     mode=Mode.NORMAL,
     rounds={2: 10, 3: 15, 4: 12, 5: 10},
-    hexes_per_player=15,
+    hexes_per_player=18,
     vineyards_per_player=2,
     stone_share=10,
     vineyard_distance=(4, 4),
     market_size=4,
     bag_mix={
-        PieceKind.STRAIGHT: 40,
-        PieceKind.GENTLE_CURVE: 20,
-        PieceKind.SHARP_CURVE: 15,
-        PieceKind.SYMMETRIC_Y: 5,
-        PieceKind.T_BRANCH: 5,
+        PieceKind.STRAIGHT: 44,
+        PieceKind.GENTLE_CURVE: 22,
+        PieceKind.SHARP_CURVE: 17,
+        PieceKind.SYMMETRIC_Y: 6,
+        PieceKind.T_BRANCH: 6,
         PieceKind.CLAW: 5,
-        PieceKind.FLOODGATE: 10,
+        PieceKind.FLOODGATE: 0,
     },
     die_faces=6,
-    bodega_points=2,
+    bodega_points=6,
     bodega_varietals=3,
-    water_right_points=1,
-    varietal_rules=VarietalRules.FIXED,
-    varietal_points={Varietal.MALBEC: 3, Varietal.BONARDA: 2, Varietal.TORRONTES: 1},
+    water_right_points=3,
+    varietal_rules=VarietalRules.ROULETTE,
+    varietal_points=SHIPPED_POINTS,
     roulette=ROULETTE_SECTORS,
     grape_clusters_per_player=None,
-    bribe_rules=BribeRules.D6,
+    bribe_rules=BribeRules.ACTION_DIE,
     action_die_cost=ACTION_DIE_COST,
-    action_die=ACTION_DIE_FACES,
+    action_die=CONSTRUCTIVE_DIE_FACES,
+    season_roll_every=3,
+    multiple_bodegas=True,
+    season_roll_personal_faces=False,
 )
 
+# Flash is for 2 or 3 players only: at 4 and 5 its short game was biased
+# (too many ties, a turn-order advantage no fix removed; #103 phases E-F).
 FLASH = Preset(
     mode=Mode.FLASH,
-    rounds={2: 6, 3: 6, 4: 4, 5: 4},
+    rounds={2: 6, 3: 6},
     hexes_per_player=14,
     vineyards_per_player=2,
     stone_share=10,
@@ -510,19 +562,67 @@ FLASH = Preset(
     market_size=4,
     bag_mix=NORMAL.bag_mix,
     die_faces=6,
-    bodega_points=1,
+    bodega_points=3,
     bodega_varietals=3,
-    water_right_points=1,
-    varietal_rules=VarietalRules.FIXED,
-    varietal_points=NORMAL.varietal_points,
+    water_right_points=3,
+    varietal_rules=VarietalRules.ROULETTE,
+    varietal_points=SHIPPED_POINTS,
     roulette=ROULETTE_SECTORS,
     grape_clusters_per_player=None,
-    bribe_rules=BribeRules.D6,
+    bribe_rules=BribeRules.ACTION_DIE,
     action_die_cost=ACTION_DIE_COST,
-    action_die=ACTION_DIE_FACES,
+    action_die=CONSTRUCTIVE_DIE_FACES,
+    season_roll_every=2,
+    multiple_bodegas=True,
+    season_roll_personal_faces=False,
 )
 
 _PRESETS: Mapping[Mode, Preset] = MappingProxyType({Mode.NORMAL: NORMAL, Mode.FLASH: FLASH})
+
+_V1_BAG = {
+    PieceKind.STRAIGHT: 40,
+    PieceKind.GENTLE_CURVE: 20,
+    PieceKind.SHARP_CURVE: 15,
+    PieceKind.SYMMETRIC_Y: 5,
+    PieceKind.T_BRANCH: 5,
+    PieceKind.CLAW: 5,
+    PieceKind.FLOODGATE: 10,
+}
+_V1_POINTS = {Varietal.MALBEC: 3, Varietal.BONARDA: 2, Varietal.TORRONTES: 1}
+
+RULES_V1: Mapping[Mode, Preset] = MappingProxyType(
+    {
+        mode: Preset(
+            mode=mode,
+            rounds=rounds,
+            hexes_per_player=hexes,
+            vineyards_per_player=2,
+            stone_share=10,
+            vineyard_distance=(4, 4),
+            market_size=4,
+            bag_mix=_V1_BAG,
+            die_faces=6,
+            bodega_points=bodega,
+            bodega_varietals=3,
+            water_right_points=1,
+            varietal_rules=VarietalRules.FIXED,
+            varietal_points=_V1_POINTS,
+            roulette=ROULETTE_SECTORS,
+            grape_clusters_per_player=None,
+            bribe_rules=BribeRules.D6,
+            action_die_cost=2,
+            action_die=ACTION_DIE_FACES,
+        )
+        for mode, rounds, hexes, bodega in (
+            (Mode.NORMAL, {2: 10, 3: 15, 4: 12, 5: 10}, 15, 2),
+            (Mode.FLASH, {2: 6, 3: 6, 4: 4, 5: 4}, 14, 1),
+        )
+    }
+)
+"""The Rules v1 presets, shipped from #20 until #126: fixed varietals, the d6
+bribe, floodgates in the bag, Flash for 2 to 5 players. Not shipped: the
+tuning sweeps (``scripts/tune.py``) and the engine tests of those rules pin
+them."""
 
 
 def preset(mode: Mode) -> Preset:

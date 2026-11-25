@@ -21,6 +21,9 @@ from acequias.model import GameState, Mode, Player
 from acequias.setup import new_game
 from acequias.turn import Bribe, IllegalAction, Pass, legal_actions
 
+PIN_RULES_V1 = True
+"""``conftest.py``: these tests check the engine under the Rules v1 presets."""
+
 PLAYER_COUNTS = (2, 3, 4, 5)
 
 

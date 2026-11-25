@@ -9,6 +9,7 @@ from mcp import Client
 from acequias import sim
 from acequias.bots import POLICIES, greedy_bot, policy, score_aware_bot
 from acequias.config import (
+    RULES_V1,
     action_die_rules,
     preset,
     roulette_rules,
@@ -43,6 +44,9 @@ from acequias.turn import (
 )
 from server.app import app
 
+PIN_RULES_V1 = True
+"""``conftest.py``: these tests check the engine under the Rules v1 presets."""
+
 E, NE, NW, W, SW, SE = list(Direction)
 STRAIGHT, GATE, T = PieceKind.STRAIGHT, PieceKind.FLOODGATE, PieceKind.T_BRANCH
 MALBEC, BONARDA, TORRONTES = Varietal.MALBEC, Varietal.BONARDA, Varietal.TORRONTES
@@ -52,7 +56,7 @@ R = Hex(0, 0)  # the river
 EAST, WEST, SOUTH, NORTH = Hex(1, 0), Hex(-1, 0), Hex(0, 1), Hex(0, -1)
 FAR_E, FAR_W, FAR_S, FAR_N = Hex(2, 0), Hex(-2, 0), Hex(0, 2), Hex(0, -2)
 
-NORMAL = preset(Mode.NORMAL)
+NORMAL = RULES_V1[Mode.NORMAL]
 DIE = action_die_rules(roulette_rules(NORMAL))
 # Roulette mean under DIE: (2 * 3 + 12 * 2) / 14 = 15/7.
 

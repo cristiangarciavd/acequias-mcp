@@ -96,10 +96,10 @@ def test_drought_never_takes_the_bonus_below_zero():
 
 
 def test_simulated_game_gives_the_bonus_by_position():
-    rules = SimRules(Mode.FLASH, 4, ("greedy",) * 4, {"seat_bonus": {4: (3, 2, 1, 0)}})
+    rules = SimRules(Mode.FLASH, 3, ("greedy",) * 3, {"seat_bonus": {3: (3, 2, 0)}})
     record = play_one(rules, game_seed(142, 0))
     order = turn_order(record.start, 1)
-    assert [record.scores[pid].seat_bonus for pid in order] == [3, 2, 1, 0]
+    assert [record.scores[pid].seat_bonus for pid in order] == [3, 2, 0]
     for s in record.scores.values():
         assert s.total == (s.vineyards + s.bodega - s.rights_paid + s.rights_collected - s.debt
                            + s.season + s.seat_bonus - s.drought)
@@ -136,9 +136,9 @@ def test_flags_apply_over_every_b5_candidate(mode):
     on = {s.name: s for s in tune.v2_sweeps(2, 1, seat_bonus=bonus, rounds=rounds)}
     for _, changes in off["b5"].candidates[mode]:
         assert "seat_bonus" not in changes
-    shipped = preset(mode).rounds
+    shipped = tune.V1_PRESET[mode].rounds
     for _, changes in on["b5"].candidates[mode]:
-        p = with_overrides(preset(mode), **{**tune.V2_BASE[mode], **changes})
+        p = with_overrides(tune.V1_PRESET[mode], **{**tune.V2_BASE[mode], **changes})
         assert dict(p.seat_bonus) == bonus
         assert dict(p.rounds) == {2: shipped[2], 3: shipped[3], 4: 5, 5: 5}
     assert "seat bonus 4=1,1,1,0;5=1,1,1,0,0" in on["b5"].title and "rounds 4=5,5=5" in on["b5"].title

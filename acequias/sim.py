@@ -456,7 +456,9 @@ def _spread(values: Sequence[int]) -> Mapping[str, float]:
 
 
 def _preset(rules: SimRules) -> Preset:
-    return with_overrides(shipped_preset(rules.mode), **rules.overrides)
+    preset = with_overrides(shipped_preset(rules.mode), **rules.overrides)
+    preset.check_players(rules.players)
+    return preset
 
 
 def _bots(rules: SimRules) -> tuple[Bot, ...]:
