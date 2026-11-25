@@ -6,6 +6,8 @@ import pytest
 
 from acequias import config
 from acequias.config import (
+    BlendRule,
+    BodegaPlacement,
     BoardShape,
     PlantingRules,
     ACTION_DIE_FACES,
@@ -99,6 +101,20 @@ README_VARIETAL_POINTS = {
     Varietal.CHARDONNAY: 6,
 }
 
+# Rules v3 scoring options (#166): opt-in, off in the shipped presets.
+V3_SCORING_DEFAULTS = dict(
+    varietal_bodega=True,
+    blends=(),
+    blend_rule=BlendRule.EACH_ONCE,
+    bodega_building=False,
+    bodega_placement=BodegaPlacement.NEW_SPOT,
+    bodega_min_vineyards=0,
+    bodega_min_reds=2,
+    bodega_min_whites=2,
+    bodega_building_points=12,
+    bodegas_per_player=1,
+)
+
 # Rules v2, approved by the owner on #103 and shipped in #126.
 README_VALUES = {
     Mode.NORMAL: dict(
@@ -131,6 +147,7 @@ README_VALUES = {
         board_shape=BoardShape.FIELD,
         river_hexes_per_segment=5,
         bag_size={},
+        **V3_SCORING_DEFAULTS,
     ),
     Mode.FLASH: dict(
         rounds={2: 6, 3: 6},
@@ -162,6 +179,7 @@ README_VALUES = {
         board_shape=BoardShape.FIELD,
         river_hexes_per_segment=5,
         bag_size={},
+        **V3_SCORING_DEFAULTS,
     ),
 }
 

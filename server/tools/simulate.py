@@ -40,7 +40,8 @@ DEFAULT_POLICY = "greedy"
 PolicyName = Literal[tuple(POLICIES)]  # type: ignore[valid-type]
 
 ActionName = Literal[
-    "canal", "floodgate", "bribe", "pass", "die", "release", "resow", "decline", "plant", "move"
+    "canal", "floodgate", "bribe", "pass", "die", "release", "resow", "decline", "plant", "move",
+    "bodega",
 ]
 DieFaceName = Literal["floodgate", "release", "resow", "move", "good_season", "drought"]
 ScoreTermName = Literal[

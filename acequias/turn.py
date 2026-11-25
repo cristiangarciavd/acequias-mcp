@@ -88,8 +88,10 @@ apart from the above. Only ``current_player`` acts, and the turn is:
    ``Preset.vertex_needs_three_canals``, only where all 3 hexes hold a
    canal; one
    ``rng.choice(preset.roulette)``; under a ``grape_clusters_per_player``
-   cap only while the player holds fewer vineyards), or ``Pass``, always
-   legal, which ends the turn. A canal is illegal once ``canals`` is 0.
+   cap only while the player holds fewer vineyards), ``BuildBodega``
+   (``Preset.bodega_building``, #166; see ``can_build_bodega``), or
+   ``Pass``, always legal, which ends the turn. A canal is illegal once
+   ``canals`` is 0. A bodega is never moved or resown.
 
 There are no claims, bribes, season rolls, or season points under Rules v3;
 the d6 ``Bribe``, the market ``PlaceFloodgate``, and the hex ``Resow`` are
@@ -98,7 +100,7 @@ under hex planting. ``legal_actions`` lists, for ``current_player`` only:
 ``RollActionDie()`` before the roll; a pending face's uses (floodgates and
 releases in edge order, then resows by vertex, then moves by vertex and
 target), then ``DeclineFace()`` for resow and move; otherwise canal placements,
-plants by vertex, then ``Pass()``. ``acequias.game`` ends the turn once no
+plants by vertex, bodega builds by vertex, then ``Pass()``. ``acequias.game`` ends the turn once no
 face is pending and no action is left. Nothing here depends on the board's
 bounds or ``Board.spots``, so the turn also fits an open board.
 
@@ -111,7 +113,13 @@ from __future__ import annotations
 import random
 from dataclasses import dataclass, replace
 
-from acequias.config import BribeRules, PlantingRules, Preset, VarietalRules
+from acequias.config import (
+    BodegaPlacement,
+    BribeRules,
+    PlantingRules,
+    Preset,
+    VarietalRules,
+)
 from acequias.config import preset as shipped_preset
 from acequias.flow import _watered, can_plant, plantable_spots
 from acequias.hex import Direction, Hex, Vertex
@@ -119,6 +127,7 @@ from acequias.model import (
     ROTATIONS,
     ActionsLeft,
     Board,
+    BodegaBuilding,
     DieFace,
     Floodgate,
     GameState,
@@ -138,6 +147,8 @@ __all__ = [
     "Release",
     "Resow",
     "DeclineFace",
+    "BuildBodega",
+    "can_build_bodega",
     "Plant",
     "ResowVineyard",
     "MoveVineyard",
@@ -281,6 +292,20 @@ class MoveVineyard:
         _check_type("MoveVineyard.to", self.to, Vertex)
 
 
+@dataclass(frozen=True)
+class BuildBodega:
+    """Rules v3 ``bodega_building`` (#166): build a bodega on ``vertex``.
+
+    ``vertex`` is a free spot you may plant on, or, with
+    ``Preset.bodega_placement`` ``REPLACE``, one of your planted vineyards.
+    """
+
+    vertex: Vertex
+
+    def __post_init__(self) -> None:
+        _check_type("BuildBodega.vertex", self.vertex, Vertex)
+
+
 Action = (
     PlaceCanal
     | PlaceFloodgate
@@ -293,12 +318,13 @@ Action = (
     | Plant
     | ResowVineyard
     | MoveVineyard
+    | BuildBodega
 )
 _ACTION_TYPES = (
     PlaceCanal, PlaceFloodgate, Bribe, Pass, RollActionDie, Release, Resow, DeclineFace,
-    Plant, ResowVineyard, MoveVineyard,
+    Plant, ResowVineyard, MoveVineyard, BuildBodega,
 )
-_V3_ACTIONS = (Plant, ResowVineyard, MoveVineyard)
+_V3_ACTIONS = (Plant, ResowVineyard, MoveVineyard, BuildBodega)
 _FACE_ACTIONS = {
     DieFace.FLOODGATE: PlaceFloodgate,
     DieFace.RELEASE: Release,
@@ -326,7 +352,8 @@ def apply(state: GameState, player: str, action: Action, rng: random.Random) -> 
     if not isinstance(action, _ACTION_TYPES):
         raise TypeError(
             "action must be PlaceCanal, PlaceFloodgate, Bribe, Pass, RollActionDie, "
-            f"Release, Resow, DeclineFace, Plant, ResowVineyard, or MoveVineyard, got {action!r}"
+            "Release, Resow, DeclineFace, Plant, ResowVineyard, MoveVineyard, or BuildBodega, "
+            f"got {action!r}"
         )
     _check_player(state, player)
     preset = _preset(state)
@@ -735,6 +762,12 @@ def _apply_v3(
             board=state.board._derive(planted=planted),  # checked by _check_plant
             actions_left=ActionsLeft(actions, min(left.canals, actions)),
         )
+    if isinstance(action, BuildBodega):
+        board = _bodega_board(state, player, action.vertex, preset)
+        actions = left.actions - 1
+        return replace(
+            state, board=board, actions_left=ActionsLeft(actions, min(left.canals, actions))
+        )
     raise IllegalAction(f"{name} is not a Rules v3 action here; place a canal, plant, or pass")
 
 
@@ -833,6 +866,8 @@ def _v3_board_after(state: GameState, player: str, action: Action) -> tuple[Boar
         _check_plant(state, player, action.vertex, preset)
         vineyard = PlantedVineyard(action.vertex, player, preset.roulette[0])
         return state.board._derive(planted=state.board.planted + (vineyard,)), action.vertex
+    if isinstance(action, BuildBodega):
+        return _bodega_board(state, player, action.vertex, preset), None
     raise IllegalAction(f"{type(action).__name__} changes no board under Rules v3")
 
 
@@ -861,6 +896,60 @@ def _check_plant(state: GameState, player: str, vertex: Vertex, preset: Preset) 
         )
 
 
+def can_build_bodega(board: Board, player: str, preset: Preset) -> bool:
+    """Whether ``player`` meets the bodega building requirement now (#166), wherever they build.
+
+    Needs ``Preset.bodega_building`` and fewer bodegas than
+    ``bodegas_per_player``; then, among the vineyards the player planted,
+    at least ``bodega_min_vineyards`` vineyards, ``bodega_min_reds``
+    distinct red and ``bodega_min_whites`` distinct white varietals.
+    """
+    if not preset.bodega_building:
+        return False
+    cap = preset.bodegas_per_player
+    if cap is not None and sum(1 for b in board.bodegas if b.owner == player) >= cap:
+        return False
+    counted = [v.varietal for v in board.planted if v.owner == player]
+    if len(counted) < preset.bodega_min_vineyards:
+        return False
+    whites = {v for v in counted if v.is_white}
+    reds = set(counted) - whites
+    return len(reds) >= preset.bodega_min_reds and len(whites) >= preset.bodega_min_whites
+
+
+def _bodega_spots(state: GameState, player: str, preset: Preset) -> list[Vertex]:
+    """Where ``player`` may build a bodega now, in vertex order; empty when they may not."""
+    board = state.board
+    if not can_build_bodega(board, player, preset):
+        return []
+    if preset.bodega_placement is BodegaPlacement.REPLACE:
+        return [v.vertex for v in board.planted if v.owner == player]
+    return list(plantable_spots(board, player, preset.vertex_needs_three_canals))
+
+
+def _bodega_board(state: GameState, player: str, vertex: Vertex, preset: Preset) -> Board:
+    """The board after ``player`` builds a bodega on ``vertex``; ``IllegalAction`` if they may not."""
+    board = state.board
+    if not can_build_bodega(board, player, preset):
+        raise IllegalAction(
+            f"{player} may not build a bodega: it needs bodega_building, fewer than "
+            f"bodegas_per_player bodegas, and {preset.bodega_min_reds} distinct red and "
+            f"{preset.bodega_min_whites} distinct white varietals"
+        )
+    bodega = BodegaBuilding(vertex, player)
+    if preset.bodega_placement is BodegaPlacement.REPLACE:
+        vineyard = board.planted_at(vertex)
+        if vineyard is None or vineyard.owner != player:
+            raise IllegalAction(f"{player} has no vineyard on {vertex} to replace with a bodega")
+        rest = tuple(v for v in board.planted if v != vineyard)
+        return board._derive(planted=rest, bodegas=board.bodegas + (bodega,))
+    if not can_plant(board, player, vertex, preset.vertex_needs_three_canals):
+        raise IllegalAction(
+            f"{player} may not build a bodega on {vertex}: it must be a spot they may plant on"
+        )
+    return board._derive(bodegas=board.bodegas + (bodega,))
+
+
 def _below_cap(state: GameState, player: str, preset: Preset) -> bool:
     cap = preset.grape_clusters_per_player
     return cap is None or sum(1 for v in state.board.planted if v.owner == player) < cap
@@ -885,7 +974,8 @@ def _legal_v3(state: GameState, player: str, preset: Preset) -> tuple[Action, ..
         if _below_cap(state, player, preset)
         else []
     )
-    return (*canals, *plants, Pass())
+    bodegas = [BuildBodega(v) for v in _bodega_spots(state, player, preset)]
+    return (*canals, *plants, *bodegas, Pass())
 
 
 # --- Shared ------------------------------------------------------------------

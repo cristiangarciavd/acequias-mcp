@@ -42,6 +42,8 @@ SCORE_KEYS = {
     "bodegas",
     "seat_bonus",
 }
+V3_SCORE_KEYS = {"blend", "blends", "buildings", "watered_bodegas"}
+"""Rules v3 #166 terms: in the schema, given only when not 0 or empty."""
 TERMS = ("vineyards", "bodega", "rights_paid", "rights_collected", "debt", "total")
 
 
@@ -169,7 +171,8 @@ async def test_input_schema_describes_every_field_and_its_allowed_values():
         schema = (await tool_info(client)).input_schema
     properties = schema["properties"]
     assert set(properties) == {
-        "mode", "hexes", "canals", "floodgates", "claims", "players", "overrides", "planted", "strip"
+        "mode", "hexes", "canals", "floodgates", "claims", "players", "overrides", "planted", "strip",
+        "bodegas",
     }
     assert all(properties[name].get("description") for name in properties)
     assert sorted(schema["required"]) == ["hexes", "mode", "players"]
@@ -215,7 +218,7 @@ async def test_output_schema_is_published():
     assert set(schema["properties"]) == {"mode", "scores", "winners"}
     jsonschema.Draft202012Validator.check_schema(schema)
     score = resolve(schema, schema["properties"]["scores"]["items"])
-    assert set(score["properties"]) == SCORE_KEYS
+    assert set(score["properties"]) == SCORE_KEYS | V3_SCORE_KEYS
 
 
 # --- Output -----------------------------------------------------------------

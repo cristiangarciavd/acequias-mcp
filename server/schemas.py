@@ -98,6 +98,9 @@ from typing_extensions import TypedDict
 from acequias.assembly import AssemblyStep
 from acequias.config import (
     PLAYER_COUNTS,
+    Blend,
+    BlendRule,
+    BodegaPlacement,
     BoardShape,
     BribeRules,
     PlantingRules,
@@ -109,6 +112,7 @@ from acequias.hex import Direction, Hex, Vertex
 from acequias.model import (
     ROTATIONS,
     Board,
+    BodegaBuilding,
     DieFace,
     Floodgate,
     Mode,
@@ -121,7 +125,7 @@ from acequias.model import (
     Tile,
     Varietal,
 )
-from acequias.scoring import Score, WateredVineyard
+from acequias.scoring import Score, WateredBodega, WateredVineyard
 
 TerrainName = Literal["river", "vineyard", "stone", "empty"]
 VarietalName = Literal[
@@ -138,6 +142,8 @@ VarietalRulesName = Literal["fixed", "roulette"]
 BribeRulesName = Literal["d6", "action_die"]
 PlantingName = Literal["hexes", "vertices"]
 BoardShapeName = Literal["field", "river_strip"]
+BlendRuleName = Literal["each_once", "disjoint"]
+BodegaPlacementName = Literal["new_spot", "replace"]
 DieFaceName = Literal["floodgate", "release", "resow", "move", "good_season", "drought"]
 ModeName = Literal["normal", "flash"]
 KindName = Literal["straight", "gentle_curve", "sharp_curve", "symmetric_y", "t_branch", "claw"]
@@ -155,6 +161,8 @@ _RULES_BY_NAME = {rules.value: rules for rules in VarietalRules}
 _BRIBE_RULES_BY_NAME = {rules.value: rules for rules in BribeRules}
 _PLANTING_BY_NAME = {rules.value: rules for rules in PlantingRules}
 _BOARD_SHAPE_BY_NAME = {shape.value: shape for shape in BoardShape}
+_BLEND_RULE_BY_NAME = {rule.value: rule for rule in BlendRule}
+_BODEGA_PLACEMENT_BY_NAME = {placement.value: placement for placement in BodegaPlacement}
 _FACE_BY_NAME = {face.value: face for face in DieFace}
 _KIND_BY_NAME = {kind.name.lower(): kind for kind in PieceKind if kind.is_canal}
 _DIRECTION_BY_NAME = {direction.name: direction for direction in Direction}
@@ -355,6 +363,28 @@ class PlantedVineyardJSON(BaseModel):
     varietal: VarietalName = Field(description="The grape the roulette gave it (lowercase ASCII).")
 
 
+class BodegaBuildingJSON(BaseModel):
+    """A bodega built on a hex vertex (Rules v3 bodega_building, #166): its spot and builder."""
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    hexes: VertexJSON
+    player: str = Field(description="Id of the player who built it.")
+
+
+class WateredBodegaJSON(BaseModel):
+    """A bodega building with at least one of the player's watered thirds (#166)."""
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    hexes: VertexJSON
+    builder: str = Field(description="Id of the player who built it.")
+    thirds: int = Field(description="The player's watered thirds of it, 1 to 3.")
+    points: int = Field(
+        description="What the player scores from it: bodega_building_points x thirds / 3, rounded down."
+    )
+
+
 class RiverStripJSON(BaseModel):
     """The river strip of a Rules v3 open board (board_shape "river_strip")."""
 
@@ -466,8 +496,8 @@ class ScoreJSON(BaseModel):
     )
     total: int = Field(
         description=(
-            "vineyards + bodega - rights_paid + rights_collected - debt + season + seat_bonus "
-            "- drought."
+            "vineyards + bodega + blend + buildings - rights_paid + rights_collected - debt "
+            "+ season + seat_bonus - drought."
         )
     )
     watered: int = Field(description="Number of watered claimed vineyards (the tie-break).")
@@ -477,6 +507,28 @@ class ScoreJSON(BaseModel):
     bodegas: int = Field(description=_BODEGAS_DESCRIPTION)
     seat_bonus: int = Field(
         description="Seat bonus points for the player's position in round 1's turn order."
+    )
+    blend: int | None = Field(
+        default=None, exclude_if=_is_none,
+        description="Rules v3 blends (#166): the blend bonus points; left out when 0.",
+    )
+    blends: list[str] | None = Field(
+        default=None, exclude_if=_is_none,
+        description=(
+            'Rules v3 blends: the blends scored, by name (e.g. "Malbec + Cabernet Franc"), in '
+            "the preset's order; left out when none."
+        ),
+    )
+    buildings: int | None = Field(
+        default=None, exclude_if=_is_none,
+        description="Rules v3 bodega buildings (#166): their split points; left out when 0.",
+    )
+    watered_bodegas: list[WateredBodegaJSON] | None = Field(
+        default=None, exclude_if=_is_none,
+        description=(
+            "Rules v3 bodega buildings with one of the player's watered thirds, by vertex; "
+            "left out when none."
+        ),
     )
 
 
@@ -565,6 +617,64 @@ _THREE_CANALS_DESCRIPTION = (
 )
 
 
+def _is_one(value: object) -> bool:
+    return value == 1
+
+
+_VARIETAL_BODEGA_DESCRIPTION = (
+    "Rules v3 (#166): whether the bodega bonus for bodega_varietals distinct varietals is "
+    "scored; false turns it off (blends replace it). true by default; left out when true."
+)
+_BLENDS_DESCRIPTION = (
+    "Rules v3 (#166): the blend (corte) table, each {\"varietals\": [2 or more distinct "
+    "varietals, red, white or mixed], \"points\": bonus}. A player holds a varietal when they "
+    "own a watered third of a vineyard of it. Needs planting \"vertices\"."
+)
+_BLEND_RULE_DESCRIPTION = (
+    'Rules v3 (#166): "each_once" (each held blend scores once; a vineyard may count for '
+    'several) or "disjoint" (the best set of distinct blends with no vineyard used twice).'
+)
+_BODEGA_BUILDING_DESCRIPTION = (
+    'Rules v3 (#166): adds the "build a bodega" action, a bodega worth bodega_building_points '
+    "split in thirds like a vineyard. false by default; left out when false. Needs planting "
+    '"vertices".'
+)
+_BODEGA_PLACEMENT_DESCRIPTION = (
+    'Rules v3 (#166): where a bodega goes: "new_spot" (a free vertex the player may plant on) '
+    'or "replace" (in place of one of their planted vineyards).'
+)
+_BODEGA_MIN_DESCRIPTION = (
+    "Rules v3 (#166): the planted vineyards of their own a player needs to build a bodega, 0 or more."
+)
+_BODEGA_REDS_DESCRIPTION = (
+    "Rules v3 (#166): the distinct red varietals among a player's own planted vineyards a "
+    "bodega needs, 0 or more."
+)
+_BODEGA_WHITES_DESCRIPTION = (
+    "Rules v3 (#166): the distinct white varietals (torrontes, chardonnay) among a player's own "
+    "planted vineyards a bodega needs, 0 or more."
+)
+_BODEGA_POINTS_DESCRIPTION = "Rules v3 (#166): a bodega building's points, split in thirds."
+_BODEGAS_PER_PLAYER_DESCRIPTION = "Rules v3 (#166): the most bodegas a player may build (null: no cap)."
+
+
+class BlendJSON(BaseModel):
+    """One blend (corte) of the Rules v3 blend table (#166)."""
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    varietals: list[VarietalName] = Field(description="The blend's varietals, 2 or more, distinct.")
+    points: int = Field(description="The blend's bonus points, 1 or more.")
+
+
+@with_config(ConfigDict(extra="forbid"))
+class BlendOverrideJSON(TypedDict):
+    """One blend (corte) in an overrides object."""
+
+    varietals: Annotated[list[VarietalName], Field(description="2 or more distinct varietals.")]
+    points: Annotated[StrictInt, Field(description="Bonus points, 1 or more.")]
+
+
 class PresetJSON(BaseModel):
     """Every value of a game preset (the numbers of one mode), after overrides."""
 
@@ -615,6 +725,42 @@ class PresetJSON(BaseModel):
     )
     bag_size: dict[PlayerCountName, int] | None = Field(
         default=None, exclude_if=_is_none, description=_BAG_SIZE_DESCRIPTION + " Left out when {}."
+    )
+    # Rules v3 scoring options (#166), left out of simulate_game's JSON at their defaults.
+    varietal_bodega: bool | None = Field(
+        default=None, exclude_if=_is_none, description=_VARIETAL_BODEGA_DESCRIPTION
+    )
+    blends: list[BlendJSON] | None = Field(
+        default=None, exclude_if=_is_none, description=_BLENDS_DESCRIPTION + " Left out when []."
+    )
+    blend_rule: BlendRuleName | None = Field(
+        default=None, exclude_if=_is_none,
+        description=_BLEND_RULE_DESCRIPTION + ' Left out when "each_once".',
+    )
+    bodega_building: bool | None = Field(
+        default=None, exclude_if=_is_none, description=_BODEGA_BUILDING_DESCRIPTION
+    )
+    bodega_placement: BodegaPlacementName | None = Field(
+        default=None, exclude_if=_is_none,
+        description=_BODEGA_PLACEMENT_DESCRIPTION + ' Left out when "new_spot".',
+    )
+    bodega_min_vineyards: int | None = Field(
+        default=None, exclude_if=_is_none, description=_BODEGA_MIN_DESCRIPTION + " Left out at 0."
+    )
+    bodega_min_reds: int | None = Field(
+        default=None, exclude_if=_is_none, description=_BODEGA_REDS_DESCRIPTION + " Left out at 2."
+    )
+    bodega_min_whites: int | None = Field(
+        default=None, exclude_if=_is_none,
+        description=_BODEGA_WHITES_DESCRIPTION + " Left out at 2.",
+    )
+    bodega_building_points: int | None = Field(
+        default=None, exclude_if=_is_none,
+        description=_BODEGA_POINTS_DESCRIPTION + " Left out at 12.",
+    )
+    bodegas_per_player: int | None = Field(
+        default=1, exclude_if=_is_one,
+        description=_BODEGAS_PER_PLAYER_DESCRIPTION + " Left out at 1.",
     )
 
 
@@ -721,6 +867,44 @@ class PresetOverridesJSON(TypedDict, total=False):
         dict[PlayerCountName, StrictInt],
         Field(description=_BAG_SIZE_DESCRIPTION + " Each value is 1 or more."),
     ]
+    varietal_bodega: Annotated[StrictBool, Field(description=_VARIETAL_BODEGA_DESCRIPTION)]
+    blends: Annotated[list[BlendOverrideJSON], Field(description=_BLENDS_DESCRIPTION)]
+    blend_rule: Annotated[BlendRuleName, Field(description=_BLEND_RULE_DESCRIPTION)]
+    bodega_building: Annotated[StrictBool, Field(description=_BODEGA_BUILDING_DESCRIPTION)]
+    bodega_placement: Annotated[
+        BodegaPlacementName, Field(description=_BODEGA_PLACEMENT_DESCRIPTION)
+    ]
+    bodega_min_vineyards: Annotated[StrictInt, Field(description=_BODEGA_MIN_DESCRIPTION)]
+    bodega_min_reds: Annotated[StrictInt, Field(description=_BODEGA_REDS_DESCRIPTION)]
+    bodega_min_whites: Annotated[StrictInt, Field(description=_BODEGA_WHITES_DESCRIPTION)]
+    bodega_building_points: Annotated[
+        StrictInt, Field(description=_BODEGA_POINTS_DESCRIPTION + " 1 or more.")
+    ]
+    bodegas_per_player: Annotated[
+        StrictInt | None,
+        Field(description=_BODEGAS_PER_PLAYER_DESCRIPTION + " An int is 1 or more."),
+    ]
+
+
+def _blend_from_json(item: object) -> Blend:
+    """The `Blend` for one `{"varietals", "points"}` object; `Blend` checks the values."""
+    if not isinstance(item, Mapping) or set(item) != {"varietals", "points"}:
+        raise ValueError(f"a blend needs exactly the keys varietals, points; got {item!r}")
+    names = item["varietals"]
+    if isinstance(names, (str, bytes, Mapping)) or not isinstance(names, Iterable):
+        raise TypeError(f"a blend's varietals must be a list of varietal names, got {names!r}")
+    varietals = [_lookup("blend varietal", name, _VARIETAL_BY_NAME) for name in names]
+    if len(set(varietals)) != len(varietals):
+        raise ValueError(f"a blend lists a varietal twice: {list(names)!r}")
+    return Blend(frozenset(varietals), item["points"])
+
+
+def blend_to_json(blend: Blend) -> dict[str, Any]:
+    """A `Blend` as `{"varietals", "points"}`, the varietals in `Varietal` order."""
+    return {
+        "varietals": [varietal_to_json(v) for v in Varietal if v in blend.varietals],
+        "points": blend.points,
+    }
 
 
 def overrides_from_json(overrides: Mapping[str, Any]) -> dict[str, Any]:
@@ -783,6 +967,14 @@ def overrides_from_json(overrides: Mapping[str, Any]) -> dict[str, Any]:
         )
     if "planting" in changes:
         changes["planting"] = _lookup("planting", changes["planting"], _PLANTING_BY_NAME)
+    if isinstance(changes.get("blends"), (list, tuple)):
+        changes["blends"] = tuple(_blend_from_json(item) for item in changes["blends"])
+    if "blend_rule" in changes:
+        changes["blend_rule"] = _lookup("blend_rule", changes["blend_rule"], _BLEND_RULE_BY_NAME)
+    if "bodega_placement" in changes:
+        changes["bodega_placement"] = _lookup(
+            "bodega_placement", changes["bodega_placement"], _BODEGA_PLACEMENT_BY_NAME
+        )
     if isinstance(changes.get("action_die"), (list, tuple)):
         changes["action_die"] = tuple(
             _lookup("action_die face", name, _FACE_BY_NAME) for name in changes["action_die"]
@@ -1251,8 +1443,43 @@ def planted_from_json(item: Mapping[str, Any] | PlantedVineyardJSON) -> PlantedV
     return PlantedVineyard(vertex_from_json(item["hexes"]), item["player"], varietal)
 
 
+def bodega_from_json(item: Mapping[str, Any] | BodegaBuildingJSON) -> BodegaBuilding:
+    """The `BodegaBuilding` for one `{"hexes", "player"}` object (#166)."""
+    if isinstance(item, BodegaBuildingJSON):
+        item = item.model_dump()
+    if not isinstance(item, Mapping):
+        raise TypeError(f"a bodega must be an object, got {item!r}")
+    if set(item) != {"hexes", "player"}:
+        raise ValueError(f"a bodega needs exactly the keys hexes, player; got {sorted(item)}")
+    return BodegaBuilding(vertex_from_json(item["hexes"]), item["player"])
+
+
+def watered_bodega_to_json(bodega: WateredBodega) -> dict[str, Any]:
+    """The JSON object for one `WateredBodega`."""
+    return {
+        "hexes": vertex_to_json(bodega.vertex),
+        "builder": bodega.builder,
+        "thirds": bodega.thirds,
+        "points": bodega.points,
+    }
+
+
 def score_to_json(score: Score) -> dict[str, Any]:
-    """The score JSON object for one `Score`, every term copied as is."""
+    """The score JSON object for one `Score`, every term copied as is.
+
+    The Rules v3 #166 terms (`blend`, `blends`, `buildings`,
+    `watered_bodegas`) are given only when not 0 or empty, so other results
+    keep their keys.
+    """
+    extra: dict[str, Any] = {}
+    if score.blend:
+        extra["blend"] = score.blend
+    if score.blends:
+        extra["blends"] = list(score.blends)
+    if score.buildings:
+        extra["buildings"] = score.buildings
+    if score.watered_bodegas:
+        extra["watered_bodegas"] = [watered_bodega_to_json(b) for b in score.watered_bodegas]
     return {
         "player": score.player,
         "seat": score.seat,
@@ -1268,4 +1495,5 @@ def score_to_json(score: Score) -> dict[str, Any]:
         "watered_vineyards": [watered_vineyard_to_json(v) for v in score.watered_vineyards],
         "bodegas": score.bodegas,
         "seat_bonus": score.seat_bonus,
+        **extra,
     }
