@@ -350,6 +350,13 @@ class Preset:
     planted (owner, #166), counted before the build; 0 turns a condition off. ``bodegas_per_player`` caps
     a player's bodegas (``None``: no cap). Blends and bodega buildings
     need vertex planting.
+
+    ``bribe_optional`` (Rules v3, opt-in, #168; off by default and in the
+    shipped presets) makes the floodgate and release faces optional: the
+    bribe (``action_die_cost``) is paid only when the player places or
+    removes a floodgate, and declining costs nothing. Off, those faces are
+    mandatory when they have a use and the bribe is paid on the roll. It
+    needs vertex planting.
     """
 
     mode: Mode
@@ -392,6 +399,7 @@ class Preset:
     bodega_min_whites: int = 2
     bodega_building_points: int = 12
     bodegas_per_player: int | None = 1
+    bribe_optional: bool = False
 
     def __post_init__(self) -> None:
         _check_type("mode", self.mode, Mode)
@@ -452,6 +460,9 @@ class Preset:
                     f"none for {missing}"
                 )
         self._check_v3_scoring()
+        _check_type("bribe_optional", self.bribe_optional, bool)
+        if self.bribe_optional and self.planting is not PlantingRules.VERTICES:
+            raise ValueError("bribe_optional needs vertex planting")
         if self.season_roll_every is not None and self.bribe_rules is not BribeRules.ACTION_DIE:
             raise ValueError("season_roll_every needs action_die bribe rules")
         if self.bribe_rules is BribeRules.ACTION_DIE:

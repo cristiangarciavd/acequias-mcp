@@ -65,6 +65,10 @@ The bribe of Floodgate and Release is paid even when the face has no use (no ope
 opening, or no floodgate to release). The tuning also compares an older die with two
 Resow faces and no Move face **(to be tuned)**.
 
+**Optional bribe (variant, to be tuned):** Floodgate and Release become optional. You
+pay the bribe only when you place or remove a floodgate; if you decline the face, or
+it has no use, it costs nothing.
+
 ### 2. Take your action
 
 Unless you rolled a Drought, take **one** action (two after a Good season):
