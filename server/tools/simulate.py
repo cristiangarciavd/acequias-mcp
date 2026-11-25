@@ -40,7 +40,7 @@ DEFAULT_POLICY = "greedy"
 PolicyName = Literal[tuple(POLICIES)]  # type: ignore[valid-type]
 
 ActionName = Literal[
-    "canal", "floodgate", "bribe", "pass", "die", "release", "resow", "decline"
+    "canal", "floodgate", "bribe", "pass", "die", "release", "resow", "decline", "plant", "move"
 ]
 DieFaceName = Literal["floodgate", "release", "resow", "good_season", "drought"]
 ScoreTermName = Literal[
@@ -101,7 +101,8 @@ class SimResultJSON(BaseModel):
         description=(
             "Mean number of each action per game; they add up to turns_per_game. Under "
             'action_die rules "die" counts rolls, "release", "resow" and "decline" the '
-            'resolutions, and a die floodgate counts as "floodgate".'
+            'resolutions, and a die floodgate counts as "floodgate". Under Rules v3 (planting '
+            '"vertices") "plant" counts plantings and "move" the resow face\'s moves.'
         )
     )
     games_with_bribe: float = Field(description="Share of games with at least one bribe.")

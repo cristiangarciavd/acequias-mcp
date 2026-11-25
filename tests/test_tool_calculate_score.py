@@ -169,7 +169,7 @@ async def test_input_schema_describes_every_field_and_its_allowed_values():
         schema = (await tool_info(client)).input_schema
     properties = schema["properties"]
     assert set(properties) == {
-        "mode", "hexes", "canals", "floodgates", "claims", "players", "overrides"
+        "mode", "hexes", "canals", "floodgates", "claims", "players", "overrides", "planted", "strip"
     }
     assert all(properties[name].get("description") for name in properties)
     assert sorted(schema["required"]) == ["hexes", "mode", "players"]

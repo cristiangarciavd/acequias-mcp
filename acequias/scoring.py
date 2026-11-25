@@ -148,7 +148,7 @@ def calculate_score(state: GameState, preset: Preset | None = None) -> Mapping[s
 
     owned: dict[str, list[WateredVineyard]] = {p.id: [] for p in players}
     collected: dict[str, int] = {p.id: 0 for p in players}
-    for hex, path in sorted(water(board).items()):
+    for hex, path in sorted(water(board).items()) if board.claims else ():  # only claims score
         claimant = board.claimant(hex)
         if claimant is None:
             continue

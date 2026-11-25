@@ -556,6 +556,14 @@ class Board:
 
     # --- Internal fast paths (for ``acequias.turn`` and ``acequias.flow``) ----
 
+    def __getstate__(self) -> dict:
+        """Pickle without the statics (a river strip's lazy lookups hold lambdas); the
+        unpickled board builds them again on first use. ``scripts/tune.py`` sends boards
+        between processes."""
+        state = dict(self.__dict__)
+        state["_statics"] = None
+        return state
+
     def _static(self) -> _BoardStatics:
         """The lookups that depend only on the tiles, built once per tile set."""
         statics = self._statics

@@ -64,7 +64,7 @@ async def test_input_schema_lists_the_three_fields():
     async with Client(app) as client:
         schema = (await tool_info(client)).input_schema
     properties = schema["properties"]
-    assert set(properties) == {"players", "mode", "seed"}
+    assert set(properties) == {"players", "mode", "seed", "overrides"}
     assert all(properties[name].get("description") for name in properties)
     assert sorted(schema["required"]) == ["mode", "players"]
 
@@ -82,7 +82,8 @@ async def test_output_schema_is_published():
     async with Client(app) as client:
         schema = (await tool_info(client)).output_schema
     assert schema is not None
-    assert set(schema["properties"]) == {"players", "mode", "seed", "hexes", "assembly"}
+    assert set(schema["properties"]) == {"players", "mode", "seed", "hexes", "assembly", "spots", "strip"}
+    assert sorted(schema["required"]) == ["assembly", "hexes", "mode", "players", "seed"]
     jsonschema.Draft202012Validator.check_schema(schema)
 
 

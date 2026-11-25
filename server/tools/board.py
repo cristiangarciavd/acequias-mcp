@@ -14,16 +14,25 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from acequias.assembly import assembly_instructions
 from acequias.board import generate_board as build_board
+from acequias.config import preset as shipped_preset
+from acequias.config import with_overrides
 from acequias.model import MAX_PLAYERS, MIN_PLAYERS
 from server.schemas import (
     MODE_PLAYERS,
     AssemblyStepJSON,
     HexJSON,
     ModeName,
+    PresetOverridesJSON,
+    RiverStripJSON,
+    VertexJSON,
+    _is_none,
     assembly_to_json,
     board_to_hexes,
     mode_from_json,
     mode_to_json,
+    overrides_from_json,
+    spots_to_json,
+    strip_to_json,
 )
 
 # The largest integer a JSON client (an IEEE double) holds exactly.
@@ -45,6 +54,20 @@ class BoardResult(BaseModel):
     )
     assembly: list[AssemblyStepJSON] = Field(
         description="Steps to lay out the printed hexes, row by row from north to south."
+    )
+    spots: list[VertexJSON] | None = Field(
+        default=None, exclude_if=_is_none,
+        description=(
+            'Rules v3 (overrides planting "vertices") on a field board: every planting spot, '
+            "each a vertex touching a non-river hex; left out otherwise."
+        ),
+    )
+    strip: RiverStripJSON | None = Field(
+        default=None, exclude_if=_is_none,
+        description=(
+            'Rules v3 open board (overrides board_shape "river_strip"): the river strip; hexes '
+            "are then its river hexes and the table east of them is open. Left out otherwise."
+        ),
     )
 
 
@@ -77,17 +100,34 @@ def generate_board(
             ),
         ),
     ] = None,
+    overrides: Annotated[
+        PresetOverridesJSON,
+        Field(
+            description=(
+                "Optional preset values to replace (default: none, the mode's shipped preset), "
+                'in the shape of simulate_game\'s preset without mode; e.g. {"planting": '
+                '"vertices"} for a Rules v3 board with planting spots, or also '
+                '{"board_shape": "river_strip", "bag_size": {...}} for the open river strip.'
+            ),
+        ),
+    ] = {},  # noqa: B006 - never mutated; overrides_from_json copies it
 ) -> BoardResult:
     """Generate a balanced Acequias board and its assembly instructions.
 
     Returns the players, mode, and seed used, the board hexes (terrain, and
     varietal on vineyards), and the steps to lay the printed hexes out on the
-    table. The same players, mode, and seed always give the same board.
+    table. The same players, mode, seed, and overrides always give the same
+    board. A Rules v3 board (overrides planting "vertices") also returns its
+    planting spots, and a river strip board its strip.
     """
     if seed is None:
         seed = pick_seed()
     game_mode = mode_from_json(mode)
-    board = build_board(players, seed, game_mode)
+    if overrides:
+        preset = with_overrides(shipped_preset(game_mode), **overrides_from_json(overrides))
+        board = build_board(players, seed, game_mode, preset=preset)
+    else:
+        board = build_board(players, seed, game_mode)
     return BoardResult.model_validate(
         {
             "players": players,
@@ -95,5 +135,7 @@ def generate_board(
             "seed": seed,
             "hexes": board_to_hexes(board),
             "assembly": assembly_to_json(assembly_instructions(board)),
+            "spots": spots_to_json(board) if board.spots else None,
+            "strip": strip_to_json(board),
         }
     )

@@ -86,6 +86,20 @@ score_aware seating, seed ``STRIP_SWEEP_SEED``): river hexes per segment
     uv run python scripts/tune.py --sweep strip
     uv run python scripts/tune.py --sweep strip --river-hexes 5 --bag-per-player 10 14
 
+Sweep ``v3`` (#153) varies one Rules v3 value at a time around a river
+strip base (``V3_RIVER_HEXES`` river hexes per segment and
+``V3_BAG_PER_PLAYER`` pieces per player, or ``--v3-river-hexes`` and
+``--v3-bag-per-player``, e.g. strip's best): rounds, action die cost (the
+bribe), vineyard points (common / rare, with the bodega and water rights
+in proportion), bodega points, ``resow_can_move`` on, river hexes per
+segment, and bag size; score_aware seating, seed ``V3_SWEEP_SEED``.
+Rules v3 rows (sweeps ``strip`` and ``v3``) get their own columns: plants,
+canals and passes per game, planted vineyards per player, die faces and
+uses, and the bodega rate:
+
+    uv run python scripts/tune.py --sweep strip v3
+    uv run python scripts/tune.py --sweep v3 --v3-river-hexes 6 --v3-bag-per-player 12
+
 Turns and minutes count turns (rounds x P), not log records: under action
 die rules a die turn is 2 records, so ``turns_per_game`` would overcount. A candidate the preset or the board
 generator rejects is printed as infeasible with its error, and the run goes
@@ -670,9 +684,76 @@ def strip_sweeps(river_hexes=STRIP_RIVER_HEXES, bag_per_player=STRIP_BAG_PER_PLA
     )
 
 
+# --- Rules v3 (#153) ------------------------------------------------------------
+
+V3_SWEEP_SEED = 153_001
+"""The run seed of sweep ``v3`` (#153); no earlier run used it."""
+V3_RIVER_HEXES = 5
+"""Sweep ``v3``'s base river hexes per segment (``--v3-river-hexes``)."""
+V3_BAG_PER_PLAYER = 16
+"""Sweep ``v3``'s base bag size in pieces per player (``--v3-bag-per-player``)."""
+V3_ROUND_STEPS = (-4, -2, 2)
+"""Sweep ``v3``'s round counts: the shipped rounds of each player count plus these."""
+V3_DIE_COSTS = (0, 2)
+"""Sweep ``v3``'s action die costs (the bribe of the floodgate and release faces); the base is shipped's."""
+V3_POINTS = ((2, 3), (4, 5), (6, 9))
+"""Sweep ``v3``'s vineyard points (common, rare); the shipped ones are 6 / 7."""
+V3_BODEGA_POINTS = (3, 9, 12)
+"""Sweep ``v3``'s bodega points."""
+
+
+def v3_points(mode: Mode, common: int, rare: int) -> dict[str, object]:
+    """Vineyard points ``common`` (``rare`` for ``RARE_VARIETALS``), with the shipped
+    bodega and water rights scaled by ``common`` over the shipped common points."""
+    p = shipped_preset(mode)
+    shipped_common = min(p.varietal_points.values())
+    return {
+        "varietal_points": {v: rare if v in RARE_VARIETALS else common for v in p.varietal_points},
+        "bodega_points": p.bodega_points * common // shipped_common,
+        "water_right_points": max(1, p.water_right_points * common // shipped_common),
+    }
+
+
+def v3_sweeps(river_hexes: int = V3_RIVER_HEXES, bag_per_player: int = V3_BAG_PER_PLAYER) -> tuple[Sweep, ...]:
+    """Sweep ``v3`` (#153): one Rules v3 value at a time around the river strip base
+    (``strip_overrides(mode, river_hexes, bag_per_player)``), score_aware seating."""
+    base = {mode: strip_overrides(mode, river_hexes, bag_per_player) for mode in Mode}
+
+    def candidates(mode: Mode) -> tuple[tuple[str, dict], ...]:
+        p = shipped_preset(mode)
+        rounds = tuple(
+            (f"rounds {step:+d} ({rounds_label({n: r + step for n, r in p.rounds.items()})})",
+             {"rounds": {n: r + step for n, r in p.rounds.items()}})
+            for step in V3_ROUND_STEPS
+        )
+        costs = tuple((f"die cost {cost}", {"action_die_cost": cost}) for cost in V3_DIE_COSTS)
+        points = tuple(
+            (f"points {common} / rare {rare}", v3_points(mode, common, rare)) for common, rare in V3_POINTS
+        )
+        bodega = tuple((f"bodega {b}", {"bodega_points": b}) for b in V3_BODEGA_POINTS)
+        hexes = tuple(
+            (f"{n} river hexes/segment", {"river_hexes_per_segment": n})
+            for n in STRIP_RIVER_HEXES if n != river_hexes
+        )
+        bags = tuple(
+            (f"bag {per}/player", {"bag_size": {n: per * n for n in p.player_counts}})
+            for per in STRIP_BAG_PER_PLAYER if per != bag_per_player
+        )
+        return (
+            ("base", {}), *rounds, *costs, *points, *bodega,
+            ("resow can move", {"resow_can_move": True}), *hexes, *bags,
+        )
+
+    return (
+        Sweep("v3", f"Rules v3, one value at a time around the river strip base ({river_hexes} river "
+                    f"hexes/segment, bag {bag_per_player}/player, shipped Rules v2 values)",
+              {mode: candidates(mode) for mode in Mode}, ("score_aware",), base, V3_SWEEP_SEED),
+    )
+
+
 V1_SWEEPS = SWEEPS
 """The sweeps of #20 (Rules v1, greedy and mixed seatings)."""
-SWEEPS = V1_SWEEPS + v2_sweeps() + strip_sweeps()
+SWEEPS = V1_SWEEPS + v2_sweeps() + strip_sweeps() + v3_sweeps()
 SWEEP_NAMES = tuple(s.name for s in SWEEPS)
 
 
@@ -1145,6 +1226,11 @@ TURNS_NOTE = (
     "Die columns: games with a roll, rolls per game, rolls per face (floodgate/release/resow), "
     "and the share of rolls used, not declined; \"-\" under d6 rules."
 )
+V3_NOTE = (
+    "Rules v3: a turn is one mandatory roll, then its face's use and 1 action (2 after a good season, "
+    "none after a drought). Rolls per face: floodgate / release / resow / good season / drought. "
+    "Planted per player: plants per game / P (a moved vineyard keeps its count)."
+)
 SWEEP_HEADER = (
     "| Candidate | P | Seating | Advantage ± 95% | Win rate by position | Shared wins "
     "| Turns (min) | Pass share | Canal / gate / bribe / pass | Winning score | Score | Bodega rate | Bodega points "
@@ -1152,6 +1238,18 @@ SWEEP_HEADER = (
     "| Die games | Rolls | Rolls per face | Die use rate |"
 )
 SWEEP_COLUMNS = 21
+V3_SWEEP_HEADER = (
+    "| Candidate | P | Seating | Advantage ± 95% | Win rate by position | Shared wins "
+    "| Turns (min) | Plant / canal / pass per game | Planted per player | Winning score | Score "
+    "| Vineyard points | Bodega rate | Bodega points | Rights paid | Mean debt "
+    "| Rolls per face | Floodgate / release / resow / move uses | Die use rate |"
+)
+V3_SWEEP_COLUMNS = 19
+
+
+def is_v3(overrides: Mapping[str, object]) -> bool:
+    """Whether a job's overrides play Rules v3 (vertex planting)."""
+    return overrides.get("planting") is PlantingRules.VERTICES
 
 
 def _varietals(data: Mapping[str, object]) -> str:
@@ -1198,6 +1296,30 @@ def sweep_row(job: Job, outcome: Outcome) -> str:
         f"| {_f(data['games_with_bribe'])} "
         f"| {_f(data['win_rate_bribers'], 3)} / {_f(data['win_rate_non_bribers'], 3)} "
         f"| {_f(data['score_terms']['debt']['mean'])} | {' | '.join(_die(data))} |"
+    )
+
+
+def v3_sweep_row(job: Job, outcome: Outcome) -> str:
+    """A Rules v3 sweep row: ``V3_SWEEP_HEADER``'s columns."""
+    head = f"| {job.label} | {job.players} | {job.seating} |"
+    data = outcome.data
+    if data is None:
+        return f"{head} {_not_run(outcome)} |" + " |" * (V3_SWEEP_COLUMNS - 4)
+    a = data["actions_per_game"]
+    turns = _turns(job, data)
+    terms = data["score_terms"]
+    faces = data["die_faces_per_game"]
+    return (
+        f"{head} {data['turn_order_advantage']:.3f} ± {margin(job.players, job.n):.3f} "
+        f"| {_list(data['win_rate_by_position'])} | {_f(data['shared_win_rate'])} "
+        f"| {turns} ({turns * MINUTES_PER_TURN}) "
+        f"| {a['plant']:.1f} / {a['canal']:.1f} / {a['pass']:.1f} | {a['plant'] / job.players:.2f} "
+        f"| {_spread(data['winning_score'])} | {_spread(terms['total'])} "
+        f"| {terms['vineyards']['mean']:.2f} | {_f(data['bodega_rate'], 3)} | {terms['bodega']['mean']:.2f} "
+        f"| {terms['rights_paid']['mean']:.2f} | {terms['debt']['mean']:.2f} "
+        f"| {' / '.join(f'{faces[f.value]:.2f}' for f in DieFace)} "
+        f"| {a['floodgate']:.2f} / {a['release']:.2f} / {a['resow']:.2f} / {a['move']:.2f} "
+        f"| {_f(data['die_use_rate'], 3)} |"
     )
 
 
@@ -1301,10 +1423,13 @@ def do_sweeps(sweeps: list[Sweep], run, modes, games: int, players_list=PLAYER_C
                 continue
             print(f"### {mode.value.capitalize()}\n")
             print(f"Base: {describe(sweep.base[mode])}.\n")
-            print(SWEEP_HEADER)
-            print("|" + " --- |" * SWEEP_COLUMNS)
+            v3 = is_v3(rows[0][0].overrides)
+            if v3:
+                print(V3_NOTE + "\n")
+            print(V3_SWEEP_HEADER if v3 else SWEEP_HEADER)
+            print("|" + " --- |" * (V3_SWEEP_COLUMNS if v3 else SWEEP_COLUMNS))
             for job, outcome in rows:
-                print(sweep_row(job, outcome))
+                print(v3_sweep_row(job, outcome) if v3 else sweep_row(job, outcome))
             print()
     return outcomes
 
@@ -1390,6 +1515,10 @@ def main(argv: list[str] | None = None) -> int:
                         metavar="N", help="sweep strip (#154): river hexes per segment (default 4 5 6)")
     parser.add_argument("--bag-per-player", type=_workers, nargs="+", default=list(STRIP_BAG_PER_PLAYER),
                         metavar="N", help="sweep strip (#154): bag sizes in pieces per player (default 12 16 20)")
+    parser.add_argument("--v3-river-hexes", type=_workers, default=V3_RIVER_HEXES, metavar="N",
+                        help=f"sweep v3 (#153): the base river hexes per segment (default {V3_RIVER_HEXES})")
+    parser.add_argument("--v3-bag-per-player", type=_workers, default=V3_BAG_PER_PLAYER, metavar="N",
+                        help=f"sweep v3 (#153): the base bag size per player (default {V3_BAG_PER_PLAYER})")
     parser.add_argument("--games", type=int,
                         help=f"games per configuration (default: {SWEEP_GAMES} in a sweep, the final count otherwise)")
     parser.add_argument("--smoke", action="store_true",
@@ -1418,7 +1547,8 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("--games must be at least 1")
     modes = [Mode(args.mode)] if args.mode else list(Mode)
     sweeps = V1_SWEEPS + v2_sweeps(args.scale, args.rare_bonus, args.multiple_bodegas, args.season_global_only,
-                                   args.seat_bonus, args.rounds) + strip_sweeps(args.river_hexes, args.bag_per_player)
+                                   args.seat_bonus, args.rounds) + strip_sweeps(args.river_hexes, args.bag_per_player) \
+        + v3_sweeps(args.v3_river_hexes, args.v3_bag_per_player)
     flags = "" if (args.scale, args.rare_bonus) == (1, 1) else f" --scale {args.scale} --rare-bonus {args.rare_bonus}"
     if args.multiple_bodegas:
         flags += " --multiple-bodegas"
@@ -1432,6 +1562,10 @@ def main(argv: list[str] | None = None) -> int:
         flags += " --river-hexes " + " ".join(map(str, args.river_hexes))
     if tuple(args.bag_per_player) != STRIP_BAG_PER_PLAYER:
         flags += " --bag-per-player " + " ".join(map(str, args.bag_per_player))
+    if args.v3_river_hexes != V3_RIVER_HEXES:
+        flags += f" --v3-river-hexes {args.v3_river_hexes}"
+    if args.v3_bag_per_player != V3_BAG_PER_PLAYER:
+        flags += f" --v3-bag-per-player {args.v3_bag_per_player}"
     players_list = [args.players] if args.players else list(PLAYER_COUNTS)
     candidate = None
     if args.candidate:
