@@ -144,7 +144,10 @@ BribeRulesName = Literal["d6", "action_die"]
 PlantingName = Literal["hexes", "vertices"]
 BoardShapeName = Literal["field", "river_strip"]
 BlendRuleName = Literal["each_once", "disjoint"]
-EndConditionName = Literal["rounds", "bag_empty", "vineyards_out", "score_target"]
+EndConditionName = Literal[
+    "rounds", "bag_empty", "vineyards_out", "score_target", "supply_empty", "dead_turns"
+]
+TriggerName = Literal["bag_empty", "vineyards_out", "score_target", "supply_empty", "dead_turns"]
 BodegaPlacementName = Literal["new_spot", "replace"]
 DieFaceName = Literal["floodgate", "release", "resow", "move", "good_season", "drought"]
 ModeName = Literal["normal", "flash"]
@@ -687,6 +690,20 @@ _SCORE_TARGET_DESCRIPTION = (
 _UNLIMITED_BAG_DESCRIPTION = (
     "Rules v3 (#163): whether the bag never runs out (each piece drawn goes back to its bottom)."
 )
+_SUPPLY_DESCRIPTION = (
+    'Rules v3 (#181): the shared vineyard supply, keyed "2" to "5": a multiplier m, so the supply '
+    "holds m pieces per roulette sector of each varietal and every planted vineyard takes one. "
+    "A player count not given has no supply. Needs planting \"vertices\"."
+)
+_MAX_SPINS_DESCRIPTION = (
+    "Rules v3 (#181): spins a plant or a resow may make: a spin on a varietal with no piece left "
+    "in the supply is spun again, up to this many spins; when all fail the turn is lost."
+)
+_END_CONDITIONS_DESCRIPTION = (
+    'Rules v3 (#181): several end triggers at once (no "rounds", no repeats); the first to fire '
+    'ends the game. "supply_empty": the vineyard supply is empty; "dead_turns": every player '
+    'has lost 2 turns in a row (ends the game at once). Needs end_condition "rounds".'
+)
 
 
 class BlendJSON(BaseModel):
@@ -813,6 +830,15 @@ class PresetJSON(BaseModel):
     )
     unlimited_bag: bool | None = Field(
         default=None, exclude_if=_is_none, description=_UNLIMITED_BAG_DESCRIPTION + " Left out when false."
+    )
+    vineyard_supply: dict[PlayerCountName, int] | None = Field(
+        default=None, exclude_if=_is_none, description=_SUPPLY_DESCRIPTION + " Left out when {}."
+    )
+    max_spins: int | None = Field(
+        default=None, exclude_if=_is_none, description=_MAX_SPINS_DESCRIPTION + " Left out at 1."
+    )
+    end_conditions: list[TriggerName] | None = Field(
+        default=None, exclude_if=_is_none, description=_END_CONDITIONS_DESCRIPTION + " Left out when []."
     )
 
 
@@ -948,6 +974,12 @@ class PresetOverridesJSON(TypedDict, total=False):
         Field(description=_SCORE_TARGET_DESCRIPTION + " Each value is 1 or more."),
     ]
     unlimited_bag: Annotated[StrictBool, Field(description=_UNLIMITED_BAG_DESCRIPTION)]
+    vineyard_supply: Annotated[
+        dict[PlayerCountName, StrictInt],
+        Field(description=_SUPPLY_DESCRIPTION + " Each value is 1 or more."),
+    ]
+    max_spins: Annotated[StrictInt, Field(description=_MAX_SPINS_DESCRIPTION + " 1 or more.")]
+    end_conditions: Annotated[list[TriggerName], Field(description=_END_CONDITIONS_DESCRIPTION)]
 
 
 def _blend_from_json(item: object) -> Blend:
@@ -1001,7 +1033,7 @@ def overrides_from_json(overrides: Mapping[str, Any]) -> dict[str, Any]:
             _lookup("bag_size key", key, _PLAYER_COUNT_BY_NAME): value
             for key, value in changes["bag_size"].items()
         }
-    for name in ("vineyard_markers", "score_target"):
+    for name in ("vineyard_markers", "score_target", "vineyard_supply"):
         if isinstance(changes.get(name), Mapping):
             changes[name] = {
                 _lookup(f"{name} key", key, _PLAYER_COUNT_BY_NAME): value
@@ -1010,6 +1042,11 @@ def overrides_from_json(overrides: Mapping[str, Any]) -> dict[str, Any]:
     if "end_condition" in changes:
         changes["end_condition"] = _lookup(
             "end_condition", changes["end_condition"], _END_CONDITION_BY_NAME
+        )
+    if isinstance(changes.get("end_conditions"), (list, tuple)):
+        changes["end_conditions"] = tuple(
+            _lookup("end_conditions item", name, _END_CONDITION_BY_NAME)
+            for name in changes["end_conditions"]
         )
     if "board_shape" in changes:
         changes["board_shape"] = _lookup(

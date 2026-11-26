@@ -28,6 +28,17 @@ With ``Preset.finish_round`` the round is played out and the game ends
 after it; without, the game ends at once, after that turn. A game whose
 trigger never fires ends after ``Preset.round_cap`` rounds.
 
+Combined end (#181, ``Preset.end_conditions``): the first trigger to hold
+when a turn ends (in the preset's order, ``fired_trigger``) ends the game,
+as above; ``SUPPLY_EMPTY`` fires once the shared vineyard supply is empty
+and ``DEAD_TURNS`` once every player's ``Player.dead_turns`` is at least
+``DEAD_TURN_LIMIT``, and ``DEAD_TURNS`` always ends the game at once.
+``GameState.end_trigger`` records the trigger that ended the game, or
+``ROUNDS`` when a preset with triggers reaches its round cap. When a Rules
+v3 turn ends, the player's ``dead_turns`` goes up by one after a lost
+turn (``ActionsLeft.lost``, also counted in ``lost_turns``) and back to 0
+after any other turn.
+
 Under Rules v3 (vertex planting) a turn is the mandatory roll, the
 face's use if one is pending, then the player's actions (one, two after a
 good season, none after a drought) or a pass; the turn moves on once no
@@ -49,10 +60,10 @@ import random
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, replace
 
-from acequias.config import EndCondition, PlantingRules
+from acequias.config import DEAD_TURN_LIMIT, EndCondition, PlantingRules
 from acequias.config import preset as shipped_preset
 from acequias.model import DieFace, GameState, SeasonRoll
-from acequias.turn import Action, RollActionDie, apply, roll_face
+from acequias.turn import Action, RollActionDie, apply, roll_face, supply_left
 
 __all__ = [
     "Bot",
@@ -61,6 +72,7 @@ __all__ = [
     "act",
     "game_over",
     "end_fired",
+    "fired_trigger",
     "play_game",
     "replay",
     "game_rngs",
@@ -115,28 +127,47 @@ def turn_order(state: GameState, round: int) -> tuple[str, ...]:
 def game_over(state: GameState) -> bool:
     """Whether the game is over: ``state.round`` is past the round count (the cap under an end
     condition), or the end condition fired (``GameState.end_triggered``) and, with
-    ``Preset.finish_round``, its round is over."""
+    ``Preset.finish_round``, its round is over; ``DEAD_TURNS`` (#181) ends it at once."""
     if state.round > _round_count(state):
         return True
     fired = state.end_triggered
     if fired is None:
         return False
     p = state.preset or shipped_preset(state.mode)
+    if state.end_trigger is EndCondition.DEAD_TURNS:
+        return True
     return not p.finish_round or state.round > fired
 
 
 def end_fired(state: GameState) -> bool:
-    """Whether the preset's end condition (#163) holds on ``state``; always False under ``ROUNDS``.
+    """Whether one of the preset's end triggers (#163, #181) holds on ``state``; always False
+    under the round count end. See ``fired_trigger``."""
+    return fired_trigger(state) is not None
+
+
+def fired_trigger(state: GameState) -> EndCondition | None:
+    """The first of the preset's triggers (``Preset.triggers``) that holds on ``state``, or None.
 
     ``BAG_EMPTY``: the bag and the market are empty. ``VINEYARDS_OUT``: a player
     holds ``Preset.markers_for`` vineyards. ``SCORE_TARGET``: a player's total
-    (``calculate_score``) is at least ``Preset.target_for``.
+    (``calculate_score``) is at least ``Preset.target_for``. ``SUPPLY_EMPTY``:
+    the shared vineyard supply has no piece left. ``DEAD_TURNS``: every
+    player's ``dead_turns`` is at least ``DEAD_TURN_LIMIT``.
     """
     p = state.preset or shipped_preset(state.mode)
-    end = p.end_condition
-    if end is EndCondition.ROUNDS:
-        return False
+    for end in p.triggers:
+        if _holds(state, p, end):
+            return end
+    return None
+
+
+def _holds(state: GameState, p, end: EndCondition) -> bool:
     players = len(state.players)
+    if end is EndCondition.SUPPLY_EMPTY:
+        left = supply_left(state)
+        return left is not None and not any(n > 0 for n in left.values())
+    if end is EndCondition.DEAD_TURNS:
+        return all(pl.dead_turns >= DEAD_TURN_LIMIT for pl in state.players)
     if end is EndCondition.BAG_EMPTY:
         return not state.bag and not state.market
     if end is EndCondition.VINEYARDS_OUT:
@@ -185,10 +216,11 @@ def _next_turn(state: GameState, after: GameState, player: str) -> GameState:
     if p.planting is PlantingRules.VERTICES:  # Rules v3: the turn lasts until no action is left
         if after.actions_left is None or after.actions_left.actions > 0:
             return after
-        after = replace(after, actions_left=None)
+        after = replace(after, actions_left=None, players=_dead_counted(after, player))
     if after.end_triggered is None and end_fired(after):
-        after = replace(after, end_triggered=state.round)
-        if not p.finish_round:
+        trigger = fired_trigger(after) or p.triggers[0]
+        after = replace(after, end_triggered=state.round, end_trigger=trigger)
+        if not p.finish_round or trigger is EndCondition.DEAD_TURNS:
             return after
     if state.season_roll is not None:  # the season roll is done: the start player's turn
         return replace(after, current_player=after.start_player)
@@ -200,6 +232,8 @@ def _next_turn(state: GameState, after: GameState, player: str) -> GameState:
     seats = _seat_order(state)
     start = seats[(seats.index(state.start_player) + 1) % len(seats)]
     round = state.round + 1
+    if after.end_triggered is None and p.triggers and round > _round_count(state):
+        after = replace(after, end_trigger=EndCondition.ROUNDS)  # the round cap ends the game
     if round <= _round_count(state) and p.is_season_round(round):
         return replace(
             after, round=round, start_player=start,
@@ -319,6 +353,24 @@ def _rolled_face(state: GameState, dice_rng: random.Random) -> DieFace:
     copy = random.Random()
     copy.setstate(dice_rng.getstate())
     return roll_face(state.preset or shipped_preset(state.mode), copy)
+
+
+def _dead_counted(after: GameState, player: str):
+    """``after``'s players with ``player``'s dead-turn counters updated at the end of their turn
+    (#181): up by one after a lost turn, back to 0 after any other. Unchanged when nothing moves."""
+    lost = after.actions_left is not None and after.actions_left.lost
+    players = after.players
+    for i, pl in enumerate(players):
+        if pl.id != player:
+            continue
+        if lost:
+            pl = replace(pl, dead_turns=pl.dead_turns + 1, lost_turns=pl.lost_turns + 1)
+        elif pl.dead_turns:
+            pl = replace(pl, dead_turns=0)
+        else:
+            return players
+        return players[:i] + (pl,) + players[i + 1:]
+    return players
 
 
 def _seat_order(state: GameState) -> tuple[str, ...]:

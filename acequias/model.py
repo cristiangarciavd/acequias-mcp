@@ -25,7 +25,7 @@ from typing import TYPE_CHECKING
 from acequias.hex import Direction, Hex, Vertex
 
 if TYPE_CHECKING:
-    from acequias.config import Preset
+    from acequias.config import EndCondition, Preset
 
 MIN_PLAYERS = 2
 MAX_PLAYERS = 5
@@ -351,14 +351,20 @@ class ActionsLeft:
     ``actions`` is the actions left (canal or plant), ``canals`` how many of
     them may still be canals: 1 and 1 on a normal turn, 2 and 1 after a
     good season (never 2 canals), 0 and 0 after a drought or a pass.
+    ``lost`` (#181) marks a lost turn: every spin of a plant or a resow
+    failed on an exhausted varietal, so no action is left (0 and 0).
     """
 
     actions: int
     canals: int
+    lost: bool = False
 
     def __post_init__(self) -> None:
         _check_int("ActionsLeft.actions", self.actions)
         _check_int("ActionsLeft.canals", self.canals)
+        _check_type("ActionsLeft.lost", self.lost, bool)
+        if self.lost and self.actions:
+            raise ValueError(f"a lost turn has no action left, got {self.actions}")
         if not 0 <= self.canals <= self.actions:
             raise ValueError(
                 f"ActionsLeft needs 0 <= canals <= actions, got {self.canals} and {self.actions}"
@@ -805,6 +811,10 @@ class Player:
     ``season`` is the sum of the good season gains of the action die so
     far, and ``drought`` the sum of its drought losses; both are 0 or
     more. Scoring takes the drought off, but never below a total of 0.
+
+    ``dead_turns`` (#181) counts the player's own turns in a row that were
+    lost turns (``ActionsLeft.lost``); any other turn of theirs sets it
+    back to 0. ``lost_turns`` counts all their lost turns so far.
     """
 
     id: str
@@ -812,6 +822,8 @@ class Player:
     debt: int = 0
     season: int = 0
     drought: int = 0
+    dead_turns: int = 0
+    lost_turns: int = 0
 
     def __post_init__(self) -> None:
         _check_type("Player.id", self.id, str)
@@ -819,7 +831,9 @@ class Player:
         _check_int("Player.debt", self.debt)
         _check_int("Player.season", self.season)
         _check_int("Player.drought", self.drought)
-        for name in ("debt", "season", "drought"):
+        _check_int("Player.dead_turns", self.dead_turns)
+        _check_int("Player.lost_turns", self.lost_turns)
+        for name in ("debt", "season", "drought", "dead_turns", "lost_turns"):
             if getattr(self, name) < 0:
                 raise ValueError(f"{name} cannot be negative, got {getattr(self, name)}")
 
@@ -854,6 +868,10 @@ class GameState:
     ``end_triggered`` is the round in which the preset's end condition
     fired (``Preset.end_condition``, #163), ``None`` until then and always
     under the round count end; ``acequias.game.game_over`` reads it.
+    ``end_trigger`` (#181) is the trigger that ended the game
+    (``EndCondition``): the one that fired, or ``ROUNDS`` when a preset
+    with end triggers reached its round cap; ``None`` until then and
+    always under the round count end.
     """
 
     board: Board
@@ -869,9 +887,14 @@ class GameState:
     season_roll: SeasonRoll | None = None
     actions_left: ActionsLeft | None = None
     end_triggered: int | None = None
+    end_trigger: EndCondition | None = None
 
     def __post_init__(self) -> None:
         _check_type("GameState.board", self.board, Board)
+        if self.end_trigger is not None:
+            from acequias.config import EndCondition  # local: config imports this module
+
+            _check_type("GameState.end_trigger", self.end_trigger, EndCondition)
         if self.end_triggered is not None:
             _check_int("GameState.end_triggered", self.end_triggered)
             if self.end_triggered < 1:

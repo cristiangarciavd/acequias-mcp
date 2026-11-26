@@ -120,6 +120,9 @@ V3_SCORING_DEFAULTS = dict(
     vineyard_markers={},
     score_target={},
     unlimited_bag=False,
+    vineyard_supply={},  # #181
+    max_spins=1,
+    end_conditions=(),
 )
 
 # Rules v2, approved by the owner on #103 and shipped in #126.
