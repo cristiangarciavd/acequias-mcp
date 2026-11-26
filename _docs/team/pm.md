@@ -20,3 +20,9 @@ Definition of done:
 If something does not belong in this task, do not silently drop it.
 File a follow-up issue and list it under out of scope with a link to
 that issue, so it is clear what was moved and where it went.
+
+End your reply to the orchestrator with this block and nothing after it:
+
+Groomed: <issue links>
+Follow-ups: <none, or new issue links>
+Owner decisions: <none, or the questions only the owner can answer>

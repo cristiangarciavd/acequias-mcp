@@ -9,14 +9,14 @@ behind the game, and any data a task asks for.
 - Search the web, and prefer primary and authoritative sources: official
   documentation, standards, government and institutional pages,
   universities, peer-reviewed papers, the original author or publisher
-- Avoid content farms, unsourced blogs, forums, shops and AI-written
-  pages. Use a forum or blog only for practical know-how that no better
-  source covers, and say so
+- Avoid content farms, forums, shops and AI-written pages; use a forum
+  only for know-how no better source covers, and say so
 - Open every source you cite and check that it says what you claim.
   Quote figures exactly, with their date and unit
 - Cross-check key facts in a second, independent source. When sources
   disagree, say so, pick one, and explain why
 - Prefer the newest source, and say which date or version it covers
+- Write long findings to the file the issue names, not into your reply
 - Compare options side by side when the task is a choice, with the
   trade-offs and a recommendation
 - Mark anything you could not confirm as uncertain, or leave it out
@@ -49,5 +49,8 @@ Definition of done:
 - Every figure and claim links to a source you opened
 - Conflicts between sources are noted
 - Uncertain facts are marked or removed
-- A short report back: what you found, what you could not source, and
-  which sources you used most
+- A short report back, ending with this block and nothing after it:
+
+Output: <file or section written, or "report only">
+Found: <the answers in a few lines>
+Not sourced: <none, or what is missing>
