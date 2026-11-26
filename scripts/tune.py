@@ -170,6 +170,12 @@ is run once more (``RETRIES``) in a process of its own, then fails only its
 configuration; every table is still printed, and the exit status is 1 if
 anything failed.
 
+``--summary PATH`` (#179) also writes, once the run ends and in one write, a short fixed-format
+Markdown summary of every sweep (one table per mode and player count, one row per candidate:
+the advantage with its pass / FAIL against ``ADVANTAGE_TARGET``, the winning score, turns with
+their pass / FAIL against ``TARGET_TURNS``, and a few figures per sweep family, all from the raw
+table's data); stdout does not change.
+
 Standard library only. Not a test: it lives outside ``tests/``.
 """
 
@@ -1540,22 +1546,26 @@ def run_all(jobs: list[Job], workers: int, checkpoints: Checkpoints | None = Non
             outcomes.append(Outcome(first.status, error=first.error))
             continue
         try:
-            games = [record for part in records[j] for record in part]
-            data = summarize(rules_of(job), job.seed, games).to_json()
-            data["floodgates"] = floodgate_stats(games)
-            if is_v3blends(job.overrides):
-                data["blend_stats"] = blend_stats(games)
-            if is_v3bribe(job.overrides):
-                data["bribe_stats"] = bribe_stats(games)
-            if is_v3end(job.overrides):
-                data["end_stats"] = end_stats(games)
-            outcomes.append(Outcome("ok", data=data))
+            outcomes.append(Outcome("ok", data=job_data(job, [record for part in records[j] for record in part])))
         except Exception as error:  # noqa: BLE001 - reported with its job, the run goes on
             outcomes.append(Outcome(FAILED, error=f"{type(error).__name__}: {error}"))
     for job, outcome in zip(jobs, outcomes):
         if outcome.status == FAILED:
             print(f"FAILED {describe_job(job)}: {outcome.error}", file=sys.stderr, flush=True)
     return outcomes
+
+
+def job_data(job: Job, games: list[GameRecord]) -> dict:
+    """A job's result JSON from its records in game order: ``summarize`` plus tune's own keys."""
+    data = summarize(rules_of(job), job.seed, games).to_json()
+    data["floodgates"] = floodgate_stats(games)
+    if is_v3blends(job.overrides):
+        data["blend_stats"] = blend_stats(games)
+    if is_v3bribe(job.overrides):
+        data["bribe_stats"] = bribe_stats(games)
+    if is_v3end(job.overrides):
+        data["end_stats"] = end_stats(games)
+    return data
 
 
 # --- Formatting --------------------------------------------------------------
@@ -2011,6 +2021,138 @@ def describe(overrides: Mapping[str, object]) -> str:
     return ", ".join(parts) or "(shipped preset)"
 
 
+# --- Summary (#179) ----------------------------------------------------------
+
+SUMMARY_COLUMNS = ("Candidate", "Seating", "Advantage ± 95%", f"≤ {ADVANTAGE_TARGET:.2f}", "Winning score",
+                   "Turns", "Length")
+"""The columns of every summary row (``--summary``); the extras of each family follow."""
+SUMMARY_EXTRAS = {
+    "v3": ("Bodega rate", "Planted / P", "Die use"),
+    "blend": ("Requirement met", "Builders", "Bodegas built / game"),
+    "bribe": ("Gates placed / released", "Gate rolls used", "Swing / use", "Debt"),
+    "end": ("Cap ended", "Best / worst seat"),
+}
+"""The extra summary columns of each sweep family, taken from the raw table's figures (short
+names, to keep the file small): v3 rows: the bodega rate, planted vineyards per player, the die
+use rate; ``v3blends``: the share of players who meet the bodega requirement, the share who
+build, bodegas built per game; ``v3bribe``: floodgates placed / released per game, the share of
+floodgate and release rolls used, the swing per floodgate use, the mean debt; ``v3end``: the
+share of games the round cap ended, the best / worst win rate by seat."""
+
+
+def advantage_verdict(advantage: float, m: float) -> str:
+    """``pass`` if the advantage as displayed (3 decimals) is at most ``ADVANTAGE_TARGET``, else
+    ``FAIL``, or ``FAIL (within margin)`` when the 95% margin reaches back to the target."""
+    shown, m = round(advantage, 3), round(m, 3)
+    if shown <= ADVANTAGE_TARGET:
+        return "pass"
+    return "FAIL (within margin)" if round(shown - m, 3) <= ADVANTAGE_TARGET else "FAIL"
+
+
+def length_verdict(mode: Mode, turns: float) -> str:
+    """``pass`` if ``turns`` (as displayed) at ``MINUTES_PER_TURN`` fall in ``TARGET_TURNS[mode]``."""
+    low, high = TARGET_TURNS[mode]
+    return "pass" if low <= turns * MINUTES_PER_TURN <= high else "FAIL"
+
+
+def summary_families(rows: list[tuple[Job, Outcome]], final: bool = False) -> tuple[str, ...]:
+    """The extra column families of one mode's rows, chosen as ``do_sweeps`` chooses its table:
+    none for a final validation or a pre-v3 sweep; v3 plus end (``v3end``), bribe (``v3bribe``)
+    or blend (``v3blends``) for the Rules v3 sweeps."""
+    if final or not rows:
+        return ()
+    overrides = rows[0][0].overrides
+    if is_v3end(overrides):
+        return ("v3", "end")
+    if not is_v3(overrides):
+        return ()
+    if any(is_v3bribe(j.overrides) for j, _ in rows):
+        return ("v3", "bribe")
+    if any(is_v3blends(j.overrides) for j, _ in rows):
+        return ("v3", "blend")
+    return ("v3",)
+
+
+def _summary_extras(family: str, job: Job, data: Mapping[str, object], end: bool) -> list[str]:
+    """One family's extra cells, formatted as the raw table formats them (``end``: the ``v3end`` table)."""
+    if family == "v3":
+        bodega = f"{data['end_stats']['bodega']:.3f}" if end else _f(data["bodega_rate"], 3)
+        return [bodega, f"{data['actions_per_game']['plant'] / job.players:.2f}", _f(data["die_use_rate"], 3)]
+    if family == "blend":
+        b = data.get("blend_stats")
+        req = b.get("requirement") if b else None
+        if req is None:
+            return ["-", "-", f"{b['built']:.2f}" if b else "-"]
+        return [f"{req['met']:.2f}", f"{req['builders']:.2f}", f"{b['built']:.2f}"]
+    if family == "bribe":
+        b = data.get("bribe_stats")
+        if b is None:
+            return ["-"] * 4
+        return [f"{b['placed']:.2f} / {b['released']:.2f}", _f(b["used"], 3), _f(b["swing"]),
+                f"{data['score_terms']['debt']['mean']:.2f}"]
+    e = data["end_stats"]
+    seats = data["win_rate_by_seat"]
+    return [_f(e["capped"], 3), f"{max(seats):.2f} / {min(seats):.2f}"]
+
+
+def _cells(cells) -> str:
+    return "| " + " | ".join(cells) + " |"
+
+
+def summary_row(job: Job, outcome: Outcome, families: tuple[str, ...]) -> str:
+    """One candidate's summary row: ``SUMMARY_COLUMNS`` then the extras of ``families``."""
+    columns = len(SUMMARY_COLUMNS) + sum(len(SUMMARY_EXTRAS[f]) for f in families)
+    data = outcome.data
+    if data is None:
+        return _cells([job.label, job.seating, _not_run(outcome)] + [""] * (columns - 3))
+    adv, m = data["turn_order_advantage"], margin(job.players, job.n)
+    end = "end" in families  # v3end counts turns from the log, as its raw table does
+    if end:
+        turns = round(data["end_stats"]["turns"], 1)
+        turns_text = f"{turns:.1f}"
+    else:
+        turns = _turns(job, data)
+        turns_text = str(turns)
+    cells = [job.label, job.seating, f"{adv:.3f} ± {m:.3f}", advantage_verdict(adv, m),
+             f"{data['winning_score']['mean']:.2f}", turns_text, length_verdict(job.mode, turns)]
+    for family in families:
+        cells += _summary_extras(family, job, data, end)
+    return _cells(cells)
+
+
+def summary_section(rows: list[tuple[Job, Outcome]], families: tuple[str, ...]) -> list[str]:
+    """One mode's summary: one table per player count, one row per job."""
+    header = SUMMARY_COLUMNS + tuple(c for f in families for c in SUMMARY_EXTRAS[f])
+    lines: list[str] = []
+    for players in sorted({job.players for job, _ in rows}):
+        lines += [f"#### {players}p", "", _cells(header), "|" + " --- |" * len(header)]
+        lines += [summary_row(job, outcome, families) for job, outcome in rows if job.players == players]
+        lines.append("")
+    return lines
+
+
+def command_text(argv: list[str]) -> str:
+    """The command line of a run, without ``--summary PATH``."""
+    args: list[str] = []
+    skip = False
+    for arg in argv:
+        if skip:
+            skip = False
+        elif arg == "--summary":
+            skip = True
+        elif not arg.startswith("--summary="):
+            args.append(f'"{arg}"' if not arg or any(c in arg for c in " ;&|\"'") else arg)
+    return " ".join(["uv run python scripts/tune.py", *args])
+
+
+def write_summary(path: Path, lines: list[str]) -> None:
+    """Write the summary in one go: to a temporary file next to ``path``, then renamed over it."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text("\n".join(lines).rstrip("\n") + "\n", encoding="utf-8")
+    os.replace(tmp, path)
+
+
 # --- Commands ----------------------------------------------------------------
 
 
@@ -2027,22 +2169,27 @@ def sweep_jobs(sweep: Sweep, modes, games: int, players_list=PLAYER_COUNTS, seat
 
 
 def do_sweeps(sweeps: list[Sweep], run, modes, games: int, players_list=PLAYER_COUNTS, seatings=None,
-              flags: str = "") -> list[Outcome]:
+              flags: str = "", summary: list[str] | None = None) -> list[Outcome]:
     """Run every job of ``sweeps`` with ``run`` (``run_all`` with the run's
     options) in one pool, so no core idles between sweeps, then print each
-    sweep's table."""
+    sweep's table; with ``summary``, append each sweep's summary lines to it."""
     per_sweep = [sweep_jobs(sweep, modes, games, players_list, seatings) for sweep in sweeps]
     outcomes = run([job for jobs in per_sweep for job in jobs])
     at = 0
     for sweep, jobs in zip(sweeps, per_sweep):
         mine, at = outcomes[at:at + len(jobs)], at + len(jobs)
+        command = f"uv run python scripts/tune.py --sweep {sweep.name}{flags}"
         print(f"## Sweep `{sweep.name}`: {sweep.title}\n")
-        print(f"Command: `uv run python scripts/tune.py --sweep {sweep.name}{flags}`. "
+        print(f"Command: `{command}`. "
               f"{games} games per row, seed {sweep.seed}. {TURNS_NOTE}\n")
+        if summary is not None:
+            summary += [f"## Sweep `{sweep.name}`: {games} games per row, seed {sweep.seed}. Command: `{command}`", ""]
         for mode in modes:
             rows = [(j, o) for j, o in zip(jobs, mine) if j.mode is mode]
             if not rows:
                 continue
+            if summary is not None:
+                summary += [f"### {mode.value.capitalize()}", ""] + summary_section(rows, summary_families(rows))
             print(f"### {mode.value.capitalize()}\n")
             print(f"Base: {describe(sweep.base[mode])}.\n")
             if is_v3end(rows[0][0].overrides):
@@ -2083,8 +2230,9 @@ def do_sweeps(sweeps: list[Sweep], run, modes, games: int, players_list=PLAYER_C
 
 
 def do_final(run, values: Mapping[Mode, Mapping[str, object]], players_list, seatings, n: int | None, seed: int,
-             label: str = "proposed") -> list[Outcome]:
-    """The final validation of ``values`` (overrides per mode; its modes are the ones run)."""
+             label: str = "proposed", summary: list[str] | None = None, command: str = "") -> list[Outcome]:
+    """The final validation of ``values`` (overrides per mode; its modes are the ones run); with
+    ``summary``, append its summary lines (common columns only) to it, headed by ``command``."""
     jobs = playable([
         Job(label, mode, players, seating, values[mode], n or final_games(players), seed)
         for mode in values
@@ -2092,10 +2240,16 @@ def do_final(run, values: Mapping[Mode, Mapping[str, object]], players_list, sea
         for seating in seatings
     ])
     outcomes = run(jobs)
-    print(f"## Final validation of {'the proposed values' if label == 'proposed' else f'`{label}`'}\n")
-    print(f"Seed {seed}; games per configuration: "
-          + ", ".join(f"{p}p {n or final_games(p)}" for p in sorted({job.players for job in jobs}))
-          + f". {TURNS_NOTE}\n")
+    title = f"Final validation of {'the proposed values' if label == 'proposed' else f'`{label}`'}"
+    counts = ", ".join(f"{p}p {n or final_games(p)}" for p in sorted({job.players for job in jobs}))
+    print(f"## {title}\n")
+    print(f"Seed {seed}; games per configuration: " + counts + f". {TURNS_NOTE}\n")
+    if summary is not None:
+        summary += [f"## {title}: games per row {counts}, seed {seed}. Command: `{command}`", ""]
+        for mode in values:
+            rows = [(j, o) for j, o in zip(jobs, outcomes) if j.mode is mode]
+            if rows:
+                summary += [f"### {mode.value.capitalize()}", ""] + summary_section(rows, ())
     for mode in values:
         print(f"- {mode.value.capitalize()}: {describe(values[mode])}")
     print()
@@ -2188,6 +2342,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--fresh", action="store_true",
                         help="ignore and overwrite the saved checkpoints of this run")
     parser.add_argument("--list", action="store_true", help="list the sweeps and their candidates")
+    parser.add_argument("--summary", type=Path, metavar="PATH",
+                        help="also write a short fixed-format summary of each sweep to PATH (#179), "
+                             "once the run ends; stdout does not change")
+    if argv is None:
+        argv = sys.argv[1:]
     args = parser.parse_args(argv)
     sys.stdout.reconfigure(encoding="utf-8", line_buffering=True)  # tables appear as each sweep ends
     games = SMOKE_GAMES if args.smoke else args.games
@@ -2243,20 +2402,21 @@ def main(argv: list[str] | None = None) -> int:
     def run(jobs: list[Job]) -> list[Outcome]:
         return run_all(jobs, args.workers, checkpoints, args.chunk_games)
 
+    summary: list[str] | None = [] if args.summary else None
     if args.smoke:
         print(f"SMOKE RUN ({SMOKE_GAMES} games per configuration): not the report's numbers\n")
     try:
         if args.sweep:
             chosen = [s for s in sweeps if "all" in args.sweep or s.name in args.sweep]
             outcomes = do_sweeps(chosen, run, modes, games or SWEEP_GAMES, players_list,
-                                 [args.seating] if args.seating else None, flags)
+                                 [args.seating] if args.seating else None, flags, summary)
         elif candidate:
             sweep, values = candidate
             seed = args.seed if args.seed is not None else (
                 V2_FINAL_SEED if sweep.seed == V2_SWEEP_SEED else FINAL_SEED)
             outcomes = do_final(run, values, players_list,
                                 [args.seating] if args.seating else list(V2_FINAL_SEATINGS),
-                                games, seed, f"{sweep.name}: {args.candidate[1]}")
+                                games, seed, f"{sweep.name}: {args.candidate[1]}", summary, command_text(argv))
         else:
             outcomes = do_final(
                 run,
@@ -2265,6 +2425,8 @@ def main(argv: list[str] | None = None) -> int:
                 [args.seating] if args.seating else list(V1_FINAL_SEATINGS),
                 games,
                 FINAL_SEED if args.seed is None else args.seed,
+                summary=summary,
+                command=command_text(argv),
             )
     except KeyboardInterrupt:
         if checkpoints:
@@ -2274,6 +2436,8 @@ def main(argv: list[str] | None = None) -> int:
             print("\nInterrupted. --smoke saves nothing; re-run the same command to start again.",
                   file=sys.stderr, flush=True)
         return 130
+    if summary is not None:
+        write_summary(args.summary, summary)
     failed = sum(o.status == FAILED for o in outcomes)
     print(f"total wall time {time.perf_counter() - started:.0f} s; {failed} failed job(s)", file=sys.stderr)
     return 1 if failed else 0
