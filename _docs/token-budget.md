@@ -20,6 +20,8 @@ every running agent mid-task and wastes the work in flight.
 | Run at most 2-3 agents at once, fewer near the limit | Parallel agents drain the limit faster and all die together when it is hit |
 | Before stopping, push any unpushed agent commits | Stopping kills an agent's background jobs; pushed work survives |
 | Keep long outputs (sweeps, logs, 3MF files) in files and report a path | Pasting them into chat costs tokens every time they are read |
+| Every agent ends with its role's handoff block, and the orchestrator reads only that | A fixed, short shape is cheaper to read than free prose |
+| Follow "When to spawn an agent" in `process.md`; small edits stay inline | A spawn re-reads the context from scratch, so a small job costs more as an agent |
 
 ## Model per role
 
@@ -32,6 +34,8 @@ Decided by the owner on 2026-11-09.
 | QA, simple tasks (docs or templates, thin wrappers over tested code, test-only changes) | Sonnet | The checks are mechanical and CI covers the rest |
 | QA, algorithms and geometry (game rules, water flow, scoring, bots, performance, CAD) | Opus | These checks need independent reference implementations and careful reasoning; this is where real bugs were caught |
 | Engineering | Opus | A weaker implementation costs more in QA round trips than it saves |
+| Research | Sonnet | Searching and summarizing sources is routine; the role file sets the quality bar |
+| Balance analysis | Sonnet | Reading a fixed-format summary against fixed targets is routine |
 
 ## When the limit is hit
 

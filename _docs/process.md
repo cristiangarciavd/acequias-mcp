@@ -7,6 +7,8 @@
 - QA - checks the result against the acceptance criteria, follows `_docs/team/qa-engineer.md`
 - Researcher - finds and checks facts and sources for docs and design, follows
   `_docs/team/researcher.md`
+- Balance Analyst - reads finished simulation sweeps and drafts the tuning
+  decision, follows `_docs/team/balance-analyst.md`
 
 ## Tasks
 
@@ -47,6 +49,31 @@
 
 The main session is the orchestrator. It launches the PM, the engineer
 and QA as subagents. It does not groom, implement or test itself.
+
+## When to spawn an agent
+
+Spawn one only for:
+
+- A role with its own file in `_docs/team/`, for a task that role owns
+- Output that would flood the orchestrator's context (logs, sweeps, searches)
+- An independent check, where a fresh context matters (QA)
+
+Do it inline instead for an edit under about 20 lines, a docs typo, or
+reading one file. Never run two engineers at once on overlapping code.
+
+## Delegation prompt
+
+Every agent prompt has these parts, in a few lines each:
+
+- Role: "You're the <role>. Follow `_docs/team/<role>.md` and `AGENTS.md`"
+  (an agent starts without the conversation, so rules do not carry over)
+- Objective: one sentence, with the issue or PR link
+- Inputs: the files or outputs to read, by path
+- Boundaries: what not to touch, and where to write long output
+- Output: the handoff block at the end of the role file
+
+The orchestrator reads only the handoff block, and opens a file the block
+names only when a decision needs it.
 
 ## Lifecycle
 

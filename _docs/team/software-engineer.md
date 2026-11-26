@@ -18,3 +18,10 @@ Definition of done:
 
 If an acceptance criterion is wrong, impossible, or contradicts
 another one, create a comment on the issue about it.
+
+End your reply to the orchestrator with this block and nothing after it:
+
+PR: <link>
+Tests: <command>, <passed> passed, <failed> failed
+Deviations: <none, or what differs from the issue and why>
+Open Qs: <none, or questions for the owner>
