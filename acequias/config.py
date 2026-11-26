@@ -116,21 +116,30 @@ class EndCondition(Enum):
     game). ``BAG_EMPTY``: when the canal bag and the market are both empty.
     ``VINEYARDS_OUT``: when a player has planted all their vineyard markers
     (``Preset.markers_for``). ``SCORE_TARGET``: when a player's total
-    reaches ``Preset.target_for``. With ``Preset.finish_round`` the game
-    ends after the round in which the trigger fired; otherwise right after
-    the turn that fired it. A game whose trigger never fires ends after
-    ``END_CAP_FACTOR`` times the round count (``Preset.round_cap``).
+    reaches ``Preset.target_for``. ``SUPPLY_EMPTY`` (#181): when the shared
+    vineyard supply (``Preset.vineyard_supply``) has no piece left.
+    ``DEAD_TURNS`` (#181): when every player has lost ``DEAD_TURN_LIMIT``
+    turns in a row (``Player.dead_turns``); it always ends the game at once.
+    With ``Preset.finish_round`` the game ends after the round in which
+    the trigger fired; otherwise right after the turn that fired it. A game
+    whose trigger never fires ends after ``END_CAP_FACTOR`` times the round
+    count (``Preset.round_cap``). ``Preset.end_conditions`` combines several
+    triggers: the first to fire ends the game.
     """
 
     ROUNDS = "rounds"
     BAG_EMPTY = "bag_empty"
     VINEYARDS_OUT = "vineyards_out"
     SCORE_TARGET = "score_target"
+    SUPPLY_EMPTY = "supply_empty"
+    DEAD_TURNS = "dead_turns"
 
 
 END_CAP_FACTOR = 2
 """Under an end condition other than ``ROUNDS``, the game ends at the latest after this many
 times the preset's round count (#163: the shipped rounds x2)."""
+DEAD_TURN_LIMIT = 2
+"""``EndCondition.DEAD_TURNS`` (#181) fires once every player has lost this many turns in a row."""
 VINEYARD_MARKERS: Mapping[Mode, Mapping[int, int]] = MappingProxyType({
     Mode.NORMAL: MappingProxyType({2: 6, 3: 9, 4: 7, 5: 6}),
     Mode.FLASH: MappingProxyType({2: 3, 3: 3}),
@@ -404,6 +413,18 @@ class Preset:
     but ``ROUNDS`` needs vertex planting. ``unlimited_bag`` (off by
     default) makes the bag never run out: each piece drawn goes back to
     the bottom of the bag, so the market always refills.
+
+    Combined end and the shared supply (opt-in, #181; off in the shipped
+    presets): ``end_conditions`` lists several triggers (no ``ROUNDS``, no
+    repeats); the first to fire ends the game, and it replaces
+    ``end_condition``, which must then stay ``ROUNDS``. ``vineyard_supply``
+    maps a player count to a multiplier ``m``: the shared supply then holds
+    ``m`` pieces per roulette sector of each varietal (``supply_for``), and
+    every planted vineyard takes one piece of its varietal (empty by
+    default: no supply). ``max_spins`` (1 by default) is how many spins a
+    plant or a resow may make: a spin that lands on a varietal with no
+    piece left is spun again, up to ``max_spins`` spins in total; when all
+    fail the player loses the rest of the turn. Both need vertex planting.
     """
 
     mode: Mode
@@ -452,6 +473,9 @@ class Preset:
     vineyard_markers: Mapping[int, int] = field(default_factory=lambda: MappingProxyType({}))
     score_target: Mapping[int, int] = field(default_factory=lambda: MappingProxyType({}))
     unlimited_bag: bool = False
+    vineyard_supply: Mapping[int, int] = field(default_factory=lambda: MappingProxyType({}))
+    max_spins: int = 1
+    end_conditions: tuple[EndCondition, ...] = ()
 
     def __post_init__(self) -> None:
         _check_type("mode", self.mode, Mode)
@@ -595,20 +619,68 @@ class Preset:
         _check_type("unlimited_bag", self.unlimited_bag, bool)
         _set(self, "vineyard_markers", _per_count("vineyard_markers", self.vineyard_markers, self.player_counts))
         _set(self, "score_target", _per_count("score_target", self.score_target, self.player_counts))
-        if self.end_condition is EndCondition.ROUNDS:
-            return
+        _set(self, "vineyard_supply", _per_count("vineyard_supply", self.vineyard_supply, self.player_counts))
+        _check_count("max_spins", self.max_spins)
+        vertices = self.planting is PlantingRules.VERTICES
+        if self.vineyard_supply and not vertices:
+            raise ValueError("vineyard_supply needs vertex planting")
+        if self.max_spins != 1 and not vertices:
+            raise ValueError("max_spins needs vertex planting")
+        ends = self.end_conditions
+        if isinstance(ends, (str, bytes, Mapping)) or not hasattr(ends, "__iter__"):
+            raise TypeError(f"end_conditions must be a sequence of EndCondition, got {ends!r}")
+        ends = tuple(ends)
+        for end in ends:
+            _check_type("end_conditions item", end, EndCondition)
+        if EndCondition.ROUNDS in ends:
+            raise ValueError("end_conditions cannot hold rounds: the round cap always applies")
+        if len(set(ends)) != len(ends):
+            raise ValueError("end_conditions holds a trigger twice")
+        if ends and self.end_condition is not EndCondition.ROUNDS:
+            raise ValueError("set end_conditions or end_condition, not both")
+        _set(self, "end_conditions", ends)
+        for end in self.triggers:
+            self._check_trigger(end)
+
+    def _check_trigger(self, end: EndCondition) -> None:
+        """Check that ``end`` (one of ``triggers``) can fire under this preset."""
         if self.planting is not PlantingRules.VERTICES:
-            raise ValueError(f"end_condition {self.end_condition.value} needs vertex planting")
+            raise ValueError(f"end_condition {end.value} needs vertex planting")
+        if end is EndCondition.SUPPLY_EMPTY:
+            missing = [n for n in self.player_counts if n not in self.vineyard_supply]
+            if missing:
+                raise ValueError(f"end_condition {end.value} needs vineyard_supply for {missing}")
+            return
         defaults = {
             EndCondition.VINEYARDS_OUT: ("vineyard_markers", VINEYARD_MARKERS),
             EndCondition.SCORE_TARGET: ("score_target", SCORE_TARGETS),
-        }.get(self.end_condition)
+        }.get(end)
         if defaults is not None:
             name, table = defaults
             given = getattr(self, name)
             missing = [n for n in self.player_counts if n not in given and n not in table[self.mode]]
             if missing:
-                raise ValueError(f"end_condition {self.end_condition.value} needs {name} for {missing}")
+                raise ValueError(f"end_condition {end.value} needs {name} for {missing}")
+
+    @property
+    def triggers(self) -> tuple[EndCondition, ...]:
+        """The end triggers in play, in order: ``end_conditions``, else ``end_condition`` unless it
+        is ``ROUNDS`` (then none: the game ends after the round count)."""
+        if self.end_conditions:
+            return self.end_conditions
+        return () if self.end_condition is EndCondition.ROUNDS else (self.end_condition,)
+
+    def supply_for(self, players: int) -> Mapping[Varietal, int] | None:
+        """The shared vineyard supply of a game of ``players`` players (#181): of each roulette
+        varietal, its sectors times ``vineyard_supply[players]`` pieces; None without a supply."""
+        self.check_players(players)
+        m = self.vineyard_supply.get(players)
+        if m is None:
+            return None
+        counts: dict[Varietal, int] = {}
+        for v in self.roulette:
+            counts[v] = counts.get(v, 0) + m
+        return MappingProxyType(counts)
 
     def markers_for(self, players: int) -> int:
         """Vineyard markers per player for ``VINEYARDS_OUT``: ``vineyard_markers`` or the default."""
@@ -624,13 +696,13 @@ class Preset:
         """The last round a game can reach: the round count, or ``END_CAP_FACTOR`` times it
         under an end condition other than ``ROUNDS``."""
         rounds = self.rounds_for(players)
-        return rounds if self.end_condition is EndCondition.ROUNDS else rounds * END_CAP_FACTOR
+        return rounds * END_CAP_FACTOR if self.triggers else rounds
 
     def plant_cap(self, players: int) -> int | None:
         """The most vineyards a player may hold: ``grape_clusters_per_player``, and under
         ``VINEYARDS_OUT`` at most ``markers_for(players)``; ``None``: no cap."""
         cap = self.grape_clusters_per_player
-        if self.end_condition is EndCondition.VINEYARDS_OUT:
+        if EndCondition.VINEYARDS_OUT in self.triggers:
             markers = self.markers_for(players)
             cap = markers if cap is None else min(cap, markers)
         return cap

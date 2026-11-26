@@ -456,8 +456,11 @@ _END_DEFAULTS = {
     "vineyard_markers": {},
     "score_target": {},
     "unlimited_bag": False,
+    "vineyard_supply": {},
+    "max_spins": 1,
+    "end_conditions": (),
 }
-"""The end of game options (#163), with their defaults."""
+"""The end of game options (#163) and the supply options (#181), with their defaults."""
 
 
 def _preset_values(preset: Preset) -> Mapping[str, object]:
@@ -493,6 +496,8 @@ def _preset_values(preset: Preset) -> Mapping[str, object]:
                     value = value.value
                 elif isinstance(value, Mapping):
                     value = MappingProxyType(dict(value))
+                elif isinstance(value, tuple):
+                    value = tuple(v.value for v in value)
                 values[f.name] = value
             continue
         if f.name in _V3_SCORING_DEFAULTS:

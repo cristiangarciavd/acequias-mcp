@@ -161,6 +161,26 @@ every row, one table per player count (``end_stats``):
 
     uv run python scripts/tune.py --sweep v3end
 
+Sweep ``v3end2`` (#181) tries the shared vineyard supply, respins and the
+combined end (supply empty / score target / dead turns, the round cap as a
+safety net) on ``v3end2_base`` (``v3end_base`` with those triggers):
+per mode and player count, 3 supply multipliers x 3 score targets
+(``V3END2_SUPPLY``, ``V3END2_TARGETS``) x ``max_spins`` 2 / 3, plus a
+control row (the ``v3end`` base, round count end); score_aware seating,
+seed ``V3END2_SWEEP_SEED``, run at 300 games per row. Its table has the
+advantage, win rate by position, turns per game and per player (counted
+from the log) with the minutes at ``SECONDS_PER_TURN`` and the pass / FAIL
+against ``V3END2_TURN_TARGETS``, the share of games each trigger ended
+(supply / target / dead / cap), lost turns per game, the bodega rate and
+the winning score; then per player count the rows that meet the turn
+target, and for 5p the lowest-advantage rows that meet it (the candidates
+for ``V3END2_CONFIRM``). Sweep ``v3end2c`` reruns the rows named in
+``V3END2_CONFIRM`` (Normal 5p) at 2000 games, seed
+``V3END2_CONFIRM_SEED``:
+
+    uv run python scripts/tune.py --sweep v3end2 --games 300
+    uv run python scripts/tune.py --sweep v3end2c --mode normal --players 5 --games 2000
+
 Turns and minutes count turns (rounds x P), not log records: under action
 die rules a die turn is 2 records, so ``turns_per_game`` would overcount. A candidate the preset or the board
 generator rejects is printed as infeasible with its error, and the run goes
@@ -1068,10 +1088,96 @@ def v3end_sweeps() -> tuple[Sweep, ...]:
     )
 
 
+# --- Rules v3 shared supply, respins and combined end (#181) ----------------------
+
+V3END2_SWEEP_SEED = 181_001
+"""The run seed of sweep ``v3end2`` (#181); no earlier run used it."""
+V3END2_CONFIRM_SEED = 181_002
+"""The run seed of sweep ``v3end2c`` (#181, the 5p confirmation); no earlier run used it."""
+V3END2_TRIGGERS = (EndCondition.SUPPLY_EMPTY, EndCondition.SCORE_TARGET, EndCondition.DEAD_TURNS)
+"""The combined end of sweep ``v3end2``: supply empty, score target, dead turns (the cap as a net)."""
+V3END2_LEVELS = ("lo", "mid", "hi")
+V3END2_SUPPLY = {
+    Mode.NORMAL: {2: (1, 2, 3), 3: (2, 3, 4), 4: (2, 3, 4), 5: (2, 3, 4)},
+    Mode.FLASH: {2: (1, 2, 3), 3: (1, 2, 3)},
+}
+"""Sweep ``v3end2``'s supply multipliers ``m`` (lo / mid / hi) per player count: 14 x m pieces."""
+V3END2_TARGETS = {
+    Mode.NORMAL: {2: (40, 50, 60), 3: (55, 65, 75), 4: (45, 55, 65), 5: (40, 50, 60)},
+    Mode.FLASH: {2: (24, 30, 36), 3: (24, 30, 36)},
+}
+"""Sweep ``v3end2``'s score targets (lo / mid / hi) per player count."""
+V3END2_SPINS = (2, 3)
+"""Sweep ``v3end2``'s ``max_spins``."""
+SECONDS_PER_TURN = 35
+"""#181: the seconds per turn the ``v3end2`` minutes assume (about 30-40 s for players who know
+the game, 50 s for beginners; research of #181)."""
+V3END2_TURN_TARGETS: Mapping[tuple[Mode, int], tuple[int, int | None]] = MappingProxyType({
+    (Mode.FLASH, 2): (16, 24),
+    (Mode.FLASH, 3): (24, 30),
+    (Mode.NORMAL, 2): (24, 36),
+    (Mode.NORMAL, 3): (30, 40),
+    (Mode.NORMAL, 4): (36, 48),
+    (Mode.NORMAL, 5): (40, 50),
+})
+"""#181: (min, max) total turns per game (rounds x P) per mode and player count (None: no max),
+from the box time / turns of Carcassonne and Kingdomino (about 30-40 s per turn); at least 8
+turns per player everywhere, about 10-25 min (5p about 20-33 min). The owner's real-time targets:
+2p Flash 5-15 min, 2p Normal 15-20, 3p Flash 5-15, 3p Normal up to ~20, 5p Normal at most 30,
+4p in between. Measured seconds per turn: #70."""
+V3END2_CONFIRM: tuple[str, ...] = ()
+"""The 3 Normal 5p ``v3end2`` rows (labels) with the lowest advantage that meet the turn target,
+rerun by sweep ``v3end2c``; filled in from the ``v3end2`` run (its 5p report lists them)."""
+V3END2_CONTROL = "control: v3end base, round count end"
+
+
+def v3end2_base(mode: Mode) -> dict[str, object]:
+    """The base of sweep ``v3end2``: ``v3end_base`` (so ``v3_best_base``) with the combined end."""
+    return {**v3end_base(mode), "end_conditions": V3END2_TRIGGERS}
+
+
+def v3end2_label(mode: Mode, supply: int, target: int, spins: int) -> str:
+    """A ``v3end2`` row label: the supply and target levels (indices into ``V3END2_LEVELS``) with
+    their values per player count, and ``max_spins``."""
+    m = {n: levels[supply] for n, levels in V3END2_SUPPLY[mode].items()}
+    t = {n: levels[target] for n, levels in V3END2_TARGETS[mode].items()}
+    return (f"supply {V3END2_LEVELS[supply]} ({rounds_label(m)}), target {V3END2_LEVELS[target]} "
+            f"({rounds_label(t)}), spins {spins}")
+
+
+def v3end2_candidates(mode: Mode) -> tuple[tuple[str, dict], ...]:
+    """Sweep ``v3end2``'s rows of ``mode``: supply x target x spins, then the control row."""
+    rows: list[tuple[str, dict]] = []
+    for i in range(len(V3END2_LEVELS)):
+        for j in range(len(V3END2_LEVELS)):
+            for spins in V3END2_SPINS:
+                rows.append((v3end2_label(mode, i, j, spins), {
+                    "vineyard_supply": {n: levels[i] for n, levels in V3END2_SUPPLY[mode].items()},
+                    "score_target": {n: levels[j] for n, levels in V3END2_TARGETS[mode].items()},
+                    "max_spins": spins,
+                }))
+    rows.append((V3END2_CONTROL, {"end_conditions": ()}))
+    return tuple(rows)
+
+
+def v3end2_sweeps(confirm: tuple[str, ...] = V3END2_CONFIRM) -> tuple[Sweep, ...]:
+    """Sweep ``v3end2`` (#181) and its 5p confirmation ``v3end2c`` (the Normal rows of ``confirm``)."""
+    base = {mode: v3end2_base(mode) for mode in Mode}
+    normal = dict(v3end2_candidates(Mode.NORMAL))
+    return (
+        Sweep("v3end2", "Rules v3 shared vineyard supply, respins and combined end (#181), around the "
+                        "best #160/#166 setup (v3_best_base)",
+              {mode: v3end2_candidates(mode) for mode in Mode}, ("score_aware",), base, V3END2_SWEEP_SEED),
+        Sweep("v3end2c", "Rules v3 combined end (#181): the 5p confirmation of the V3END2_CONFIRM rows",
+              {Mode.NORMAL: tuple((label, normal[label]) for label in confirm)}, ("score_aware",), base,
+              V3END2_CONFIRM_SEED),
+    )
+
+
 V1_SWEEPS = SWEEPS
 """The sweeps of #20 (Rules v1, greedy and mixed seatings)."""
 SWEEPS = (V1_SWEEPS + v2_sweeps() + strip_sweeps() + v3_sweeps() + v3split_sweeps() + v3blends_sweeps()
-          + v3bribe_sweeps() + v3end_sweeps())
+          + v3bribe_sweeps() + v3end_sweeps() + v3end2_sweeps())
 SWEEP_NAMES = tuple(s.name for s in SWEEPS)
 
 
@@ -1563,7 +1669,9 @@ def job_data(job: Job, games: list[GameRecord]) -> dict:
         data["blend_stats"] = blend_stats(games)
     if is_v3bribe(job.overrides):
         data["bribe_stats"] = bribe_stats(games)
-    if is_v3end(job.overrides):
+    if is_v3end2(job.overrides):
+        data["end2_stats"] = end2_stats(games)
+    elif is_v3end(job.overrides):
         data["end_stats"] = end_stats(games)
     return data
 
@@ -1726,6 +1834,114 @@ def end_stats(records: list[GameRecord]) -> dict[str, object]:
     }
 
 
+END2_NAMES = {
+    EndCondition.SUPPLY_EMPTY: "supply",
+    EndCondition.SCORE_TARGET: "target",
+    EndCondition.DEAD_TURNS: "dead",
+    EndCondition.ROUNDS: "cap",
+}
+"""``v3end2``: the name of each trigger that can end a game (``GameState.end_trigger``)."""
+
+
+def end2_stats(records: list[GameRecord]) -> dict[str, object]:
+    """Combined end figures (#181), from the logs and final states (no replay): ``turns`` and
+    ``rounds`` (mean per game; a turn is a run of log records by one player in one round),
+    ``ended`` (the share of games each trigger ended, ``END2_NAMES``; None under the round count
+    end), ``lost`` (lost turns per game) and ``bodega`` (the share of player-games with a bodega
+    bonus or a bodega building)."""
+    turns = rounds = lost = bodegas = 0
+    ended = dict.fromkeys(END2_NAMES.values(), 0)
+    preset = records[0].start.preset
+    for record in records:
+        last = None
+        for r in record.log:
+            if (r.round, r.player) != last:
+                turns += 1
+                last = (r.round, r.player)
+        rounds += record.log[-1].round if record.log else 0
+        lost += sum(p.lost_turns for p in record.final.players)
+        bodegas += sum(s.bodega > 0 or s.buildings > 0 for s in record.scores.values())
+        ended[END2_NAMES[record.final.end_trigger or EndCondition.ROUNDS]] += 1
+    games = len(records)
+    players = len(records[0].start.players)
+    return {
+        "turns": turns / games,
+        "rounds": rounds / games,
+        "ended": {k: n / games for k, n in ended.items()} if preset.triggers else None,
+        "lost": lost / games,
+        "bodega": bodegas / (games * players),
+    }
+
+
+def turn_target_verdict(mode: Mode, players: int, turns: float) -> str:
+    """``pass`` if ``turns`` per game (as displayed, 1 decimal) fall in ``V3END2_TURN_TARGETS``."""
+    low, high = V3END2_TURN_TARGETS[(mode, players)]
+    shown = round(turns, 1)
+    return "pass" if low <= shown and (high is None or shown <= high) else "FAIL"
+
+
+def _turn_target_text(mode: Mode, players: int) -> str:
+    low, high = V3END2_TURN_TARGETS[(mode, players)]
+    return f"{low}-{high}" if high is not None else f"{low}+"
+
+
+def _ended_text(ended: Mapping[str, float] | None) -> str:
+    if ended is None:
+        return "-"
+    return " / ".join(f"{ended[name]:.2f}" for name in END2_NAMES.values())
+
+
+END2_HEADER = (
+    "| Candidate | P | Advantage ± 95% | Win rate by position | Turns (per player) | Minutes "
+    "| Turn target | Supply / target / dead / cap | Lost turns per game | Rounds | Bodega rate | Winning score |"
+)
+"""The columns of sweep ``v3end2`` (#181)."""
+END2_COLUMNS = 12
+
+
+def end2_row(job: Job, outcome: Outcome) -> str:
+    """A ``v3end2`` row: ``END2_HEADER``'s columns."""
+    head = f"| {job.label} | {job.players} |"
+    data = outcome.data
+    if data is None:
+        return f"{head} {_not_run(outcome)} |" + " |" * (END2_COLUMNS - 3)
+    e = data["end2_stats"]
+    turns = e["turns"]
+    verdict = turn_target_verdict(job.mode, job.players, turns)
+    return (
+        f"{head} {data['turn_order_advantage']:.3f} ± {margin(job.players, job.n):.3f} "
+        f"| {_list(data['win_rate_by_position'])} | {turns:.1f} ({turns / job.players:.1f}) "
+        f"| {turns * SECONDS_PER_TURN / 60:.0f} | {verdict} ({_turn_target_text(job.mode, job.players)}) "
+        f"| {_ended_text(e['ended'])} | {e['lost']:.2f} | {e['rounds']:.1f} | {e['bodega']:.3f} "
+        f"| {_spread(data['winning_score'])} |"
+    )
+
+
+def end2_report(rows: list[tuple[Job, Outcome]]) -> list[str]:
+    """Sweep ``v3end2``'s lines after its table, per player count: the rows that meet the turn
+    target, those of them with a bodega rate above 0 and those at most ``ADVANTAGE_TARGET``; for
+    5p also the 3 lowest-advantage rows that meet it (the candidates for ``V3END2_CONFIRM``)."""
+
+    def names(pairs) -> str:
+        return ", ".join(f"`{j.label}`" for j, _ in pairs) if pairs else "none"
+
+    lines: list[str] = []
+    for players in sorted({job.players for job, _ in rows}):
+        mine = [(j, o.data) for j, o in rows if j.players == players and o.data is not None]
+        meet = [(j, d) for j, d in mine
+                if turn_target_verdict(j.mode, j.players, d["end2_stats"]["turns"]) == "pass"]
+        lines.append(f"- {players}p: meet the turn target: {names(meet)}")
+        lines.append(f"- {players}p: of those, bodega rate above 0: "
+                     + names([(j, d) for j, d in meet if d["end2_stats"]["bodega"] > 0]))
+        lines.append(f"- {players}p: of those, advantage at most {ADVANTAGE_TARGET:.2f}: "
+                     + names([(j, d) for j, d in meet if round(d["turn_order_advantage"], 3) <= ADVANTAGE_TARGET]))
+        if players == 5:
+            best = sorted(meet, key=lambda pair: pair[1]["turn_order_advantage"])[:3]
+            lines.append("- 5p: lowest advantage that meet the turn target (V3END2_CONFIRM): " + names(best))
+    lines.append("")
+    return lines
+
+
 def _bribe_columns(data: Mapping[str, object]) -> str:
     """The #168 columns: floodgates placed / released per game, share of their rolls used, swing, debt."""
     b = data.get("bribe_stats")
@@ -1809,6 +2025,11 @@ def is_v3blends(overrides: Mapping[str, object]) -> bool:
 def is_v3bribe(overrides: Mapping[str, object]) -> bool:
     """Whether a job's overrides set ``bribe_optional`` (#168; off too, as sweep ``v3bribe`` does)."""
     return "bribe_optional" in overrides
+
+
+def is_v3end2(overrides: Mapping[str, object]) -> bool:
+    """Whether a job is a #181 job: it sets ``end_conditions`` (the ``v3end2`` control row too)."""
+    return "end_conditions" in overrides
 
 
 def is_v3end(overrides: Mapping[str, object]) -> bool:
@@ -2031,13 +2252,16 @@ SUMMARY_EXTRAS = {
     "blend": ("Requirement met", "Builders", "Bodegas built / game"),
     "bribe": ("Gates placed / released", "Gate rolls used", "Swing / use", "Debt"),
     "end": ("Cap ended", "Best / worst seat"),
+    "end2": ("Turns / P", f"Minutes @ {SECONDS_PER_TURN} s", "Supply / target / dead / cap", "Lost turns / game"),
 }
 """The extra summary columns of each sweep family, taken from the raw table's figures (short
 names, to keep the file small): v3 rows: the bodega rate, planted vineyards per player, the die
 use rate; ``v3blends``: the share of players who meet the bodega requirement, the share who
 build, bodegas built per game; ``v3bribe``: floodgates placed / released per game, the share of
 floodgate and release rolls used, the swing per floodgate use, the mean debt; ``v3end``: the
-share of games the round cap ended, the best / worst win rate by seat."""
+share of games the round cap ended, the best / worst win rate by seat; ``v3end2``: turns per
+player, the minutes at ``SECONDS_PER_TURN``, the share of games each trigger ended, lost turns
+per game (its Turns and Length columns use the log's turns and ``V3END2_TURN_TARGETS``)."""
 
 
 def advantage_verdict(advantage: float, m: float) -> str:
@@ -2062,6 +2286,8 @@ def summary_families(rows: list[tuple[Job, Outcome]], final: bool = False) -> tu
     if final or not rows:
         return ()
     overrides = rows[0][0].overrides
+    if is_v3end2(overrides):
+        return ("v3", "end2")
     if is_v3end(overrides):
         return ("v3", "end")
     if not is_v3(overrides):
@@ -2076,7 +2302,8 @@ def summary_families(rows: list[tuple[Job, Outcome]], final: bool = False) -> tu
 def _summary_extras(family: str, job: Job, data: Mapping[str, object], end: bool) -> list[str]:
     """One family's extra cells, formatted as the raw table formats them (``end``: the ``v3end`` table)."""
     if family == "v3":
-        bodega = f"{data['end_stats']['bodega']:.3f}" if end else _f(data["bodega_rate"], 3)
+        stats = data.get("end2_stats") or data.get("end_stats")
+        bodega = f"{stats['bodega']:.3f}" if end else _f(data["bodega_rate"], 3)
         return [bodega, f"{data['actions_per_game']['plant'] / job.players:.2f}", _f(data["die_use_rate"], 3)]
     if family == "blend":
         b = data.get("blend_stats")
@@ -2090,6 +2317,10 @@ def _summary_extras(family: str, job: Job, data: Mapping[str, object], end: bool
             return ["-"] * 4
         return [f"{b['placed']:.2f} / {b['released']:.2f}", _f(b["used"], 3), _f(b["swing"]),
                 f"{data['score_terms']['debt']['mean']:.2f}"]
+    if family == "end2":
+        e = data["end2_stats"]
+        return [f"{e['turns'] / job.players:.1f}", f"{e['turns'] * SECONDS_PER_TURN / 60:.0f}",
+                _ended_text(e["ended"]), f"{e['lost']:.2f}"]
     e = data["end_stats"]
     seats = data["win_rate_by_seat"]
     return [_f(e["capped"], 3), f"{max(seats):.2f} / {min(seats):.2f}"]
@@ -2106,15 +2337,17 @@ def summary_row(job: Job, outcome: Outcome, families: tuple[str, ...]) -> str:
     if data is None:
         return _cells([job.label, job.seating, _not_run(outcome)] + [""] * (columns - 3))
     adv, m = data["turn_order_advantage"], margin(job.players, job.n)
-    end = "end" in families  # v3end counts turns from the log, as its raw table does
+    end2 = "end2" in families
+    end = "end" in families or end2  # v3end and v3end2 count turns from the log, as their raw tables do
     if end:
-        turns = round(data["end_stats"]["turns"], 1)
+        turns = round(data["end2_stats" if end2 else "end_stats"]["turns"], 1)
         turns_text = f"{turns:.1f}"
     else:
         turns = _turns(job, data)
         turns_text = str(turns)
+    length = turn_target_verdict(job.mode, job.players, turns) if end2 else length_verdict(job.mode, turns)
     cells = [job.label, job.seating, f"{adv:.3f} ± {m:.3f}", advantage_verdict(adv, m),
-             f"{data['winning_score']['mean']:.2f}", turns_text, length_verdict(job.mode, turns)]
+             f"{data['winning_score']['mean']:.2f}", turns_text, length]
     for family in families:
         cells += _summary_extras(family, job, data, end)
     return _cells(cells)
@@ -2192,6 +2425,18 @@ def do_sweeps(sweeps: list[Sweep], run, modes, games: int, players_list=PLAYER_C
                 summary += [f"### {mode.value.capitalize()}", ""] + summary_section(rows, summary_families(rows))
             print(f"### {mode.value.capitalize()}\n")
             print(f"Base: {describe(sweep.base[mode])}.\n")
+            if is_v3end2(rows[0][0].overrides):
+                print(f"Turns are counted from the log, per game and per player; minutes at {SECONDS_PER_TURN} s "
+                      "per turn; the turn target is V3END2_TURN_TARGETS (total turns per game).")
+                print()
+                print(END2_HEADER)
+                print("|" + " --- |" * END2_COLUMNS)
+                for job, outcome in rows:
+                    print(end2_row(job, outcome))
+                print()
+                for line in end2_report(rows):
+                    print(line)
+                continue
             if is_v3end(rows[0][0].overrides):
                 print("Turns here are counted from the log, since an end condition changes the length.")
                 print()
@@ -2355,7 +2600,8 @@ def main(argv: list[str] | None = None) -> int:
     modes = [Mode(args.mode)] if args.mode else list(Mode)
     sweeps = V1_SWEEPS + v2_sweeps(args.scale, args.rare_bonus, args.multiple_bodegas, args.season_global_only,
                                    args.seat_bonus, args.rounds) + strip_sweeps(args.river_hexes, args.bag_per_player) \
-        + v3_sweeps(args.v3_river_hexes, args.v3_bag_per_player) + v3split_sweeps() + v3blends_sweeps()         + v3bribe_sweeps() + v3end_sweeps()
+        + v3_sweeps(args.v3_river_hexes, args.v3_bag_per_player) + v3split_sweeps() + v3blends_sweeps() \
+        + v3bribe_sweeps() + v3end_sweeps() + v3end2_sweeps()
     flags = "" if (args.scale, args.rare_bonus) == (1, 1) else f" --scale {args.scale} --rare-bonus {args.rare_bonus}"
     if args.multiple_bodegas:
         flags += " --multiple-bodegas"

@@ -96,6 +96,19 @@ apart from the above. Only ``current_player`` acts, and the turn is:
    ``Pass``, always legal, which ends the turn. A canal is illegal once
    ``canals`` is 0. A bodega is never moved or resown.
 
+Shared vineyard supply (#181, opt-in: ``Preset.vineyard_supply``): the
+pieces left of each varietal are the supply (``Preset.supply_for``) less
+the vineyards of that varietal on the board (``supply_left``). A plant or
+a resow spins ``rng.choice(preset.roulette)`` until it lands on a varietal
+with a piece left, at most ``Preset.max_spins`` spins (one draw each, and
+nothing else); a resown vineyard's own piece goes back first, so its own
+varietal always works. When every spin fails the turn is lost
+(``ActionsLeft.lost``): a failed ``Plant`` plants nothing and leaves no
+action (canals placed earlier stay), a failed resow keeps the old
+varietal and ends the turn before the actions. ``Plant`` is illegal while
+the supply is empty. Without a supply every spin works, so a plant or a
+resow is one draw as before.
+
 There are no claims, bribes, season rolls, or season points under Rules v3;
 the d6 ``Bribe``, the market ``PlaceFloodgate``, and the hex ``Resow`` are
 illegal, and ``Plant``, ``ResowVineyard``, and ``MoveVineyard`` are illegal
@@ -163,6 +176,7 @@ __all__ = [
     "legal_actions",
     "season_applied",
     "roll_face",
+    "supply_left",
 ]
 
 
@@ -775,7 +789,9 @@ def _apply_v3(
         return replace(state, actions_left=ActionsLeft(left.actions - 1, left.canals - 1))
     if isinstance(action, Plant):
         _check_plant(state, player, action.vertex, preset)
-        varietal = rng.choice(preset.roulette)
+        varietal = _spin(state, preset, rng)
+        if varietal is None:
+            return replace(state, actions_left=_LOST)
         planted = state.board.planted + (PlantedVineyard(action.vertex, player, varietal),)
         actions = left.actions - 1
         return replace(
@@ -826,7 +842,10 @@ def _resolve_v3_face(
         return replace(state, pending_face=None)
     board = _v3_face_board(state, player, action, preset)
     if isinstance(action, ResowVineyard):
-        board = _respun(board, action.vertex, rng.choice(preset.roulette))
+        varietal = _spin(state, preset, rng, action.vertex)
+        if varietal is None:
+            return replace(state, pending_face=None, actions_left=_LOST)
+        board = _respun(board, action.vertex, varietal)
     cost = bribe_on_use(state, action, preset)
     players = state.players
     if cost:
@@ -907,6 +926,47 @@ def _v3_face_uses(board: Board, player: str, face: DieFace, preset: Preset) -> l
     return _face_uses(board, face)
 
 
+_LOST = ActionsLeft(0, 0, lost=True)
+"""``actions_left`` after a lost turn (#181)."""
+
+
+def supply_left(state: GameState, without: Vertex | None = None) -> dict | None:
+    """The shared vineyard supply's pieces left of each varietal (#181), None without a supply.
+
+    The supply (``Preset.supply_for``) less the vineyards of that varietal
+    on the board; the vineyard on ``without`` (a resow) counts as back in
+    the supply.
+    """
+    preset = _preset(state)
+    supply = preset.supply_for(len(state.players)) if preset.vineyard_supply else None
+    if supply is None:
+        return None
+    left = dict(supply)
+    for v in state.board.planted:
+        if v.vertex != without and v.varietal in left:
+            left[v.varietal] -= 1
+    return left
+
+
+def _spin(state: GameState, preset: Preset, rng: random.Random, without: Vertex | None = None):
+    """The varietal a plant (or a resow of the vineyard on ``without``) gets: up to ``max_spins``
+    ``rng.choice(preset.roulette)`` spins until one lands on a varietal with a piece left; None
+    when every spin fails. Without a supply, one spin."""
+    left = supply_left(state, without)
+    if left is None:
+        return rng.choice(preset.roulette)
+    for _ in range(preset.max_spins):
+        varietal = rng.choice(preset.roulette)
+        if left.get(varietal, 0) > 0:
+            return varietal
+    return None
+
+
+def _supply_empty(state: GameState) -> bool:
+    left = supply_left(state)
+    return left is not None and not any(n > 0 for n in left.values())
+
+
 def _check_plant(state: GameState, player: str, vertex: Vertex, preset: Preset) -> None:
     if not can_plant(state.board, player, vertex, preset.vertex_needs_three_canals):
         extra = " and have a canal on each of its 3 hexes" if preset.vertex_needs_three_canals else ""
@@ -919,6 +979,8 @@ def _check_plant(state: GameState, player: str, vertex: Vertex, preset: Preset) 
             f"{player} already holds {preset.plant_cap(len(state.players))} vineyards, the most "
             f"allowed (grape_clusters_per_player, or the vineyard markers under vineyards_out)"
         )
+    if _supply_empty(state):
+        raise IllegalAction("the vineyard supply is empty: no vineyard can be planted")
 
 
 def can_build_bodega(board: Board, player: str, preset: Preset) -> bool:
@@ -998,7 +1060,7 @@ def _legal_v3(state: GameState, player: str, preset: Preset) -> tuple[Action, ..
     canals = _canal_placements(state) if left.canals else []
     plants = (
         [Plant(v) for v in plantable_spots(state.board, player, preset.vertex_needs_three_canals)]
-        if _below_cap(state, player, preset)
+        if _below_cap(state, player, preset) and not _supply_empty(state)
         else []
     )
     bodegas = [BuildBodega(v) for v in _bodega_spots(state, player, preset)]
