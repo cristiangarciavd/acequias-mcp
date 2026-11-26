@@ -1300,6 +1300,33 @@ Flash, x1, building 12: the requirement is met by 7% of players with 2 whites an
 
 Decision: `v3_best_base` moves to cortes `each_once` x1 plus the bodega building at 12 points with 2 reds + 1 white. The sweeps `v3bribe` (#168) and `v3end` (#163) run on it. The shipped presets are unchanged.
 
+## Rules v3 optional floodgate faces (#168)
+
+Sweep `v3bribe`, `score_aware`, 500 games per row, raw output `output/tuning-168/v3bribe.md` (3.1 h at 8 workers). Base: the #166 best setup. Candidates: the floodgate and release faces mandatory (the bribe paid on every roll of them) or optional (`bribe_optional`, paid only when used), x the bribe 1 / 2 / 3 / 4 / 6.
+
+Normal, 3p / 4p:
+
+| Candidate | Advantage | Winning score | Floodgate rolls used | Swing per use | Bribe paid per player |
+| --- | --- | --- | --- | --- | --- |
+| mandatory 1 | 0.185 / 0.416 | 44.0 / 39.4 | 0.81 / 0.81 | 2.2 / 0.3 | 5.0 / 4.0 |
+| mandatory 3 | 0.229 / 0.488 | 35.9 / 30.5 | 0.81 / 0.81 | 2.3 / 0.2 | 15.1 / 12.0 |
+| mandatory 6 | 0.191 / 0.460 | 21.7 / 19.5 | 0.81 / 0.81 | 2.1 / 0.3 | 30.0 / 24.2 |
+| optional 1 | 0.239 / 0.448 | 43.6 / 38.0 | 0.61 / 0.54 | 4.5 / 2.3 | 3.1 / 2.2 |
+| optional 2 | 0.260 / 0.480 | 41.4 / 36.4 | 0.55 / 0.46 | 4.8 / 2.5 | 5.5 / 3.7 |
+| optional 3 | 0.238 / 0.624 | 40.0 / 35.5 | 0.50 / 0.40 | 5.0 / 2.6 | 7.5 / 4.9 |
+| optional 4 | 0.226 / 0.496 | 39.9 / 36.2 | 0.43 / 0.33 | 5.8 / 3.0 | 8.6 / 5.3 |
+| optional 6 | 0.263 / 0.520 | 38.7 / 36.2 | 0.33 / 0.23 | 6.6 / 3.4 | 10.0 / 5.6 |
+
+Flash 3p, optional: floodgate rolls used 0.42 / 0.35 / 0.29 / 0.20 / 0.12 at bribe 1 / 2 / 3 / 4 / 6, swing per use 1.4 to 3.1.
+
+- Seat bias: unchanged by either switch; 2p passes everywhere, 4-5p fails everywhere, all within noise
+- Mandatory faces are a tax: bots pay on about 81% of floodgate rolls for a swing of 0.2-0.3 points at 4p, so a higher bribe only lowers every score (winning score 39 to 20 at 4p from bribe 1 to 6)
+- Optional faces turn the floodgate into a decision: use falls as the bribe rises and the swing per use grows, so a floodgate is placed only when it pays
+- Bribe 2 in Normal keeps floodgates in about half of the rolls (4 on the board at once, at most 10-11) and a swing above the bribe at 3p; bribe 3 or more makes them rare at 4-5p (40% or less). Flash has fewer points per vineyard, so bribe 1 keeps the swing (1.4) above the bribe; at bribe 2 the swing per use (1.5) is barely above it
+- A supply of 12 floodgates is enough at every count
+
+Decision: `v3_best_base` moves to optional floodgate faces with bribe 2 in Normal and 1 in Flash (`V3_BEST_BRIBE`). The sweep `v3end` (#163) runs on it. The shipped presets are unchanged.
+
 ## Rules v3 seat bias and end conditions (#163)
 
 Sweep `v3end`, `score_aware`, 500 games per row, seed 163001, around `v3_best_base` (the best #160/#166/#168 setup in `scripts/tune.py`): `uv run python scripts/tune.py --sweep v3end`. Rows: the base; seats rotated and shuffled per game; an unlimited bag; `bag_empty`, `vineyards_out` (default markers 6 / 9 / 7 / 6, Flash 3) and `score_target` (#160's winning scores x1 / x1.5 / x2), each with `finish_round` on and off. Games whose trigger never fires end after twice the shipped rounds, and the table reports their share.
