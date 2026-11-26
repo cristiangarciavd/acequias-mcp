@@ -1546,22 +1546,26 @@ def run_all(jobs: list[Job], workers: int, checkpoints: Checkpoints | None = Non
             outcomes.append(Outcome(first.status, error=first.error))
             continue
         try:
-            games = [record for part in records[j] for record in part]
-            data = summarize(rules_of(job), job.seed, games).to_json()
-            data["floodgates"] = floodgate_stats(games)
-            if is_v3blends(job.overrides):
-                data["blend_stats"] = blend_stats(games)
-            if is_v3bribe(job.overrides):
-                data["bribe_stats"] = bribe_stats(games)
-            if is_v3end(job.overrides):
-                data["end_stats"] = end_stats(games)
-            outcomes.append(Outcome("ok", data=data))
+            outcomes.append(Outcome("ok", data=job_data(job, [record for part in records[j] for record in part])))
         except Exception as error:  # noqa: BLE001 - reported with its job, the run goes on
             outcomes.append(Outcome(FAILED, error=f"{type(error).__name__}: {error}"))
     for job, outcome in zip(jobs, outcomes):
         if outcome.status == FAILED:
             print(f"FAILED {describe_job(job)}: {outcome.error}", file=sys.stderr, flush=True)
     return outcomes
+
+
+def job_data(job: Job, games: list[GameRecord]) -> dict:
+    """A job's result JSON from its records in game order: ``summarize`` plus tune's own keys."""
+    data = summarize(rules_of(job), job.seed, games).to_json()
+    data["floodgates"] = floodgate_stats(games)
+    if is_v3blends(job.overrides):
+        data["blend_stats"] = blend_stats(games)
+    if is_v3bribe(job.overrides):
+        data["bribe_stats"] = bribe_stats(games)
+    if is_v3end(job.overrides):
+        data["end_stats"] = end_stats(games)
+    return data
 
 
 # --- Formatting --------------------------------------------------------------

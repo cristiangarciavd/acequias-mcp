@@ -55,8 +55,8 @@ def test_failed_job_row_keeps_its_label():
 def test_v3bribe_row_matches_the_raw_table():
     (sweep,) = [s for s in tune.SWEEPS if s.name == "v3bribe"]
     job = tune.sweep_jobs(sweep, [Mode.FLASH], 2, [2])[0]
-    (outcome,) = tune.run_all([job], 1, None)
-    assert outcome.status == "ok"
+    # In process (no worker pool), with the same assembly as run_all.
+    outcome = tune.Outcome("ok", data=tune.job_data(job, tune.run_chunk(job, 0, job.n).records))
     rows = [(job, outcome)]
     families = tune.summary_families(rows)
     assert families == ("v3", "bribe")
