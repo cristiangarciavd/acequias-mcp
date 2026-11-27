@@ -46,7 +46,9 @@ def test_v3end2_has_18_grid_rows_and_a_control_per_mode_and_count():
 
 
 def test_v3end2c_reruns_the_confirm_rows():
-    assert tune.V3END2_CONFIRM == () and _sweep("v3end2c").candidates[Mode.NORMAL] == ()
+    labels = {label for label, _ in tune.v3end2_candidates(Mode.NORMAL)}
+    assert len(tune.V3END2_CONFIRM) == 3 and set(tune.V3END2_CONFIRM) <= labels
+    assert [label for label, _ in _sweep("v3end2c").candidates[Mode.NORMAL]] == list(tune.V3END2_CONFIRM)
     picked = tuple(label for label, _ in tune.v3end2_candidates(Mode.NORMAL)[:3])
     _, confirm = tune.v3end2_sweeps(picked)
     assert confirm.name == "v3end2c" and confirm.seed == 181_002

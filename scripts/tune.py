@@ -1125,9 +1125,13 @@ from the box time / turns of Carcassonne and Kingdomino (about 30-40 s per turn)
 turns per player everywhere, about 10-25 min (5p about 20-33 min). The owner's real-time targets:
 2p Flash 5-15 min, 2p Normal 15-20, 3p Flash 5-15, 3p Normal up to ~20, 5p Normal at most 30,
 4p in between. Measured seconds per turn: #70."""
-V3END2_CONFIRM: tuple[str, ...] = ()
-"""The 3 Normal 5p ``v3end2`` rows (labels) with the lowest advantage that meet the turn target,
-rerun by sweep ``v3end2c``; filled in from the ``v3end2`` run (its 5p report lists them)."""
+V3END2_CONFIRM: tuple[str, ...] = (
+    "supply lo (2=1,3=2,4=2,5=2), target lo (2=40,3=55,4=45,5=40), spins 3",
+    "supply mid (2=2,3=3,4=3,5=3), target lo (2=40,3=55,4=45,5=40), spins 3",
+    "supply lo (2=1,3=2,4=2,5=2), target mid (2=50,3=65,4=55,5=50), spins 3",
+)
+"""The 3 Normal 5p ``v3end2`` rows (labels) rerun by sweep ``v3end2c``. No 5p row met the turn
+target (40-50; the shortest ran 51), so these are the lowest advantages among the shortest rows."""
 V3END2_CONTROL = "control: v3end base, round count end"
 
 
