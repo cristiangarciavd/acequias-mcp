@@ -124,3 +124,12 @@ def test_end2_stats_counts_each_trigger():
     names = [tune.END2_NAMES[r.final.end_trigger or EndCondition.ROUNDS] for r in records]
     assert stats["ended"] == {k: names.count(k) / 3 for k in tune.END2_NAMES.values()}
     assert stats["lost"] == sum(p.lost_turns for r in records for p in r.final.players) / 3
+
+
+def test_v3end3_rows():
+    rows = tune.v3end3_candidates()
+    assert len(rows) == len(tune.V3END3_SUPPLY) * 3 + 1 and rows[-1][0] == tune.V3END2_CONTROL
+    sweep = _sweep("v3end3")
+    assert set(sweep.candidates) == {Mode.NORMAL} and sweep.seed == 181_003
+    for _, overrides in rows[:-1]:
+        assert overrides["max_spins"] == 3 and set(overrides["score_target"]) == {2, 3, 4, 5}
