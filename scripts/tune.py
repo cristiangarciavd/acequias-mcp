@@ -1178,10 +1178,45 @@ def v3end2_sweeps(confirm: tuple[str, ...] = V3END2_CONFIRM) -> tuple[Sweep, ...
     )
 
 
+V3END3_SUPPLY = (1, 2)
+"""Sweep ``v3end3``'s supply multipliers ``m`` (Normal 3-5p): the owner wants the supply to be
+the main end, so tighter than ``v3end2``."""
+V3END3_TARGETS = {2: (40, 40, 40), 3: (40, 45, 50), 4: (35, 40, 45), 5: (30, 35, 40)}
+"""Sweep ``v3end3``'s score targets (lo / mid / hi) per player count (2p is a placeholder; not run): below ``v3end2``'s, whose
+lowest still ran past the Normal 3-5p turn targets."""
+V3END3_SPINS = 3
+"""Sweep ``v3end3``'s ``max_spins``: 3 cut lost turns by about 40% in ``v3end2``."""
+V3END3_SWEEP_SEED = 181_003
+"""The run seed of sweep ``v3end3``; no earlier run used it."""
+
+
+def v3end3_candidates() -> tuple[tuple[str, dict], ...]:
+    """Sweep ``v3end3``'s Normal rows: supply x target at ``V3END3_SPINS`` spins, then the control."""
+    rows: list[tuple[str, dict]] = []
+    for m in V3END3_SUPPLY:
+        for j, level in enumerate(V3END2_LEVELS):
+            t = {n: levels[j] for n, levels in V3END3_TARGETS.items()}
+            rows.append((f"supply m{m}, target {level} ({rounds_label(t)}), spins {V3END3_SPINS}", {
+                "vineyard_supply": {n: m for n in V3END3_TARGETS},
+                "score_target": t,
+                "max_spins": V3END3_SPINS,
+            }))
+    rows.append((V3END2_CONTROL, {"end_conditions": ()}))
+    return tuple(rows)
+
+
+def v3end3_sweeps() -> tuple[Sweep, ...]:
+    """Sweep ``v3end3`` (#181 follow-up): Normal 3-5p, tighter supply and lower targets. Run one
+    player count at a time: ``--sweep v3end3 --mode normal --players 3 --games 1000``."""
+    return (Sweep("v3end3", "Rules v3 combined end (#181): Normal 3-5p with a tighter supply and lower "
+                            "score targets", {Mode.NORMAL: v3end3_candidates()}, ("score_aware",),
+                  {Mode.NORMAL: v3end2_base(Mode.NORMAL)}, V3END3_SWEEP_SEED),)
+
+
 V1_SWEEPS = SWEEPS
 """The sweeps of #20 (Rules v1, greedy and mixed seatings)."""
 SWEEPS = (V1_SWEEPS + v2_sweeps() + strip_sweeps() + v3_sweeps() + v3split_sweeps() + v3blends_sweeps()
-          + v3bribe_sweeps() + v3end_sweeps() + v3end2_sweeps())
+          + v3bribe_sweeps() + v3end_sweeps() + v3end2_sweeps() + v3end3_sweeps())
 SWEEP_NAMES = tuple(s.name for s in SWEEPS)
 
 
@@ -2605,7 +2640,7 @@ def main(argv: list[str] | None = None) -> int:
     sweeps = V1_SWEEPS + v2_sweeps(args.scale, args.rare_bonus, args.multiple_bodegas, args.season_global_only,
                                    args.seat_bonus, args.rounds) + strip_sweeps(args.river_hexes, args.bag_per_player) \
         + v3_sweeps(args.v3_river_hexes, args.v3_bag_per_player) + v3split_sweeps() + v3blends_sweeps() \
-        + v3bribe_sweeps() + v3end_sweeps() + v3end2_sweeps()
+        + v3bribe_sweeps() + v3end_sweeps() + v3end2_sweeps() + v3end3_sweeps()
     flags = "" if (args.scale, args.rare_bonus) == (1, 1) else f" --scale {args.scale} --rare-bonus {args.rare_bonus}"
     if args.multiple_bodegas:
         flags += " --multiple-bodegas"
