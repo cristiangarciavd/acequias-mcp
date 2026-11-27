@@ -181,6 +181,12 @@ for ``V3END2_CONFIRM``). Sweep ``v3end2c`` reruns the rows named in
     uv run python scripts/tune.py --sweep v3end2 --games 300
     uv run python scripts/tune.py --sweep v3end2c --mode normal --players 5 --games 2000
 
+Sweep ``v3end4`` (#188) tries fractional supply multipliers (``V3END4_SUPPLY``: m1, m1.25,
+m1.5 = 14, 20, 22 pieces) x score targets at 3 spins, plus the control row: Normal 2p-5p
+(``V3END4_TARGETS``), Flash 2p-3p (``V3END4_FLASH_TARGETS``); seed ``V3END4_SWEEP_SEED``:
+
+    uv run python scripts/tune.py --sweep v3end4 --mode normal --players 5 --games 1000
+
 Turns and minutes count turns (rounds x P), not log records: under action
 die rules a die turn is 2 records, so ``turns_per_game`` would overcount. A candidate the preset or the board
 generator rejects is printed as infeasible with its error, and the run goes
@@ -245,7 +251,7 @@ from acequias.config import (
     scaled,
     with_overrides,
 )
-from acequias.config import players_text
+from acequias.config import ROULETTE_SECTORS, players_text
 from acequias.config import preset as shipped_preset
 from acequias.model import DieFace, GameState, Mode, PieceKind, Varietal
 from acequias.sim import GameRecord, SimRules, game_seed, play_one, summarize
@@ -1213,10 +1219,65 @@ def v3end3_sweeps() -> tuple[Sweep, ...]:
                   {Mode.NORMAL: v3end2_base(Mode.NORMAL)}, V3END3_SWEEP_SEED),)
 
 
+V3END4_SUPPLY = (1, 1.25, 1.5)
+"""Sweep ``v3end4``'s supply multipliers ``m`` (#188): fractional ones sit between m1 (14 pieces,
+too short at 5p) and m2 (28, where the score target ends the game)."""
+V3END4_TARGETS = {2: (40, 45, 50), 3: (45, 50, 55), 4: (45, 50, 55), 5: (35, 40, 45)}
+"""Sweep ``v3end4``'s Normal score targets (lo / mid / hi) per player count, around ``v3end3``'s results."""
+V3END4_FLASH_TARGETS = (30, 35, 40)
+"""Sweep ``v3end4``'s Flash score targets (2p and 3p alike)."""
+V3END4_FLASH_COUNTS = (2, 3)
+"""The Flash player counts of sweep ``v3end4``."""
+V3END4_SPINS = 3
+"""Sweep ``v3end4``'s ``max_spins``, as in ``v3end3``."""
+V3END4_SWEEP_SEED = 181_004
+"""The run seed of sweep ``v3end4``; no earlier run used it."""
+
+
+def supply_pieces(m: int | float) -> int:
+    """The total shared supply at multiplier ``m`` (``Preset.supply_for``: each varietal's roulette
+    sectors x m, half up, at least 1): m1 14, m1.25 20, m1.5 22."""
+    sectors = [ROULETTE_SECTORS.count(v) for v in dict.fromkeys(ROULETTE_SECTORS)]
+    return sum(n * m if isinstance(m, int) else max(1, math.floor(n * m + 0.5)) for n in sectors)
+
+
+def _v3end4_row(m: int | float, target: str, t: Mapping[int, int]) -> tuple[str, dict]:
+    return (f"supply m{m} ({supply_pieces(m)} pieces), target {target} ({rounds_label(t)}), spins {V3END4_SPINS}", {
+        "vineyard_supply": {n: m for n in t},
+        "score_target": dict(t),
+        "max_spins": V3END4_SPINS,
+    })
+
+
+def v3end4_candidates(mode: Mode) -> tuple[tuple[str, dict], ...]:
+    """Sweep ``v3end4``'s rows of ``mode``: supply x target at ``V3END4_SPINS`` spins, then the control.
+    Normal (2p-5p) uses the lo / mid / hi levels of ``V3END4_TARGETS``; Flash (2p-3p) each of
+    ``V3END4_FLASH_TARGETS``."""
+    rows: list[tuple[str, dict]] = []
+    for m in V3END4_SUPPLY:
+        if mode is Mode.NORMAL:
+            for j, level in enumerate(V3END2_LEVELS):
+                rows.append(_v3end4_row(m, level, {n: levels[j] for n, levels in V3END4_TARGETS.items()}))
+        else:
+            for target in V3END4_FLASH_TARGETS:
+                rows.append(_v3end4_row(m, str(target), {n: target for n in V3END4_FLASH_COUNTS}))
+    rows.append((V3END2_CONTROL, {"end_conditions": ()}))
+    return tuple(rows)
+
+
+def v3end4_sweeps() -> tuple[Sweep, ...]:
+    """Sweep ``v3end4`` (#188): fractional supply multipliers, Normal 2p-5p and Flash 2p-3p. Run
+    one player count at a time: ``--sweep v3end4 --mode normal --players 5 --games 1000``."""
+    return (Sweep("v3end4", "Rules v3 combined end (#188): fractional supply multipliers x score "
+                            "targets, Normal 2p-5p and Flash 2p-3p",
+                  {mode: v3end4_candidates(mode) for mode in Mode}, ("score_aware",),
+                  {mode: v3end2_base(mode) for mode in Mode}, V3END4_SWEEP_SEED),)
+
+
 V1_SWEEPS = SWEEPS
 """The sweeps of #20 (Rules v1, greedy and mixed seatings)."""
 SWEEPS = (V1_SWEEPS + v2_sweeps() + strip_sweeps() + v3_sweeps() + v3split_sweeps() + v3blends_sweeps()
-          + v3bribe_sweeps() + v3end_sweeps() + v3end2_sweeps() + v3end3_sweeps())
+          + v3bribe_sweeps() + v3end_sweeps() + v3end2_sweeps() + v3end3_sweeps() + v3end4_sweeps())
 SWEEP_NAMES = tuple(s.name for s in SWEEPS)
 
 
@@ -2640,7 +2701,7 @@ def main(argv: list[str] | None = None) -> int:
     sweeps = V1_SWEEPS + v2_sweeps(args.scale, args.rare_bonus, args.multiple_bodegas, args.season_global_only,
                                    args.seat_bonus, args.rounds) + strip_sweeps(args.river_hexes, args.bag_per_player) \
         + v3_sweeps(args.v3_river_hexes, args.v3_bag_per_player) + v3split_sweeps() + v3blends_sweeps() \
-        + v3bribe_sweeps() + v3end_sweeps() + v3end2_sweeps() + v3end3_sweeps()
+        + v3bribe_sweeps() + v3end_sweeps() + v3end2_sweeps() + v3end3_sweeps() + v3end4_sweeps()
     flags = "" if (args.scale, args.rare_bonus) == (1, 1) else f" --scale {args.scale} --rare-bonus {args.rare_bonus}"
     if args.multiple_bodegas:
         flags += " --multiple-bodegas"

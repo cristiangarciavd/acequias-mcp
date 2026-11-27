@@ -133,3 +133,28 @@ def test_v3end3_rows():
     assert set(sweep.candidates) == {Mode.NORMAL} and sweep.seed == 181_003
     for _, overrides in rows[:-1]:
         assert overrides["max_spins"] == 3 and set(overrides["score_target"]) == {2, 3, 4, 5}
+
+
+def test_v3end4_rows_build_presets():
+    sweep = _sweep("v3end4")
+    assert sweep.seed == 181_004 and sweep.seatings == ("score_aware",)
+    for mode in Mode:
+        labels = [label for label, _ in sweep.candidates[mode]]
+        assert len(labels) == len(set(labels)) == 10 and labels[-1] == tune.V3END2_CONTROL
+        assert sweep.base[mode] == tune.v3end2_base(mode)
+    assert [label for label, _ in sweep.candidates[Mode.NORMAL][3:6]] == [
+        f"supply m1.25 (20 pieces), target {level} ({t}), spins 3" for level, t in (
+            ("lo", "2=40,3=45,4=45,5=35"), ("mid", "2=45,3=50,4=50,5=40"), ("hi", "2=50,3=55,4=55,5=45"))]
+    assert sweep.candidates[Mode.FLASH][8][0] == "supply m1.5 (22 pieces), target 40 (2=40,3=40), spins 3"
+    jobs = tune.sweep_jobs(sweep, list(Mode), 10)
+    assert len(jobs) == 4 * 10 + 2 * 10
+    for job in jobs:  # every row builds a preset
+        p = _preset(tune.rules_of(job))
+        if job.label == tune.V3END2_CONTROL:
+            assert p.triggers == () and p.vineyard_supply == {}
+            continue
+        m = p.vineyard_supply[job.players]
+        assert m in tune.V3END4_SUPPLY and p.triggers == tune.V3END2_TRIGGERS and p.max_spins == 3
+        assert sum(p.supply_for(job.players).values()) == tune.supply_pieces(m)
+        assert f"({tune.supply_pieces(m)} pieces)" in job.label
+    assert [tune.supply_pieces(m) for m in tune.V3END4_SUPPLY] == [14, 20, 22]

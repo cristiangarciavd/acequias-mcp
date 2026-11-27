@@ -19,6 +19,7 @@ This module depends on nothing in ``acequias`` except ``acequias.model``.
 from __future__ import annotations
 
 import dataclasses
+import math
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import Enum
@@ -418,10 +419,11 @@ class Preset:
     presets): ``end_conditions`` lists several triggers (no ``ROUNDS``, no
     repeats); the first to fire ends the game, and it replaces
     ``end_condition``, which must then stay ``ROUNDS``. ``vineyard_supply``
-    maps a player count to a multiplier ``m``: the shared supply then holds
-    ``m`` pieces per roulette sector of each varietal (``supply_for``), and
-    every planted vineyard takes one piece of its varietal (empty by
-    default: no supply). ``max_spins`` (1 by default) is how many spins a
+    maps a player count to a multiplier ``m`` (an int or, #188, a positive
+    non-integer such as 1.5): the shared supply then holds, of each
+    varietal, its roulette sectors times ``m`` pieces rounded half up, at
+    least 1 (``supply_for``), and every planted vineyard takes one piece of
+    its varietal (empty by default: no supply). ``max_spins`` (1 by default) is how many spins a
     plant or a resow may make: a spin that lands on a varietal with no
     piece left is spun again, up to ``max_spins`` spins in total; when all
     fail the player loses the rest of the turn. Both need vertex planting.
@@ -473,7 +475,7 @@ class Preset:
     vineyard_markers: Mapping[int, int] = field(default_factory=lambda: MappingProxyType({}))
     score_target: Mapping[int, int] = field(default_factory=lambda: MappingProxyType({}))
     unlimited_bag: bool = False
-    vineyard_supply: Mapping[int, int] = field(default_factory=lambda: MappingProxyType({}))
+    vineyard_supply: Mapping[int, int | float] = field(default_factory=lambda: MappingProxyType({}))
     max_spins: int = 1
     end_conditions: tuple[EndCondition, ...] = ()
 
@@ -619,7 +621,7 @@ class Preset:
         _check_type("unlimited_bag", self.unlimited_bag, bool)
         _set(self, "vineyard_markers", _per_count("vineyard_markers", self.vineyard_markers, self.player_counts))
         _set(self, "score_target", _per_count("score_target", self.score_target, self.player_counts))
-        _set(self, "vineyard_supply", _per_count("vineyard_supply", self.vineyard_supply, self.player_counts))
+        _set(self, "vineyard_supply", _supply_per_count(self.vineyard_supply, self.player_counts))
         _check_count("max_spins", self.max_spins)
         vertices = self.planting is PlantingRules.VERTICES
         if self.vineyard_supply and not vertices:
@@ -672,15 +674,19 @@ class Preset:
 
     def supply_for(self, players: int) -> Mapping[Varietal, int] | None:
         """The shared vineyard supply of a game of ``players`` players (#181): of each roulette
-        varietal, its sectors times ``vineyard_supply[players]`` pieces; None without a supply."""
+        varietal, its sectors times ``m = vineyard_supply[players]`` pieces; None without a supply.
+
+        A non-integer ``m`` (#188) rounds half up, at least 1 piece: on the 14-sector roulette m 1.5
+        gives 3 of each two-sector varietal and 2 of each one-sector one (22 in all), m 1.25 gives
+        3 and 1 (20). An int ``m`` gives exactly sectors x m."""
         self.check_players(players)
         m = self.vineyard_supply.get(players)
         if m is None:
             return None
-        counts: dict[Varietal, int] = {}
+        sectors: dict[Varietal, int] = {}
         for v in self.roulette:
-            counts[v] = counts.get(v, 0) + m
-        return MappingProxyType(counts)
+            sectors[v] = sectors.get(v, 0) + 1
+        return MappingProxyType({v: _supply_pieces(n, m) for v, n in sectors.items()})
 
     def markers_for(self, players: int) -> int:
         """Vineyard markers per player for ``VINEYARDS_OUT``: ``vineyard_markers`` or the default."""
@@ -890,6 +896,30 @@ def _per_count(name: str, value: object, counts: tuple[int, ...]) -> Mapping[int
     for players in counts:
         if players in value:
             _check_count(f"{name}[{players}]", value[players])
+    return MappingProxyType({n: value[n] for n in counts if n in value})
+
+
+def _supply_pieces(sectors: int, m: int | float) -> int:
+    """Pieces of a varietal with ``sectors`` roulette sectors at multiplier ``m``: half up, at least 1."""
+    if isinstance(m, int):
+        return sectors * m
+    return max(1, math.floor(sectors * m + 0.5))
+
+
+def _supply_per_count(value: object, counts: tuple[int, ...]) -> Mapping[int, int | float]:
+    """``vineyard_supply``: like ``_per_count``, but a multiplier may also be a positive finite
+    non-integer (#188); 0, negatives, bools and non-numbers raise ``ValueError``."""
+    name = "vineyard_supply"
+    _check_type(name, value, Mapping)
+    extra = [n for n in value if n not in counts or isinstance(n, bool)]
+    if extra:
+        raise ValueError(f"{name} gives player counts {extra}; rounds has only {players_text(counts)}")
+    for players in counts:
+        if players in value:
+            m = value[players]
+            if (isinstance(m, bool) or not isinstance(m, (int, float)) or not math.isfinite(m)
+                    or m <= 0):
+                raise ValueError(f"{name}[{players}] must be a positive number, got {m!r}")
     return MappingProxyType({n: value[n] for n in counts if n in value})
 
 
