@@ -37,7 +37,8 @@ and ``DEAD_TURNS`` once every player's ``Player.dead_turns`` is at least
 ``ROUNDS`` when a preset with triggers reaches its round cap. When a Rules
 v3 turn ends, the player's ``dead_turns`` goes up by one after a lost
 turn (``ActionsLeft.lost``, also counted in ``lost_turns``) and back to 0
-after any other turn.
+after any other turn. A turn in which a plant or a resow succeeded is
+never lost, even if a later plant fails (#184).
 
 Under Rules v3 (vertex planting) a turn is the mandatory roll, the
 face's use if one is pending, then the player's actions (one, two after a

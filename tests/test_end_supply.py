@@ -208,7 +208,7 @@ def test_a_failed_resow_keeps_the_varietal_and_ends_the_turn():
     # The vineyard's own piece goes back first, so its own varietal always works.
     ok = apply(s, "p1", ResowVineyard(syrah.vertex), Rigged(M, S))
     assert ok.board.planted_at(syrah.vertex) == syrah
-    assert ok.actions_left == ActionsLeft(1, 1)
+    assert ok.actions_left == ActionsLeft(1, 1, planted=True)  # #184: a resow that works counts as planted
 
 
 def test_plant_is_illegal_while_the_supply_is_empty():
