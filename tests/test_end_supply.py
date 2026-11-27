@@ -290,3 +290,30 @@ def test_a_finished_game_records_its_trigger(spins):
     left = supply_left(record.final)
     assert all(n >= 0 for n in left.values())
     assert _preset(SimRules(Mode.FLASH, 2, ("greedy",) * 2, overrides)).max_spins == spins
+
+
+# --- Fractional supply multiplier (#188) --------------------------------------
+
+
+@pytest.mark.parametrize(("m", "two", "one", "total"), [
+    (1, 2, 1, 14), (2, 4, 2, 28), (1.25, 3, 1, 20), (1.5, 3, 2, 22), (0.5, 1, 1, 8), (0.2, 1, 1, 8),
+    (1.75, 4, 2, 28), (2.0, 4, 2, 28),
+])
+def test_fractional_supply_rounds_half_up_at_least_one(m, two, one, total):
+    supply = with_overrides(V3, vineyard_supply={2: m}).supply_for(2)
+    sectors = {v: ALL_PIECES.count(v) for v in set(ALL_PIECES)}
+    assert sorted(set(sectors.values())) == [1, 2]
+    assert {v: supply[v] for v in sectors} == {v: two if n == 2 else one for v, n in sectors.items()}
+    assert sum(supply.values()) == total
+
+
+def test_integer_supply_is_unchanged():
+    supply = with_overrides(V3, vineyard_supply={2: 3}).supply_for(2)
+    assert dict(supply) == {v: 3 * ALL_PIECES.count(v) for v in set(ALL_PIECES)}
+    assert all(type(n) is int for n in supply.values())
+
+
+@pytest.mark.parametrize("bad", [0, -1, -0.5, 0.0, True, False, "1", None, float("nan"), float("inf")])
+def test_supply_rejects_bad_multipliers(bad):
+    with pytest.raises(ValueError, match=r"vineyard_supply\[2\]"):
+        with_overrides(V3, vineyard_supply={2: bad})
