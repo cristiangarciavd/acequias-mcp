@@ -102,10 +102,13 @@ the vineyards of that varietal on the board (``supply_left``). A plant or
 a resow spins ``rng.choice(preset.roulette)`` until it lands on a varietal
 with a piece left, at most ``Preset.max_spins`` spins (one draw each, and
 nothing else); a resown vineyard's own piece goes back first, so its own
-varietal always works. When every spin fails the turn is lost
-(``ActionsLeft.lost``): a failed ``Plant`` plants nothing and leaves no
-action (canals placed earlier stay), a failed resow keeps the old
-varietal and ends the turn before the actions. ``Plant`` is illegal while
+varietal always works. When every spin fails, a failed ``Plant`` plants
+nothing, takes no piece and leaves no action (canals and bodegas placed
+earlier stay), and a failed resow keeps the old varietal and ends the turn
+before the actions. The turn is lost (``ActionsLeft.lost``) only if no
+plant or resow succeeded earlier in it (#184, ``ActionsLeft.planted``):
+after a good season, a plant that succeeds then a plant that fails ends
+the turn, but it is not a lost turn. ``Plant`` is illegal while
 the supply is empty. Without a supply every spin works, so a plant or a
 resow is one draw as before.
 
@@ -780,30 +783,31 @@ def _apply_v3(
     if left.actions == 0:
         raise IllegalAction(f"{player} has no action left this turn")
     if isinstance(action, Pass):
-        return replace(state, actions_left=ActionsLeft(0, 0))
+        return replace(state, actions_left=replace(left, actions=0, canals=0))
     if isinstance(action, PlaceCanal):
         if left.canals == 0:
             raise IllegalAction("only one canal per turn; plant or pass")
         board = _canal_board(state, player, action)
         state = _take_from_market(state, board, action.kind)
-        return replace(state, actions_left=ActionsLeft(left.actions - 1, left.canals - 1))
+        return replace(state, actions_left=replace(left, actions=left.actions - 1, canals=left.canals - 1))
     if isinstance(action, Plant):
         _check_plant(state, player, action.vertex, preset)
         varietal = _spin(state, preset, rng)
-        if varietal is None:
-            return replace(state, actions_left=_LOST)
+        if varietal is None:  # lost only if nothing was planted or resown this turn (#184)
+            return replace(state, actions_left=replace(left, actions=0, canals=0) if left.planted else _LOST)
         planted = state.board.planted + (PlantedVineyard(action.vertex, player, varietal),)
         actions = left.actions - 1
         return replace(
             state,
             board=state.board._derive(planted=planted),  # checked by _check_plant
-            actions_left=ActionsLeft(actions, min(left.canals, actions)),
+            actions_left=replace(left, actions=actions, canals=min(left.canals, actions),
+                                 planted=bool(preset.vineyard_supply)),
         )
     if isinstance(action, BuildBodega):
         board = _bodega_board(state, player, action.vertex, preset)
         actions = left.actions - 1
         return replace(
-            state, board=board, actions_left=ActionsLeft(actions, min(left.canals, actions))
+            state, board=board, actions_left=replace(left, actions=actions, canals=min(left.canals, actions))
         )
     raise IllegalAction(f"{name} is not a Rules v3 action here; place a canal, plant, or pass")
 
@@ -846,6 +850,8 @@ def _resolve_v3_face(
         if varietal is None:
             return replace(state, pending_face=None, actions_left=_LOST)
         board = _respun(board, action.vertex, varietal)
+        if preset.vineyard_supply:  # a resow that succeeds counts as planted (#184)
+            state = replace(state, actions_left=replace(state.actions_left, planted=True))
     cost = bribe_on_use(state, action, preset)
     players = state.players
     if cost:

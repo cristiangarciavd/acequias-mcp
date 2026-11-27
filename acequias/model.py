@@ -352,19 +352,27 @@ class ActionsLeft:
     them may still be canals: 1 and 1 on a normal turn, 2 and 1 after a
     good season (never 2 canals), 0 and 0 after a drought or a pass.
     ``lost`` (#181) marks a lost turn: every spin of a plant or a resow
-    failed on an exhausted varietal, so no action is left (0 and 0).
+    failed on an exhausted varietal, so no action is left (0 and 0), and
+    no plant or resow succeeded earlier in the turn. ``planted`` (#184)
+    says a plant or a resow already succeeded this turn (set only under a
+    vineyard supply): a later failed plant then ends the turn without
+    making it a lost turn.
     """
 
     actions: int
     canals: int
     lost: bool = False
+    planted: bool = False
 
     def __post_init__(self) -> None:
         _check_int("ActionsLeft.actions", self.actions)
         _check_int("ActionsLeft.canals", self.canals)
         _check_type("ActionsLeft.lost", self.lost, bool)
+        _check_type("ActionsLeft.planted", self.planted, bool)
         if self.lost and self.actions:
             raise ValueError(f"a lost turn has no action left, got {self.actions}")
+        if self.lost and self.planted:
+            raise ValueError("a turn in which a plant or a resow succeeded is not lost")
         if not 0 <= self.canals <= self.actions:
             raise ValueError(
                 f"ActionsLeft needs 0 <= canals <= actions, got {self.canals} and {self.actions}"
