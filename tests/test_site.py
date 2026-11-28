@@ -87,3 +87,37 @@ def test_license_files():
     assert "# PolyForm Noncommercial License 1.0.0" in lic
     game = (root / "LICENSE-GAME.md").read_text(encoding="utf-8")
     assert "https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode" in game
+
+
+def _fact_tags(html):
+    block = html[html.index("const VAR=["):html.index("const VBY")]
+    tags = set()
+    for group in re.findall(r'","([^"]+)"\]', block):
+        tags.update(group.split("; "))
+    return tags
+
+
+@pytest.mark.parametrize("name", PAGES)
+def test_varietal_source_tags_match_the_sources_list(name):
+    html = _page(name)
+    listed = html[html.index('id="sources-list"'):html.index("</ul>", html.index('id="sources-list"'))]
+    entries = re.findall(r"<li><b>([^<]+)</b>:", listed)
+    assert len(entries) == len(set(entries))
+    assert _fact_tags(html) == set(entries)
+
+
+@pytest.mark.parametrize("name", PAGES)
+def test_die_history_notes_match_its_sources(name):
+    html = _page(name)
+    start = html.index('id="die"')
+    page = html[start:html.index("</section>", start)]
+    entries = re.findall(r"<li>", page[page.index('<ol class="src"'):])
+    cited = {int(n) for n in re.findall(r"<sup>(\d+)</sup>", html)}
+    assert cited == set(range(1, len(entries) + 1))
+
+
+def test_rulebooks_use_the_2025_areas():
+    for name in PAGES:
+        html = _page(name)
+        assert "INV 2024" not in html
+        assert '"INV 2025"' in html and "anuario_superficie_2025.pdf" in html
