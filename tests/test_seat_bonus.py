@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from acequias.config import NORMAL, preset, with_overrides
+from acequias.config import NORMAL_V2, preset, with_overrides
 from acequias.game import turn_order
 from acequias.model import Board, GameState, Mode, Player
 from acequias.scoring import calculate_score
@@ -38,7 +38,7 @@ def test_seat_bonus_is_off_in_the_shipped_presets():
 
 
 def test_seat_bonus_is_read_only_and_in_player_count_order():
-    p = with_overrides(NORMAL, seat_bonus={4: [1, 1, 1, 0], 3: (2, 1, 0)})
+    p = with_overrides(NORMAL_V2, seat_bonus={4: [1, 1, 1, 0], 3: (2, 1, 0)})
     assert list(p.seat_bonus) == [3, 4] and p.seat_bonus[4] == (1, 1, 1, 0)
     with pytest.raises(TypeError):
         p.seat_bonus[2] = (0, 0)
@@ -58,20 +58,20 @@ def test_seat_bonus_is_read_only_and_in_player_count_order():
 ])
 def test_bad_seat_bonus_is_rejected(bonus, error):
     with pytest.raises(error):
-        with_overrides(NORMAL, seat_bonus=bonus)
+        with_overrides(NORMAL_V2, seat_bonus=bonus)
 
 
 # --- Scoring -------------------------------------------------------------------
 
 
 def test_no_bonus_by_default_or_for_an_unlisted_player_count():
-    assert all(s.seat_bonus == 0 for s in calculate_score(state(), NORMAL).values())
-    p = with_overrides(NORMAL, seat_bonus={4: (1, 1, 1, 0)})
+    assert all(s.seat_bonus == 0 for s in calculate_score(state(), NORMAL_V2).values())
+    p = with_overrides(NORMAL_V2, seat_bonus={4: (1, 1, 1, 0)})
     assert all(s.seat_bonus == 0 for s in calculate_score(state(), p).values())
 
 
 def test_bonus_follows_round_1_turn_order():
-    p = with_overrides(NORMAL, seat_bonus=BONUS)
+    p = with_overrides(NORMAL_V2, seat_bonus=BONUS)
     scores = calculate_score(state(start="b"), p)
     assert {pid: s.seat_bonus for pid, s in scores.items()} == {"b": 2, "c": 1, "a": 0}
     assert all(s.total == s.seat_bonus for s in scores.values())
@@ -82,13 +82,13 @@ def test_bonus_uses_round_1_start_player_in_later_rounds(round):
     # Round 1 started with "b": the start player of `round` is round - 1 seats later.
     ids = ("a", "b", "c")
     start = ids[(1 + round - 1) % 3]
-    p = with_overrides(NORMAL, seat_bonus=BONUS)
+    p = with_overrides(NORMAL_V2, seat_bonus=BONUS)
     scores = calculate_score(state(round=round, start=start), p)
     assert {pid: s.seat_bonus for pid, s in scores.items()} == {"b": 2, "c": 1, "a": 0}
 
 
 def test_drought_never_takes_the_bonus_below_zero():
-    p = with_overrides(NORMAL, seat_bonus=BONUS)
+    p = with_overrides(NORMAL_V2, seat_bonus=BONUS)
     scores = calculate_score(state(drought=5, debt=0), p)
     assert [(s.seat_bonus, s.drought, s.total) for s in scores.values()] == [(2, 2, 0), (1, 1, 0), (0, 0, 0)]
     scores = calculate_score(state(season=3, drought=4), p)
@@ -102,7 +102,7 @@ def test_simulated_game_gives_the_bonus_by_position():
     assert [record.scores[pid].seat_bonus for pid in order] == [3, 2, 0]
     for s in record.scores.values():
         assert s.total == (s.vineyards + s.bodega - s.rights_paid + s.rights_collected - s.debt
-                           + s.season + s.seat_bonus - s.drought)
+                           + s.season + s.seat_bonus - s.drought + s.blend + s.buildings)
 
 
 # --- tune.py -------------------------------------------------------------------

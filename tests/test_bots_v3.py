@@ -23,7 +23,7 @@ from mcp import Client
 from acequias import bots
 from acequias.bots import _Evaluator, greedy_bot, lookahead_bot, score_aware_bot
 from acequias.config import (
-    NORMAL,
+    NORMAL_V2,
     V3_DIE_FACES,
     V3_POINTS,
     BoardShape,
@@ -63,10 +63,11 @@ from acequias.turn import (
 )
 from server.app import app
 from server.schemas import WateredVineyardJSON, overrides_from_json
+from test_split_scoring import v2_overrides
 
 pytestmark = pytest.mark.anyio
 
-V3 = with_overrides(NORMAL, planting=PlantingRules.VERTICES, varietal_points=V3_POINTS)
+V3 = with_overrides(NORMAL_V2, planting=PlantingRules.VERTICES, varietal_points=V3_POINTS)
 V3_MOVE = with_overrides(V3, action_die=V3_DIE_FACES)
 STRIP = {
     "planting": PlantingRules.VERTICES,
@@ -269,6 +270,7 @@ def test_a_v3_strip_game_record_pickles():
 # --- MCP tools --------------------------------------------------------------------
 
 
+
 STRIP_JSON = {"planting": "vertices", "board_shape": "river_strip", "bag_size": {"2": 24, "3": 36}}
 
 
@@ -290,11 +292,15 @@ async def test_simulate_game_returns_v3_results_equal_to_the_library():
     assert data["actions_per_game"]["plant"] > 0
 
 
-async def test_simulate_game_v1_preset_json_has_no_v3_keys():
+async def test_simulate_game_default_is_v3_and_v2_preset_json_has_no_v3_keys():
     async with Client(app) as client:
         result = await client.call_tool("simulate_game", {"mode": "flash", "players": 2, "games": 1, "seed": 1})
+    values = result.structured_content["preset"]
+    assert values["planting"] == "vertices" and values["board_shape"] == "river_strip"
+    assert values["bribe_optional"] is True and values["end_conditions"]
+    v2 = simulate_game(SimRules(Mode.FLASH, 2, ("greedy",) * 2, v2_overrides(Mode.FLASH)), 1, 1).to_json()
     assert not {"planting", "board_shape", "bag_size", "vertex_needs_three_canals", "river_hexes_per_segment"} & set(
-        result.structured_content["preset"]
+        v2["preset"]
     )
 
 
@@ -302,13 +308,16 @@ async def test_generate_board_returns_spots_or_the_strip():
     async with Client(app) as client:
         plain = await client.call_tool("generate_board", {"players": 2, "mode": "flash", "seed": 3})
         field = await client.call_tool(
-            "generate_board", {"players": 2, "mode": "flash", "seed": 3, "overrides": {"planting": "vertices"}}
+            "generate_board", {"players": 2, "mode": "flash", "seed": 3, "overrides": {"board_shape": "field"}}
         )
         strip = await client.call_tool(
             "generate_board", {"players": 2, "mode": "flash", "seed": 3, "overrides": STRIP_JSON}
         )
     assert not (plain.is_error or field.is_error or strip.is_error), (field.content, strip.content)
-    assert "spots" not in plain.structured_content and "strip" not in plain.structured_content
+    # The shipped Rules v3 preset gives the open river strip, which has no fixed spots (#192).
+    assert "spots" not in plain.structured_content and len(plain.structured_content["strip"]["segments"]) == 1
+    assert all(h["terrain"] == "river" for h in plain.structured_content["hexes"])
+    assert "strip" not in field.structured_content
     assert field.structured_content["spots"] and all(len(v) == 3 for v in field.structured_content["spots"])
     assert len(strip.structured_content["strip"]["segments"]) == 1
     assert all(h["terrain"] == "river" for h in strip.structured_content["hexes"])

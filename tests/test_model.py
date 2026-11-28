@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from acequias.config import FLASH, NORMAL, with_overrides
+from acequias.config import FLASH_V2, NORMAL_V2, with_overrides
 from acequias.hex import Direction, Hex
 from acequias.model import (
     Board,
@@ -461,14 +461,14 @@ def test_game_state_preset_defaults_to_none():
 
 
 def test_game_state_keeps_its_preset():
-    assert state(preset=NORMAL).preset is NORMAL
+    assert state(preset=NORMAL_V2).preset is NORMAL_V2
 
 
 def test_game_state_rejects_a_preset_for_another_mode():
     with pytest.raises(ValueError):
-        state(mode=Mode.NORMAL, preset=FLASH)
+        state(mode=Mode.NORMAL, preset=FLASH_V2)
     with pytest.raises(ValueError):
-        state(mode=Mode.FLASH, preset=NORMAL)
+        state(mode=Mode.FLASH, preset=NORMAL_V2)
 
 
 def test_game_state_rejects_a_non_preset():
@@ -477,12 +477,12 @@ def test_game_state_rejects_a_non_preset():
 
 
 def test_game_state_preset_is_in_equality_but_not_in_the_hash():
-    tuned = with_overrides(NORMAL, bodega_points=9)
-    assert state(preset=NORMAL) == state(preset=NORMAL)
-    assert state(preset=NORMAL) == state(preset=with_overrides(NORMAL))
-    assert state(preset=NORMAL) != state(preset=tuned)
-    assert state(preset=NORMAL) != state()
-    assert hash(state(preset=NORMAL)) == hash(state(preset=tuned)) == hash(state())
+    tuned = with_overrides(NORMAL_V2, bodega_points=9)
+    assert state(preset=NORMAL_V2) == state(preset=NORMAL_V2)
+    assert state(preset=NORMAL_V2) == state(preset=with_overrides(NORMAL_V2))
+    assert state(preset=NORMAL_V2) != state(preset=tuned)
+    assert state(preset=NORMAL_V2) != state()
+    assert hash(state(preset=NORMAL_V2)) == hash(state(preset=tuned)) == hash(state())
 
 
 # --- Immutability ----------------------------------------------------------

@@ -58,15 +58,17 @@ class BoardResult(BaseModel):
     spots: list[VertexJSON] | None = Field(
         default=None, exclude_if=_is_none,
         description=(
-            'Rules v3 (overrides planting "vertices") on a field board: every planting spot, '
-            "each a vertex touching a non-river hex; left out otherwise."
+            'A field board under vertex planting (overrides board_shape "field"; the shipped '
+            "Rules v3 presets plant on vertices): every planting spot, each a vertex touching a "
+            "non-river hex. Left out otherwise: the river strip has no fixed spots."
         ),
     )
     strip: RiverStripJSON | None = Field(
         default=None, exclude_if=_is_none,
         description=(
-            'Rules v3 open board (overrides board_shape "river_strip"): the river strip; hexes '
-            "are then its river hexes and the table east of them is open. Left out otherwise."
+            "The Rules v3 open board (the shipped game): the river strip; hexes are then its river "
+            "hexes and the table east of them is open. Left out on a field board (overrides "
+            'board_shape "field").'
         ),
     )
 
@@ -104,10 +106,10 @@ def generate_board(
         PresetOverridesJSON,
         Field(
             description=(
-                "Optional preset values to replace (default: none, the mode's shipped preset), "
-                'in the shape of simulate_game\'s preset without mode; e.g. {"planting": '
-                '"vertices"} for a Rules v3 board with planting spots, or also '
-                '{"board_shape": "river_strip", "bag_size": {...}} for the open river strip.'
+                "Optional preset values to replace (default: none, the mode's shipped Rules v3 "
+                "preset, which gives the open river strip), in the shape of simulate_game's "
+                'preset without mode; e.g. {"river_hexes_per_segment": 6} for a longer strip, '
+                'or {"board_shape": "field"} for a field board with planting spots.'
             ),
         ),
     ] = {},  # noqa: B006 - never mutated; overrides_from_json copies it
@@ -117,8 +119,10 @@ def generate_board(
     Returns the players, mode, and seed used, the board hexes (terrain, and
     varietal on vineyards), and the steps to lay the printed hexes out on the
     table. The same players, mode, seed, and overrides always give the same
-    board. A Rules v3 board (overrides planting "vertices") also returns its
-    planting spots, and a river strip board its strip.
+    board. The shipped Rules v3 presets give the open river strip (strip; hexes
+    are its river hexes); a field board under vertex planting (overrides
+    board_shape "field") returns its planting spots instead, and Rules v2
+    overrides (planting "hexes", board_shape "field", ...) a field of vineyard tiles.
     """
     if seed is None:
         seed = pick_seed()

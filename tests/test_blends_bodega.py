@@ -12,8 +12,8 @@ from mcp import Client
 from acequias import bots
 from acequias.bots import _Evaluator, greedy_bot, lookahead_bot, score_aware_bot
 from acequias.config import (
-    FLASH,
-    NORMAL,
+    FLASH_V2,
+    NORMAL_V2,
     DEFAULT_BLENDS,
     V3_DIE_FACES,
     V3_POINTS,
@@ -77,7 +77,7 @@ TABLE = (
                      Varietal.CABERNET_FRANC}), 5),
     Blend(frozenset({Varietal.MALBEC, Varietal.CABERNET_SAUVIGNON, Varietal.BONARDA}), 4),
 )
-V3 = with_overrides(NORMAL, planting=PlantingRules.VERTICES, varietal_points=V3_POINTS)
+V3 = with_overrides(NORMAL_V2, planting=PlantingRules.VERTICES, varietal_points=V3_POINTS)
 BLENDS = with_overrides(V3, varietal_bodega=False, blends=DEFAULT_BLENDS)
 BUILD = with_overrides(V3, bodega_building=True, action_die=V3_DIE_FACES)
 
@@ -134,7 +134,7 @@ def anyio_backend():
 
 
 def test_shipped_presets_keep_the_options_off():
-    for p in (NORMAL, FLASH):
+    for p in (NORMAL_V2, FLASH_V2):
         assert p.varietal_bodega and p.blends == () and not p.bodega_building
     assert (V3.bodega_min_reds, V3.bodega_min_whites, V3.bodega_building_points) == (2, 2, 12)
     assert V3.bodegas_per_player == 1 and V3.bodega_placement is BodegaPlacement.NEW_SPOT
@@ -181,9 +181,9 @@ def test_bad_options_are_rejected(changes, error):
 
 def test_blends_and_buildings_need_vertex_planting():
     with pytest.raises(ValueError, match="vertex planting"):
-        with_overrides(NORMAL, blends=DEFAULT_BLENDS)
+        with_overrides(NORMAL_V2, blends=DEFAULT_BLENDS)
     with pytest.raises(ValueError, match="vertex planting"):
-        with_overrides(NORMAL, bodega_building=True)
+        with_overrides(NORMAL_V2, bodega_building=True)
 
 
 # --- Blend scoring ----------------------------------------------------------------
@@ -243,7 +243,7 @@ def test_a_bodega_and_a_vineyard_cannot_share_a_vertex():
     with pytest.raises(ValueError, match="hex planting"):
         GameState(board=board(ALL, bodegas=(BodegaBuilding(V, "p1"),)),
                   players=(Player("p1", 1), Player("p2", 2)), mode=Mode.NORMAL, round=1,
-                  start_player="p1", current_player="p1", market=(), preset=NORMAL)
+                  start_player="p1", current_player="p1", market=(), preset=NORMAL_V2)
 
 
 # --- Bodega buildings: the action ---------------------------------------------------
@@ -433,7 +433,8 @@ def test_simulate_game_counts_bodegas_and_writes_the_options():
     assert values["varietal_bodega"] is False and values["bodega_building"] is True
     assert values["blends"][0] == {"varietals": ["malbec", "cabernet_sauvignon"], "points": 2}
     assert "bodega_placement" not in values and "bodegas_per_player" not in values
-    plain = simulate_game(SimRules(Mode.FLASH, 2, ("greedy", "greedy"), STRIP), 1, 1).to_json()
+    no_v3_scoring = {"varietal_bodega": True, "blends": (), "bodega_building": False}
+    plain = simulate_game(SimRules(Mode.FLASH, 2, ("greedy", "greedy"), {**STRIP, **no_v3_scoring}), 1, 1).to_json()
     assert "bodega" not in plain["actions_per_game"] and "blends" not in plain["preset"]
 
 
@@ -493,7 +494,7 @@ def test_tune_v3blends_sweep_covers_the_options():
         assert sum("2 reds + 1 whites" in x for x in labels) == sum("2 reds + 2 whites" in x for x in labels) == 4
         for label, changes in sweep.candidates[mode]:
             job = tune.Job(label, mode, 2, "score_aware", {**sweep.base[mode], **changes}, 1, 1)
-            p = with_overrides(tune.shipped_preset(mode), **dict(tune.rules_of(job).overrides))
+            p = with_overrides(tune.default_preset(mode), **dict(tune.rules_of(job).overrides))
             assert p.planting is PlantingRules.VERTICES and p.action_die == V3_DIE_FACES
     x15 = dict(sweep.candidates[Mode.NORMAL])["blends each_once x1.5"]
     assert [b.points for b in x15["blends"]] == [3, 3, 3, 5, 5, 5, 6, 6, 6, 8]

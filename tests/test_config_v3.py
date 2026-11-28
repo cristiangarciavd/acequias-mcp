@@ -1,14 +1,17 @@
-"""The opt-in Rules v3 presets ``NORMAL_V3`` / ``FLASH_V3`` (#182)."""
+"""The Rules v3 presets ``NORMAL_V3`` / ``FLASH_V3`` (#182), the default since #192."""
 
 from __future__ import annotations
 
 import pytest
 
 from acequias.config import (
+    FLASH_V2,
     FLASH,
     FLASH_V3,
     NORMAL,
+    NORMAL_V2,
     NORMAL_V3,
+    RULES_V2,
     RULES_V3,
     BodegaPlacement,
     BoardShape,
@@ -31,10 +34,11 @@ TARGET = {Mode.NORMAL: {2: 50, 3: 50, 4: 55, 5: 40}, Mode.FLASH: {2: 30, 3: 35}}
 GAMES = [(mode, n) for mode in Mode for n in TARGET[mode]]
 
 
-def test_shipped_presets_stay_rules_v2():
-    assert preset(Mode.NORMAL) is NORMAL and preset(Mode.FLASH) is FLASH
+def test_shipped_presets_are_rules_v3_and_v2_is_kept():
+    assert preset(Mode.NORMAL) is NORMAL is NORMAL_V3 and preset(Mode.FLASH) is FLASH is FLASH_V3
     assert RULES_V3 == {Mode.NORMAL: NORMAL_V3, Mode.FLASH: FLASH_V3}
-    for p in (NORMAL, FLASH):
+    assert RULES_V2 == {Mode.NORMAL: NORMAL_V2, Mode.FLASH: FLASH_V2}
+    for p in (NORMAL_V2, FLASH_V2):
         assert p.planting is PlantingRules.HEXES and p.triggers == () and not p.vineyard_supply
 
 

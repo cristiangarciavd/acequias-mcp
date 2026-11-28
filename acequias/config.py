@@ -62,8 +62,8 @@ class PlantingRules(Enum):
     """Where vineyards grow.
 
     ``HEXES``: on vineyard tiles the board generator places (Rules v1 and
-    v2, the shipped game). ``VERTICES``: on hex vertices, like Catan
-    settlements (Rules v3, #149): the board has no vineyard tiles, every
+    v2). ``VERTICES``: on hex vertices, like Catan settlements (Rules v3,
+    #149; the shipped game): the board has no vineyard tiles, every
     vertex touching a non-river hex is a planting spot, and a player plants
     one next to their own watered canal. Needs roulette varietal rules.
     """
@@ -76,8 +76,8 @@ class BoardShape(Enum):
     """What the board is.
 
     ``FIELD``: the generated board of river, vineyard, stone and empty
-    hexes (``acequias.board.generate_board``; the shipped game). ``RIVER_STRIP``:
-    Rules v3's open board (#150, #154): only a strip of river hexes, with an
+    hexes (``acequias.board.generate_board``; Rules v1 and v2). ``RIVER_STRIP``:
+    Rules v3's open board (#150, #154; the shipped game): only a strip of river hexes, with an
     unbounded, obstacle-free table to the east; the bag limits the game.
     Needs vertex planting and a ``bag_size`` for every player count.
     """
@@ -111,10 +111,10 @@ class BodegaPlacement(Enum):
 
 
 class EndCondition(Enum):
-    """What ends the game (Rules v3, opt-in, #163; ``Preset.end_condition``).
+    """What ends the game (Rules v3, #163; ``Preset.end_condition``).
 
-    ``ROUNDS``: after the preset's round count (the default; every shipped
-    game). ``BAG_EMPTY``: when the canal bag and the market are both empty.
+    ``ROUNDS``: after the preset's round count (the default; Rules v1 and
+    v2; the shipped Rules v3 presets combine other triggers). ``BAG_EMPTY``: when the canal bag and the market are both empty.
     ``VINEYARDS_OUT``: when a player has planted all their vineyard markers
     (``Preset.markers_for``). ``SCORE_TARGET``: when a player's total
     reaches ``Preset.target_for``. ``SUPPLY_EMPTY`` (#181): when the shared
@@ -213,7 +213,7 @@ CONSTRUCTIVE_DIE_FACES: tuple[DieFace, ...] = (
     DieFace.DROUGHT,
 )
 """The constructive action die (#130), in order: floodgate, release, two
-resows, good season, drought: the shipped ``action_die`` (#103)."""
+resows, good season, drought: the Rules v2 ``action_die`` (#103)."""
 
 V3_DIE_FACES: tuple[DieFace, ...] = (
     DieFace.FLOODGATE,
@@ -251,7 +251,7 @@ ROULETTE_SECTORS: tuple[Varietal, ...] = (
 have one each, every other varietal two."""
 
 # Points under roulette rules at scale 1: Bonarda and Cabernet Franc are
-# worth a bit more. ``roulette_rules`` uses them; the shipped presets use
+# worth a bit more. ``roulette_rules`` uses them; the Rules v2 presets use
 # ``SHIPPED_POINTS`` (#103).
 ROULETTE_POINTS: Mapping[Varietal, int] = MappingProxyType(
     {
@@ -278,7 +278,7 @@ SHIPPED_POINTS: Mapping[Varietal, int] = MappingProxyType(
         Varietal.CHARDONNAY: 6,
     }
 )
-"""The shipped points of a watered vineyard (#103): ``ROULETTE_POINTS`` at
+"""The Rules v2 points of a watered vineyard (#103): ``ROULETTE_POINTS`` at
 scale 3 with a rare bonus of 1, so 6 for a common varietal and 7 for the
 rare Bonarda and Cabernet Franc."""
 
@@ -287,7 +287,7 @@ V3_POINTS: Mapping[Varietal, int] = MappingProxyType(
 )
 """Rules v3 vineyard values (#160): 6 for a common varietal, 9 for the rare
 Bonarda and Cabernet Franc, so each third of a split vineyard is a whole
-number (``acequias.scoring``). Opt-in, like the rest of Rules v3."""
+number (``acequias.scoring``). Shipped with the rest of Rules v3 (#192)."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -302,7 +302,7 @@ class Preset:
     non-river hexes that are stone, and ``bag_mix`` the percentage of the bag
     for each ``PieceKind``. A player whose watered vineyards include
     ``bodega_varietals`` distinct varietals earns ``bodega_points``. With
-    ``multiple_bodegas`` (off by default, on in the shipped presets) a player earns it once per
+    ``multiple_bodegas`` (off by default, on in the Rules v2 and v3 presets) a player earns it once per
     disjoint group of ``bodega_varietals`` watered vineyards of distinct
     varietals (``acequias.scoring.bodega_count``).
     ``water_right_points`` is what a watered claimed vineyard pays each
@@ -318,10 +318,10 @@ class Preset:
 
     ``vineyards_per_player`` is the number of vineyard plots per player on
     the board. ``grape_clusters_per_player`` caps the claims each player can
-    hold; ``None`` means no cap (the shipped game).
+    hold; ``None`` means no cap (every preset).
 
     ``bribe_rules`` says what the bribe action is: the d6 bribe (Rules v1)
-    or the action die (shipped). ``action_die_cost`` is the debt one roll of the
+    or the action die (Rules v2 and v3). ``action_die_cost`` is the debt one roll of the
     action die costs, and ``action_die`` its faces in order; both are used
     only under ``action_die`` rules, where the bag has no floodgates
     (``bag_mix`` gives them 0) and a ``RESOW`` face needs roulette rules.
@@ -334,11 +334,11 @@ class Preset:
     (the default) derives them: ``season_gain`` is one common vineyard
     plot's value (``common_vineyard_points``), and ``drought_loss`` half
     of ``season_gain``, rounded down, at least 1. ``season_roll_every``
-    (``None``: off, the default; on in the shipped presets) starts every X-th round with a free roll
+    (``None``: off, the default; on in the Rules v2 presets) starts every X-th round with a free roll
     of the action die by the season die's holder, which passes to the
     next seat after each season roll (``acequias.game.season_holder``);
     it needs action die rules. With ``season_roll_personal_faces`` off
-    (on by default, off in the shipped presets), a season roll applies only a season face: a
+    (on by default, off in the Rules v2 presets), a season roll applies only a season face: a
     personal face it rolls does nothing (voluntary rolls are unchanged).
 
     ``seat_bonus`` (empty by default: off) maps a player count to each
@@ -350,9 +350,9 @@ class Preset:
     of the final score (``acequias.scoring``). It is read-only, keyed in
     player count order.
 
-    ``planting`` (``HEXES`` by default and in the shipped presets) says
+    ``planting`` (``HEXES`` by default and in the Rules v2 presets) says
     where vineyards grow: on vineyard tiles, or on vertices (Rules v3,
-    opt-in). Under ``VERTICES`` the board has no vineyard tiles, so
+    shipped). Under ``VERTICES`` the board has no vineyard tiles, so
     ``vineyards_per_player`` and ``vineyard_distance`` place nothing, and
     roulette varietal rules and action die bribe rules are required. Vertex
     planting also turns on the Rules v3 turn (``acequias.turn``): a
@@ -366,8 +366,8 @@ class Preset:
     (``acequias.scoring``), with no water rights. The ``MOVE`` die face
     (``V3_DIE_FACES``) needs vertex planting.
 
-    ``board_shape`` (``FIELD`` by default and in the shipped presets) says
-    what the board is; ``RIVER_STRIP`` (Rules v3, opt-in, #154) is the open
+    ``board_shape`` (``FIELD`` by default and in the Rules v2 presets) says
+    what the board is; ``RIVER_STRIP`` (Rules v3, shipped, #154) is the open
     board: a base river segment for 2 players plus one per extra player,
     each of ``river_hexes_per_segment`` river hexes, and no stones or
     vineyard tiles, so ``hexes_per_player``, ``stone_share`` and
@@ -377,7 +377,7 @@ class Preset:
     board. ``RIVER_STRIP`` needs vertex planting and a ``bag_size`` for
     every player count, since its table has no fixed hexes to count.
 
-    Rules v3 scoring options (#166, opt-in): ``varietal_bodega`` (on by
+    Rules v3 scoring options (#166; on in the shipped presets): ``varietal_bodega`` (on by
     default) turns the ``bodega_varietals`` bodega bonus on or off.
     ``blends`` is the blend (*corte*) table, one ``Blend`` each (empty by
     default: no blends; ``DEFAULT_BLENDS`` is #165's table); a player holds a
@@ -396,15 +396,15 @@ class Preset:
     a player's bodegas (``None``: no cap). Blends and bodega buildings
     need vertex planting.
 
-    ``bribe_optional`` (Rules v3, opt-in, #168; off by default and in the
-    shipped presets) makes the floodgate and release faces optional: the
+    ``bribe_optional`` (Rules v3, #168; off by default and in the Rules
+    v2 presets, on in the shipped ones) makes the floodgate and release faces optional: the
     bribe (``action_die_cost``) is paid only when the player places or
     removes a floodgate, and declining costs nothing. Off, those faces are
     mandatory when they have a use and the bribe is paid on the roll. It
     needs vertex planting.
 
-    End of the game (opt-in, #163): ``end_condition`` (``EndCondition``,
-    ``ROUNDS`` by default and in the shipped presets) says what ends the
+    End of the game (#163): ``end_condition`` (``EndCondition``,
+    ``ROUNDS`` by default and in every preset) says what ends the
     game, and ``finish_round`` (on by default) whether the round in which
     the trigger fired is played out. ``vineyard_markers`` and
     ``score_target`` map a player count to the markers per player and the
@@ -415,8 +415,8 @@ class Preset:
     default) makes the bag never run out: each piece drawn goes back to
     the bottom of the bag, so the market always refills.
 
-    Combined end and the shared supply (opt-in, #181; off in the shipped
-    presets): ``end_conditions`` lists several triggers (no ``ROUNDS``, no
+    Combined end and the shared supply (#181; off in the Rules v2
+    presets, on in the shipped ones): ``end_conditions`` lists several triggers (no ``ROUNDS``, no
     repeats); the first to fire ends the game, and it replaces
     ``end_condition``, which must then stay ``ROUNDS``. ``vineyard_supply``
     maps a player count to a multiplier ``m`` (an int or, #188, a positive
@@ -1040,9 +1040,10 @@ blend 4, the 4-varietal one 5. Opt-in: ``Preset.blends`` is empty by default."""
 
 
 # Rules v2, approved by the owner on #103 (candidate B, phases D-F of
-# ``_docs/tuning-results.md``). ``die_faces`` (the d6 bribe) is unused under
-# action die rules.
-NORMAL = Preset(
+# ``_docs/tuning-results.md``), shipped from #126 until #192; kept under
+# ``NORMAL_V2``/``FLASH_V2`` (``RULES_V2``). ``die_faces`` (the d6 bribe) is
+# unused under action die rules.
+NORMAL_V2 = Preset(
     mode=Mode.NORMAL,
     rounds={2: 10, 3: 15, 4: 12, 5: 10},
     hexes_per_player=18,
@@ -1077,7 +1078,7 @@ NORMAL = Preset(
 
 # Flash is for 2 or 3 players only: at 4 and 5 its short game was biased
 # (too many ties, a turn-order advantage no fix removed; #103 phases E-F).
-FLASH = Preset(
+FLASH_V2 = Preset(
     mode=Mode.FLASH,
     rounds={2: 6, 3: 6},
     hexes_per_player=14,
@@ -1085,7 +1086,7 @@ FLASH = Preset(
     stone_share=10,
     vineyard_distance=(4, 4),
     market_size=4,
-    bag_mix=NORMAL.bag_mix,
+    bag_mix=NORMAL_V2.bag_mix,
     die_faces=6,
     bodega_points=3,
     bodega_varietals=3,
@@ -1102,7 +1103,9 @@ FLASH = Preset(
     season_roll_personal_faces=False,
 )
 
-_PRESETS: Mapping[Mode, Preset] = MappingProxyType({Mode.NORMAL: NORMAL, Mode.FLASH: FLASH})
+RULES_V2: Mapping[Mode, Preset] = MappingProxyType({Mode.NORMAL: NORMAL_V2, Mode.FLASH: FLASH_V2})
+"""The Rules v2 presets, shipped from #126 until #192: the field board, hex vineyards, the
+roulette, the action die with its mandatory bribe, and the round count end."""
 
 V3_BAG_PER_PLAYER = 16
 """Rules v3 bag: pieces per player (#160)."""
@@ -1159,16 +1162,24 @@ def _v3(p: Preset) -> Preset:
     )
 
 
-# Rules v3 (#182): opt-in, not shipped; ``preset`` still returns Rules v2. The
-# tuned setup of ``scripts/tune.py`` (``v3_best_base`` with sweep ``v3end4``'s
-# combined end, approved by the owner on #182); ``tests/test_config_v3.py``
-# proves both agree.
-NORMAL_V3 = _v3(NORMAL)
-FLASH_V3 = _v3(FLASH)
+# Rules v3 (#182), the shipped game since #192: ``preset``, ``NORMAL`` and
+# ``FLASH`` are these presets. The tuned setup of ``scripts/tune.py``
+# (``v3_best_base`` with sweep ``v3end4``'s combined end, approved by the owner
+# on #182); ``tests/test_config_v3.py`` proves both agree. Built from the
+# Rules v2 presets, so ``NORMAL_V2``/``FLASH_V2`` must be defined first.
+NORMAL_V3 = _v3(NORMAL_V2)
+FLASH_V3 = _v3(FLASH_V2)
 
 RULES_V3: Mapping[Mode, Preset] = MappingProxyType({Mode.NORMAL: NORMAL_V3, Mode.FLASH: FLASH_V3})
-"""The Rules v3 presets (opt-in): river strip, vertex planting, split scoring, blends and the
-bodega building, the optional bribe, and the combined end (#182)."""
+"""The Rules v3 presets (shipped since #192): river strip, vertex planting, split scoring, blends
+and the bodega building, the optional bribe, and the combined end (#182)."""
+
+NORMAL = NORMAL_V3
+"""The shipped Normal preset (Rules v3; the same object as ``NORMAL_V3``)."""
+FLASH = FLASH_V3
+"""The shipped Flash preset (Rules v3, 2 or 3 players; the same object as ``FLASH_V3``)."""
+
+_PRESETS: Mapping[Mode, Preset] = RULES_V3
 
 _V1_BAG = {
     PieceKind.STRAIGHT: 40,
@@ -1217,7 +1228,7 @@ them."""
 
 
 def preset(mode: Mode) -> Preset:
-    """The shipped preset for ``mode``."""
+    """The shipped preset for ``mode`` (Rules v3, ``RULES_V3``; Rules v2 is ``RULES_V2``)."""
     _check_type("mode", mode, Mode)
     return _PRESETS[mode]
 
@@ -1251,7 +1262,7 @@ def action_die_rules(p: Preset) -> Preset:
     The floodgate share goes to 0 and the other shares are rescaled to add
     up to 100 by the largest remainder method (ties in ``PieceKind``
     order). ``p`` must be under roulette rules for the die's ``RESOW``
-    face: ``action_die_rules(roulette_rules(preset(mode)))``; otherwise the
+    face: ``action_die_rules(roulette_rules(RULES_V1[mode]))``; otherwise the
     ``Preset`` check raises ``ValueError``.
     """
     _check_type("p", p, Preset)
