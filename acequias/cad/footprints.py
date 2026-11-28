@@ -11,6 +11,7 @@ covers on the print plate, for ``acequias.plate.layout_plates``:
 - ``"owner_token"``: ``CircleFootprint(cap_diameter)``
 - ``"grape_cluster"``: ``CircleFootprint(base_diameter)``
 - ``"debt_token"``: ``CircleFootprint(diameter)``
+- ``"qr_plate"``: ``RectFootprint(size, size + label_band)``
 
 Unlike ``acequias.cad.pieces`` this module imports neither build123d nor
 trimesh, so the layout needs no CAD. It reads only the sizes that set the
@@ -50,6 +51,9 @@ def piece_footprint(piece_type: str, variant: object = None, **params: Any) -> F
         return CircleFootprint(_size(piece_type, params, "base_diameter"))
     if piece_type == "debt_token":
         return CircleFootprint(_size(piece_type, params, "diameter"))
+    if piece_type == "qr_plate":
+        size = _size(piece_type, params, "size")
+        return RectFootprint(size, size + _size(piece_type, params, "label_band"))
     raise ValueError(f"no footprint for piece type {piece_type!r}")
 
 

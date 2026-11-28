@@ -30,7 +30,9 @@ HAS_CAD = all(importlib.util.find_spec(name) for name in ("build123d", "trimesh"
 needs_cad = pytest.mark.skipif(not HAS_CAD, reason=CAD_REASON)
 
 TOOL = "generate_piece_stl"
-TYPES = ["terrain", "canal", "floodgate", "owner_token", "grape_cluster", "debt_token"]
+TYPES = [
+    "terrain", "canal", "floodgate", "owner_token", "grape_cluster", "debt_token", "qr_plate"
+]
 TERRAINS = ["river", "vineyard", "stone", "empty"]
 KINDS = ["straight", "gentle_curve", "sharp_curve", "symmetric_y", "t_branch", "claw"]
 EVERY_PIECE = (
@@ -43,11 +45,14 @@ EVERY_PIECE = (
         {"type": "grape_cluster"},
         {"type": "debt_token", "value": 1},
         {"type": "debt_token", "value": 5},
+        {"type": "qr_plate", "language": "reglas"},
+        {"type": "qr_plate", "language": "rules"},
     ]
 )
 LENGTHS = {"side", "height", "groove_width", "groove_depth", "thickness", "fin_thickness",
            "cap_diameter",
-           "cap_height", "base_diameter", "diameter"}
+           "cap_height", "base_diameter", "diameter", "size", "base_height", "module_height",
+           "label_band"}
 FITS = {"clearance", "tolerance"}
 
 
@@ -108,7 +113,7 @@ async def test_listed_with_a_description():
     assert "cad" in tool.description
 
 
-async def test_input_schema_has_the_six_types_and_only_piece():
+async def test_input_schema_has_the_seven_types_and_only_piece():
     async with Client(app) as client:
         schema = (await tool_info(client)).input_schema
     assert set(schema["properties"]) == {"piece"}
@@ -133,12 +138,14 @@ async def test_every_field_has_a_description_and_every_size_a_default_in_mm():
                 else:
                     assert field["minimum"] == 0
             else:
-                assert name in {"type", "terrain", "kind", "value"}, (piece_type, name)
+                assert name in {"type", "terrain", "kind", "value", "language"}, (piece_type, name)
     assert shapes["terrain"]["properties"]["terrain"]["enum"] == TERRAINS
     assert shapes["canal"]["properties"]["kind"]["enum"] == KINDS
     assert shapes["debt_token"]["properties"]["value"]["enum"] == [1, 5]
     assert sorted(shapes["canal"]["required"]) == ["kind", "type"]
     assert sorted(shapes["debt_token"]["required"]) == ["type", "value"]
+    assert shapes["qr_plate"]["properties"]["language"]["enum"] == ["reglas", "rules"]
+    assert sorted(shapes["qr_plate"]["required"]) == ["language", "type"]
     assert shapes["floodgate"]["required"] == ["type"]
     floodgate = shapes["floodgate"]["properties"]
     for name in ("groove_width", "groove_depth"):
@@ -159,6 +166,7 @@ def test_defaults_are_the_cad_generators_defaults():
     from acequias.cad.pieces import GENERATORS, PIECE_TYPES
     from acequias.cad.channel import canal_piece, floodgate
     from acequias.cad.hex_tile import hex_tile
+    from acequias.cad.qr_plate import qr_plate
     from acequias.cad.tokens import debt_token
 
     assert list(PIECE_TYPES) == TYPES == list(PIECE_MODELS)
@@ -168,6 +176,7 @@ def test_defaults_are_the_cad_generators_defaults():
         "canal": canal_piece,
         "floodgate": floodgate,
         "debt_token": debt_token,
+        "qr_plate": qr_plate,
     }
     for piece_type, model in PIECE_MODELS.items():
         generator = signatures.get(piece_type, GENERATORS[piece_type][0])

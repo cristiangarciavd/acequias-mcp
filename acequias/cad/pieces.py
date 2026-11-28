@@ -13,6 +13,8 @@ their variants:
 - ``"owner_token"``: no variant, ``owner_token``
 - ``"grape_cluster"``: no variant, ``grape_cluster``
 - ``"debt_token"``: the token value, 1 or 5, ``debt_token``
+- ``"qr_plate"``: the rulebook language, ``"reglas"`` or ``"rules"``,
+  ``qr_plate``
 
 ``params`` are the generator's keyword arguments; any left out keep the
 generator's default. The generators check every value and raise
@@ -30,6 +32,7 @@ from build123d import Axis, Solid
 
 from acequias.cad.channel import canal_piece, floodgate, owner_token
 from acequias.cad.hex_tile import hex_tile
+from acequias.cad.qr_plate import qr_plate
 from acequias.cad.tokens import debt_token, grape_cluster
 from acequias.model import PieceKind, Terrain
 
@@ -76,6 +79,7 @@ GENERATORS: dict[str, tuple[Callable[..., Solid], bool]] = {
     "owner_token": (owner_token, False),
     "grape_cluster": (grape_cluster, False),
     "debt_token": (_debt_token, True),
+    "qr_plate": (qr_plate, True),
 }
 
 PIECE_TYPES: tuple[str, ...] = tuple(GENERATORS)

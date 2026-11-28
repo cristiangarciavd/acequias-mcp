@@ -121,7 +121,7 @@ class BuildPlateResult(BaseModel):
 
 
 def id_prefix(piece: BaseModel) -> str:
-    """`<type>[-<variant>]`: the type, then the terrain, canal kind, or debt value."""
+    """`<type>[-<variant>]`: the type, then the terrain, canal kind, debt value, or QR language."""
     piece_type: str = piece.type  # type: ignore[attr-defined]
     variant_field = PIECE_VARIANT_FIELDS.get(piece_type)
     if variant_field is None:
@@ -240,7 +240,7 @@ def build_plate(
     """Lay pieces out on Bambu Lab A1 print plates and write one 3MF file per plate.
 
     Each entry is a piece (the same objects as generate_piece_stl: "terrain",
-    "canal", "floodgate", "owner_token", "grape_cluster", or "debt_token",
+    "canal", "floodgate", "owner_token", "grape_cluster", "debt_token", or "qr_plate",
     sizes in mm with their defaults), a count, and a color. Each plate holds
     one color and one kind of grid (hexes, or round and flat pieces), so it
     prints with one filament.
