@@ -30,7 +30,9 @@ HAS_CAD = all(importlib.util.find_spec(name) for name in ("build123d", "trimesh"
 needs_cad = pytest.mark.skipif(not HAS_CAD, reason=CAD_REASON)
 
 TOOL = "build_plate"
-TYPES = ["terrain", "canal", "floodgate", "owner_token", "grape_cluster", "debt_token"]
+TYPES = [
+    "terrain", "canal", "floodgate", "owner_token", "grape_cluster", "debt_token", "qr_plate"
+]
 TERRAINS = ["river", "vineyard", "stone", "empty"]
 KINDS = ["straight", "gentle_curve", "sharp_curve", "symmetric_y", "t_branch", "claw"]
 EVERY_PIECE = (
@@ -45,6 +47,8 @@ EVERY_PIECE = (
         {"type": "grape_cluster"},
         {"type": "debt_token", "value": 1},
         {"type": "debt_token", "value": 5},
+        {"type": "qr_plate", "language": "reglas"},
+        {"type": "qr_plate", "language": "rules"},
     ]
 )
 
@@ -106,7 +110,7 @@ def piece_label(piece):
 # --- Listing and schema -----------------------------------------------------
 
 
-async def test_listed_with_a_description_and_the_six_piece_types():
+async def test_listed_with_a_description_and_the_seven_piece_types():
     async with Client(app) as client:
         tool = await tool_info(client)
     assert tool.description.strip()
