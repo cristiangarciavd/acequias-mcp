@@ -67,7 +67,7 @@ back into `int`, `PieceKind`, and `Varietal`, the names into `VarietalRules`,
 The piece shape, read by `generate_piece_stl` (and `build_plate`): `PieceJSON`,
 one object per printable piece, told apart by `type` (`"terrain"`,
 `"canal"`, `"floodgate"`, `"owner_token"`, `"grape_cluster"`,
-`"debt_token"`, `"qr_plate"`), with the sizes of its `acequias.cad` generator in mm.
+`"debt_token"`, `"qr_plate"`, `"vineyard_cluster"`, `"bodega_token"`), with the sizes of its `acequias.cad` generator in mm.
 `piece_variant` and `piece_params` split one into the arguments of
 `acequias.cad.pieces.build_piece`. `build_plate` reads a list of
 `PlateEntryJSON`: `{"piece": PieceJSON, "count": int, "color": str}`.
@@ -1247,6 +1247,27 @@ class QrPlatePieceJSON(BaseModel):
     label_band: float = _length(6.0, "Depth of the label band under the code (at least 6)")
 
 
+class VineyardClusterPieceJSON(BaseModel):
+    """A Rules v3 vineyard cluster: the varietal's initials, a flat top with an owner-peg hole."""
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    type: Literal["vineyard_cluster"] = Field(description='Piece type: "vineyard_cluster".')
+    varietal: VarietalName = Field(description="The varietal whose initials it shows (lowercase ASCII).")
+    base_diameter: float = _length(13.0, "Width of the cluster's widest band (11 to 20)")
+    height: float = _length(13.0, "Height, foot to flat top (10 to 20)")
+
+
+class BodegaTokenPieceJSON(BaseModel):
+    """A Rules v3 bodega token: a small building with a barrel-vault roof, one per player."""
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    type: Literal["bodega_token"] = Field(description='Piece type: "bodega_token".')
+    base_diameter: float = _length(13.0, "Diameter of the round base (10 to 25)")
+    height: float = _length(12.0, "Height, base to the top of the vault")
+
+
 PieceJSON = Annotated[
     TerrainPieceJSON
     | CanalPieceJSON
@@ -1254,7 +1275,9 @@ PieceJSON = Annotated[
     | OwnerTokenPieceJSON
     | GrapeClusterPieceJSON
     | DebtTokenPieceJSON
-    | QrPlatePieceJSON,
+    | QrPlatePieceJSON
+    | VineyardClusterPieceJSON
+    | BodegaTokenPieceJSON,
     Field(discriminator="type"),
 ]
 """One printable piece, by `type`."""
@@ -1267,6 +1290,8 @@ PIECE_MODELS: dict[str, type[BaseModel]] = {
     "grape_cluster": GrapeClusterPieceJSON,
     "debt_token": DebtTokenPieceJSON,
     "qr_plate": QrPlatePieceJSON,
+    "vineyard_cluster": VineyardClusterPieceJSON,
+    "bodega_token": BodegaTokenPieceJSON,
 }
 """Each piece type and its shape, in the order of `acequias.cad.pieces.PIECE_TYPES`."""
 
@@ -1275,6 +1300,7 @@ PIECE_VARIANT_FIELDS: dict[str, str] = {
     "canal": "kind",
     "debt_token": "value",
     "qr_plate": "language",
+    "vineyard_cluster": "varietal",
 }
 """The field that holds the variant, for the piece types that have one."""
 
@@ -1294,7 +1320,8 @@ class PlateEntryJSON(BaseModel):
     piece: PieceJSON = Field(
         description=(
             'The piece to print, chosen by its "type": "terrain", "canal", "floodgate", '
-            '"owner_token", "grape_cluster", "debt_token", or "qr_plate". Sizes are in mm; any left '
+            '"owner_token", "grape_cluster", "debt_token", "qr_plate", "vineyard_cluster", or '
+            '"bodega_token". Sizes are in mm; any left '
             "out take their default."
         )
     )
@@ -1315,11 +1342,12 @@ class PlateEntryJSON(BaseModel):
     )
 
 
-def piece_variant(piece: BaseModel) -> Terrain | PieceKind | int | str | None:
+def piece_variant(piece: BaseModel) -> Terrain | PieceKind | Varietal | int | str | None:
     """The variant of a piece as `acequias.cad.pieces.build_piece` takes it.
 
     A `Terrain` for a terrain, a canal `PieceKind` for a canal, the value for
-    a debt token, the language for a QR plate, and None for the other types.
+    a debt token, the language for a QR plate, a `Varietal` for a vineyard
+    cluster, and None for the other types.
     """
     field = PIECE_VARIANT_FIELDS.get(piece.type)  # type: ignore[attr-defined]
     if field is None:
@@ -1329,6 +1357,8 @@ def piece_variant(piece: BaseModel) -> Terrain | PieceKind | int | str | None:
         return terrain_from_json(raw)
     if field == "kind":
         return kind_from_json(raw)
+    if field == "varietal":
+        return varietal_from_json(raw)
     return raw
 
 

@@ -10,7 +10,7 @@ trimesh = pytest.importorskip("trimesh", reason=CAD_REASON)
 
 from acequias.cad.hex_tile import export_stl  # noqa: E402
 from acequias.cad.qr_plate import (  # noqa: E402
-    FONT,
+    LABEL_FONT_RATIO,
     MIN_MODULE,
     QR_LABELS,
     QR_LANGUAGES,
@@ -19,6 +19,7 @@ from acequias.cad.qr_plate import (  # noqa: E402
     qr_matrix,
     qr_plate,
 )
+from acequias.cad.text import text_faces  # noqa: E402
 
 VERSION = 4
 """Both URLs (54 and 53 bytes) need QR version 4 at error correction M."""
@@ -89,12 +90,12 @@ def test_plate_size_module_size_and_watertight_stl(language, tmp_path):
     assert box.center().Y == pytest.approx(0, abs=0.01)
     assert 45.0 / SIDE >= MIN_MODULE
 
-    # The plate and every raised module and label pixel, 0.6 mm high.
+    # The plate, every raised module, and the label in the bundled font, 0.6 mm high.
     module = 45.0 / SIDE
-    pixel = 6.0 / 7.5
     dark = sum(map(sum, qr_matrix(language)))
-    lit = sum(row.count("1") for letter in QR_LABELS[language] for row in FONT[letter])
-    expected = 45.0 * 51.0 * 1.0 + 0.6 * (dark * module**2 + lit * pixel**2)
+    label = sum(face.area for face in text_faces(QR_LABELS[language], LABEL_FONT_RATIO * 6.0))
+    assert label > 10
+    expected = 45.0 * 51.0 * 1.0 + 0.6 * (dark * module**2 + label)
     assert plate.volume == pytest.approx(expected, rel=0.01)
 
     mesh = trimesh.load_mesh(export_stl(plate, tmp_path / f"qr_{language}.stl"))
@@ -117,3 +118,21 @@ def test_plate_size_module_size_and_watertight_stl(language, tmp_path):
 def test_bad_sizes_raise_naming_the_parameter(kwargs, name):
     with pytest.raises(ValueError, match=name):
         qr_plate(**kwargs)
+
+
+@pytest.mark.parametrize("language", QR_LANGUAGES)
+def test_label_is_centered_in_its_band_in_the_bundled_font(language):
+    plate = qr_plate(language)
+    # Only the label rises above the base south of the code.
+    band = [
+        face for face in plate.faces()
+        if face.center().Z > 1.5 and face.center().Y < -51.0 / 2 + 6.0
+    ]
+    assert band
+    from build123d import Compound
+
+    box = Compound(band).bounding_box()
+    letters = Compound(text_faces(QR_LABELS[language], LABEL_FONT_RATIO * 6.0)).bounding_box()
+    assert box.size.X == pytest.approx(letters.size.X, abs=0.05)
+    assert box.center().X == pytest.approx(0, abs=0.05)
+    assert box.center().Y == pytest.approx(-51.0 / 2 + 3.0, abs=0.05)

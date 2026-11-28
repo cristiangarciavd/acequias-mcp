@@ -240,7 +240,8 @@ def build_plate(
     """Lay pieces out on Bambu Lab A1 print plates and write one 3MF file per plate.
 
     Each entry is a piece (the same objects as generate_piece_stl: "terrain",
-    "canal", "floodgate", "owner_token", "grape_cluster", "debt_token", or "qr_plate",
+    "canal", "floodgate", "owner_token", "grape_cluster", "debt_token", "qr_plate",
+    "vineyard_cluster", or "bodega_token",
     sizes in mm with their defaults), a count, and a color. Each plate holds
     one color and one kind of grid (hexes, or round and flat pieces), so it
     prints with one filament.

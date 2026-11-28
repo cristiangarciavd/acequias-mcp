@@ -12,6 +12,9 @@ covers on the print plate, for ``acequias.plate.layout_plates``:
 - ``"grape_cluster"``: ``CircleFootprint(base_diameter)``
 - ``"debt_token"``: ``CircleFootprint(diameter)``
 - ``"qr_plate"``: ``RectFootprint(size, size + label_band)``
+- ``"vineyard_cluster"``: ``RectFootprint(base_diameter, 0.75 * base_diameter)``,
+  the round cluster cut by its two flat sides (``CLUSTER_FLAT_RATIO``)
+- ``"bodega_token"``: ``CircleFootprint(base_diameter)``
 
 Unlike ``acequias.cad.pieces`` this module imports neither build123d nor
 trimesh, so the layout needs no CAD. It reads only the sizes that set the
@@ -25,6 +28,9 @@ from typing import Any
 
 from acequias.hex import SQRT3
 from acequias.plate import CircleFootprint, Footprint, HexFootprint, RectFootprint
+
+CLUSTER_FLAT_RATIO = 0.75
+"""``acequias.cad.markers.CLUSTER_FLAT_RATIO``, repeated so no CAD is imported."""
 
 
 def piece_footprint(piece_type: str, variant: object = None, **params: Any) -> Footprint:
@@ -54,6 +60,11 @@ def piece_footprint(piece_type: str, variant: object = None, **params: Any) -> F
     if piece_type == "qr_plate":
         size = _size(piece_type, params, "size")
         return RectFootprint(size, size + _size(piece_type, params, "label_band"))
+    if piece_type == "vineyard_cluster":
+        base = _size(piece_type, params, "base_diameter")
+        return RectFootprint(base, CLUSTER_FLAT_RATIO * base)
+    if piece_type == "bodega_token":
+        return CircleFootprint(_size(piece_type, params, "base_diameter"))
     raise ValueError(f"no footprint for piece type {piece_type!r}")
 
 

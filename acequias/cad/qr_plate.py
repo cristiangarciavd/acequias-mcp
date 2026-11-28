@@ -1,7 +1,8 @@
 """The QR plate: a printed QR code to the online rulebook, glued inside the box.
 
 ``qr_plate(language)`` is a thin plate with the QR code's dark modules raised
-on top and a small block-letter label ("REGLAS" or "RULES") under the code.
+on top and a small label ("REGLAS" or "RULES") under the code, in the bundled
+font (``acequias.cad.text``).
 Change filament at ``base_height`` so the modules and the label print in a
 second color.
 
@@ -21,8 +22,9 @@ from __future__ import annotations
 
 from importlib.resources import files
 
-from build123d import Face, Pos, Solid, extrude
+from build123d import Compound, Face, Pos, Solid, extrude
 
+from acequias.cad.text import text_faces
 from acequias.cad.tokens import _check_size, _single_solid
 
 QR_LANGUAGES: tuple[str, ...] = ("reglas", "rules")
@@ -56,32 +58,20 @@ MIN_MODULE = 1.0
 """Smallest QR module in mm, so a phone reads the printed code."""
 
 MIN_WALL = 0.8
-"""Thinnest wall in mm (two 0.4 mm nozzle widths): the plate and a label stroke."""
+"""Thinnest wall in mm (two 0.4 mm nozzle widths): the plate under the modules."""
 
 MIN_RAISE = 0.4
 """Lowest module height in mm: two 0.2 mm layers of the second color."""
 
-LABEL_PIXELS_HIGH = 5
-"""Each label letter is 3 x 5 square pixels (block strokes, no font file)."""
+LABEL_FONT_RATIO = 0.9
+"""The label's em size over ``label_band``: capitals about 0.6 of the band deep."""
 
-_LABEL_BAND_IN_PIXELS = 7.5
-"""The band is this many pixels deep: the 5-pixel letters and a margin."""
+MIN_LABEL_BAND = 6.0
+"""Smallest label band in mm: below it the label's strokes get thinner than 0.8 mm."""
 
 _GROW = 0.01
 """Each raised square grows this much on every side, so squares that touch
 only at a corner overlap and the mesh stays manifold."""
-
-FONT: dict[str, tuple[str, ...]] = {
-    "A": ("010", "101", "111", "101", "101"),
-    "E": ("111", "100", "110", "100", "111"),
-    "G": ("011", "100", "101", "101", "011"),
-    "L": ("100", "100", "100", "100", "111"),
-    "R": ("110", "101", "110", "101", "101"),
-    "S": ("011", "100", "010", "001", "110"),
-    "U": ("101", "101", "101", "101", "111"),
-}
-"""The block letters the labels need, top row first, ``1`` raised."""
-
 
 def qr_matrix(language: str) -> list[list[bool]]:
     """The stored QR matrix for ``language``, top row first, ``True`` dark.
@@ -107,13 +97,14 @@ def qr_plate(
     and ``base_height + module_height`` high. The code with its quiet zone
     fills the ``size`` x ``size`` square at the north end, so each module is
     ``size`` divided by the matrix side. The label is centered in the
-    ``label_band`` at the south end, in block letters
-    ``label_band / 7.5`` mm per pixel.
+    ``label_band`` at the south end, in the bundled font at an em size of
+    ``LABEL_FONT_RATIO * label_band``.
 
     Raises ``ValueError`` naming the parameter for an unknown ``language``,
     a size that is not finite or not above 0, a module under ``MIN_MODULE``,
-    a ``base_height`` or label stroke under ``MIN_WALL``, a
-    ``module_height`` under ``MIN_RAISE``, or a label wider than the plate.
+    a ``base_height`` under ``MIN_WALL``, a ``module_height`` under
+    ``MIN_RAISE``, a ``label_band`` under ``MIN_LABEL_BAND``, or a label
+    wider than the plate.
     """
     matrix = qr_matrix(language)
     for name, value in (
@@ -134,31 +125,25 @@ def qr_plate(
         raise ValueError(f"base_height must be >= {MIN_WALL} mm, got {base_height!r}")
     if module_height < MIN_RAISE:
         raise ValueError(f"module_height must be >= {MIN_RAISE} mm, got {module_height!r}")
-    pixel = label_band / _LABEL_BAND_IN_PIXELS
-    if pixel < MIN_WALL:
+    if label_band < MIN_LABEL_BAND:
         raise ValueError(
-            f"label_band must be >= {MIN_WALL * _LABEL_BAND_IN_PIXELS:g} mm for "
-            f"{MIN_WALL} mm label strokes, got {label_band!r}"
+            f"label_band must be >= {MIN_LABEL_BAND:g} mm for 0.8 mm label strokes, "
+            f"got {label_band!r}"
         )
-    label = QR_LABELS[language]
-    label_width = (4 * len(label) - 1) * pixel
+    depth = size + label_band
+    top = depth / 2
+    letters = [
+        Pos(0, -top + label_band / 2, 0) * face
+        for face in text_faces(QR_LABELS[language], LABEL_FONT_RATIO * label_band)
+    ]
+    label_width = Compound(letters).bounding_box().size.X
     if label_width > size:
         raise ValueError(f"size must be >= {label_width:g} mm to fit the label, got {size!r}")
 
-    depth = size + label_band
-    top = depth / 2
     squares: list[tuple[float, float, float, float]] = []  # x0, y0, width, height
     for i, row in enumerate(matrix):
         for j, length in _runs(row):
             squares.append((-size / 2 + j * module, top - (i + 1) * module, length * module, module))
-
-    label_left = -label_width / 2
-    label_top = -top + (label_band + LABEL_PIXELS_HIGH * pixel) / 2
-    for k, letter in enumerate(label):
-        for i, row in enumerate(FONT[letter]):
-            for j, length in _runs([cell == "1" for cell in row]):
-                x0 = label_left + (4 * k + j) * pixel
-                squares.append((x0, label_top - (i + 1) * pixel, length * pixel, pixel))
 
     plate = Pos(-size / 2, -depth / 2, 0) * Solid.make_box(size, depth, base_height)
     # Union the squares in 2D first (much faster than fusing hundreds of
@@ -171,7 +156,7 @@ def qr_plate(
         )
         for x0, y0, width, height in squares
     ]
-    outline = faces[0].fuse(*faces[1:]).clean()
+    outline = faces[0].fuse(*faces[1:], *letters).clean()
     bottom = base_height / 2
     raised = Pos(0, 0, bottom) * extrude(outline, base_height - bottom + module_height)
     return _single_solid(plate.fuse(raised).clean(), "qr_plate")

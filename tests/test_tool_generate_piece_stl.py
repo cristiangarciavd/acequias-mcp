@@ -31,7 +31,8 @@ needs_cad = pytest.mark.skipif(not HAS_CAD, reason=CAD_REASON)
 
 TOOL = "generate_piece_stl"
 TYPES = [
-    "terrain", "canal", "floodgate", "owner_token", "grape_cluster", "debt_token", "qr_plate"
+    "terrain", "canal", "floodgate", "owner_token", "grape_cluster", "debt_token", "qr_plate",
+    "vineyard_cluster", "bodega_token",
 ]
 TERRAINS = ["river", "vineyard", "stone", "empty"]
 KINDS = ["straight", "gentle_curve", "sharp_curve", "symmetric_y", "t_branch", "claw"]
@@ -47,6 +48,9 @@ EVERY_PIECE = (
         {"type": "debt_token", "value": 5},
         {"type": "qr_plate", "language": "reglas"},
         {"type": "qr_plate", "language": "rules"},
+        {"type": "vineyard_cluster", "varietal": "cabernet_sauvignon"},
+        {"type": "vineyard_cluster", "varietal": "torrontes", "base_diameter": 15, "height": 14},
+        {"type": "bodega_token"},
     ]
 )
 LENGTHS = {"side", "height", "groove_width", "groove_depth", "thickness", "fin_thickness",
@@ -138,7 +142,9 @@ async def test_every_field_has_a_description_and_every_size_a_default_in_mm():
                 else:
                     assert field["minimum"] == 0
             else:
-                assert name in {"type", "terrain", "kind", "value", "language"}, (piece_type, name)
+                assert name in {"type", "terrain", "kind", "value", "language", "varietal"}, (
+                    piece_type, name
+                )
     assert shapes["terrain"]["properties"]["terrain"]["enum"] == TERRAINS
     assert shapes["canal"]["properties"]["kind"]["enum"] == KINDS
     assert shapes["debt_token"]["properties"]["value"]["enum"] == [1, 5]

@@ -97,7 +97,8 @@ def generate_piece_stl(
         Field(
             description=(
                 'The piece to print, chosen by its "type": "terrain", "canal", "floodgate", '
-                '"owner_token", "grape_cluster", "debt_token", or "qr_plate". Sizes are in mm; any left '
+                '"owner_token", "grape_cluster", "debt_token", "qr_plate", "vineyard_cluster", or '
+                '"bodega_token". Sizes are in mm; any left '
                 "out take their default."
             )
         ),
@@ -107,8 +108,10 @@ def generate_piece_stl(
 
     Piece types: "terrain" (a hex tile; needs "terrain"), "canal" (a hex
     tile with a groove; needs "kind"), "floodgate", "owner_token",
-    "grape_cluster", "debt_token" (needs "value", 1 or 5), and "qr_plate"
-    (a QR code to the rulebook; needs "language", "reglas" or "rules"). Every size is
+    "grape_cluster", "debt_token" (needs "value", 1 or 5), "qr_plate"
+    (a QR code to the rulebook; needs "language", "reglas" or "rules"), and
+    the Rules v3 markers "vineyard_cluster" (needs "varietal") and
+    "bodega_token". Every size is
     in mm and optional, with the defaults of the game's geometry profile.
 
     The file goes into the output folder (the ACEQUIAS_OUTPUT_DIR
