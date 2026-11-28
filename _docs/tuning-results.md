@@ -1370,7 +1370,7 @@ Ends at once, Flash 3p: vineyards_out 0.196 (within margin), x1 0.091, x1.5 0.01
 - Flash: `vineyards_out` with 3 markers ends games at 10-11 turns and the bodega rate falls to 0.03-0.04 (base 0.27), so the building disappears; it needs more markers if used (not swept). `score_target` x1 (14) passes at 2p / 3p (0.008 / 0.060) with 11.7 / 15.9 turns and a bodega rate within 0.07 of the base. x1.5 and x2 push 3p past the 20-turn target. At 3p, `bag_empty` leaves the bias at 0.26
 - Flash 3p base bias (0.268) is fixed by `score_target` x1 and x1.5 and by `vineyards_out` with finish round; ends-at-once `vineyards_out` (0.196) is within noise of both
 
-Decision: end condition per mode and count, proposed to the owner (no preset is changed here): Normal 2-4p `vineyards_out` with finish round (default markers 6 / 9 / 7); Normal 5p `vineyards_out` (marker 6) with finish round, as best known but unconfirmed (0.155 +- 0.175); Flash 2-3p `score_target` x1 (14 points), finish round. Not recommended: `bag_empty`, `score_target` x1.5 / x2, Flash `vineyards_out` at 3 markers. Open: 5p, and whether Flash `vineyards_out` with more markers beats `score_target`.
+Decision (owner): the per-player vineyard markers (`vineyards_out`) are superseded by the owner's end redesign of 2026-11-26 (#181: shared supply, respins, combined end). The `score_target` and `bag_empty` options are not adopted. The shipped presets are unchanged.
 
 ## Rules v3 shared supply, respins and combined end (#181)
 
@@ -1435,7 +1435,7 @@ Noise and sample size:
 
 - The three rows are within noise of each other on advantage (0.074 to 0.115). The 500-game reading of m 2 / 40 (0.060) and the 2000-game one (0.095) agree inside the margin. No row meets both targets at 5p, so lower targets go to a second sweep (`v3end3`)
 
-Decision: Flash 2p and 3p (m 2, 30, 3) and Normal 2p (m 2, 40, 3) pass in `v3end2`. Normal 3p-5p have no row that meets both the turn target and the seat advantage; the grid's lowest targets were still too high. Next: `v3end3` with lower targets and, at 3p-5p, supply m 1. The shipped presets are unchanged.
+Decision (owner): adopted shared supply, max 3 spins, and an end on supply empty, score target or dead turns; the final sizes and targets are set in #188. The shipped presets are unchanged.
 
 ## Rules v3 lower targets, Normal 3-5p (#181, sweep `v3end3`)
 
@@ -1461,7 +1461,7 @@ Control (round count end): advantage 0.244 / 0.472 / 0.530 at 3p / 4p / 5p (all 
 - Supply m 1 ends the game by supply (65% to 96%) and costs 3.8 to 4.8 lost turns per game. Winning scores fall to about 29.5 (3p), 25 (4p) and 20 (5p), and the bodega rate to 0.33 to 0.34 at 5p and about 0.5 at 4p. Supply m 2 keeps the target as the main end (82% to 98%) with 0.55 to 2.3 lost turns
 - 5p m 2 / 35 (45.5 turns, 27 min) is the only 5p row under 0.10 with a mid-band length and a normal score (34.80); it is within margin of the others, so the pick rests on length and score, not on advantage
 
-Decision: the 3p-5p turn targets are reachable with lower targets and m 1 or m 2. A finer supply step (fractional multiplier) is swept next (`v3end4`). The shipped presets are unchanged.
+Decision (superseded by the #188 table below): the 3p-5p turn targets are reachable with lower targets and m 1 or m 2. A finer supply step (fractional multiplier) is swept next (`v3end4`). The shipped presets are unchanged.
 
 Owner decisions (#181):
 
