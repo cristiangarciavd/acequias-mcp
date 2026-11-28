@@ -31,7 +31,8 @@ needs_cad = pytest.mark.skipif(not HAS_CAD, reason=CAD_REASON)
 
 TOOL = "build_plate"
 TYPES = [
-    "terrain", "canal", "floodgate", "owner_token", "grape_cluster", "debt_token", "qr_plate"
+    "terrain", "canal", "floodgate", "owner_token", "grape_cluster", "debt_token", "qr_plate",
+    "vineyard_cluster", "bodega_token",
 ]
 TERRAINS = ["river", "vineyard", "stone", "empty"]
 KINDS = ["straight", "gentle_curve", "sharp_curve", "symmetric_y", "t_branch", "claw"]
@@ -49,6 +50,9 @@ EVERY_PIECE = (
         {"type": "debt_token", "value": 5},
         {"type": "qr_plate", "language": "reglas"},
         {"type": "qr_plate", "language": "rules"},
+        {"type": "vineyard_cluster", "varietal": "cabernet_sauvignon"},
+        {"type": "vineyard_cluster", "varietal": "torrontes", "base_diameter": 15, "height": 14},
+        {"type": "bodega_token"},
     ]
 )
 
@@ -598,3 +602,19 @@ def test_the_tool_module_does_not_import_cad_at_module_level():
     )
     assert result.returncode == 0, result.stderr
     assert result.stdout.strip() == "[]"
+
+
+@needs_cad
+async def test_a_full_rules_v3_marker_set_gets_one_plate_per_color(out):
+    from acequias.cad.piece_set import cluster_entries, player_entries
+
+    result = await build(cluster_entries() + player_entries("blue"))
+    assert not result.is_error, text_of(result)
+    data = result.structured_content
+    assert data["summary"]["plates_per_color"] == {
+        "violet": 1, "red": 1, "fluorescent_green": 1, "blue": 1
+    }
+    assert data["summary"]["pieces"] == 20 + 28 + 1
+    ids = [p["id"] for plate in data["plates"] for p in plate["placements"]]
+    assert "vineyard_cluster-cabernet_sauvignon-03" in ids
+    assert "bodega_token-01" in ids
