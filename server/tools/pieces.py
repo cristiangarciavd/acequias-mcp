@@ -74,8 +74,8 @@ def format_number(value: float) -> str:
 def piece_file_name(piece: BaseModel) -> str:
     """The file name for a piece: `<type>[-<variant>]-<name><value>-...stl`.
 
-    Built only from the type, the variant (terrain, canal kind, or debt
-    value), and every size parameter in field order, defaults included, so
+    Built only from the type, the variant (terrain, canal kind, debt value, or
+    QR language), and every size parameter in field order, defaults included, so
     the same piece always gets the same name and a different one a
     different name.
     """
@@ -97,7 +97,7 @@ def generate_piece_stl(
         Field(
             description=(
                 'The piece to print, chosen by its "type": "terrain", "canal", "floodgate", '
-                '"owner_token", "grape_cluster", or "debt_token". Sizes are in mm; any left '
+                '"owner_token", "grape_cluster", "debt_token", or "qr_plate". Sizes are in mm; any left '
                 "out take their default."
             )
         ),
@@ -107,7 +107,8 @@ def generate_piece_stl(
 
     Piece types: "terrain" (a hex tile; needs "terrain"), "canal" (a hex
     tile with a groove; needs "kind"), "floodgate", "owner_token",
-    "grape_cluster", and "debt_token" (needs "value", 1 or 5). Every size is
+    "grape_cluster", "debt_token" (needs "value", 1 or 5), and "qr_plate"
+    (a QR code to the rulebook; needs "language", "reglas" or "rules"). Every size is
     in mm and optional, with the defaults of the game's geometry profile.
 
     The file goes into the output folder (the ACEQUIAS_OUTPUT_DIR

@@ -67,7 +67,7 @@ back into `int`, `PieceKind`, and `Varietal`, the names into `VarietalRules`,
 The piece shape, read by `generate_piece_stl` (and `build_plate`): `PieceJSON`,
 one object per printable piece, told apart by `type` (`"terrain"`,
 `"canal"`, `"floodgate"`, `"owner_token"`, `"grape_cluster"`,
-`"debt_token"`), with the sizes of its `acequias.cad` generator in mm.
+`"debt_token"`, `"qr_plate"`), with the sizes of its `acequias.cad` generator in mm.
 `piece_variant` and `piece_params` split one into the arguments of
 `acequias.cad.pieces.build_piece`. `build_plate` reads a list of
 `PlateEntryJSON`: `{"piece": PieceJSON, "count": int, "color": str}`.
@@ -1111,6 +1111,8 @@ MAX_FIT_MM = 2.0
 
 DebtValue = Literal[1, 5]
 
+QrLanguage = Literal["reglas", "rules"]
+
 _LENGTH_LIMITS = f"above 0 and at most {MAX_LENGTH_MM:g}"
 _FIT_LIMITS = f"0 to {MAX_FIT_MM:g}"
 
@@ -1226,13 +1228,33 @@ class DebtTokenPieceJSON(BaseModel):
     thickness: float = _length(2.0, "Thickness of the coin")
 
 
+class QrPlatePieceJSON(BaseModel):
+    """A QR plate: a QR code to the online rulebook, to glue inside the box."""
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    type: Literal["qr_plate"] = Field(description='Piece type: "qr_plate".')
+    language: QrLanguage = Field(
+        description='The rulebook the code opens: "reglas" (Spanish) or "rules" (English).'
+    )
+    size: float = _length(
+        45.0, "Width of the plate, the side of the code with its quiet zone (modules at least 1 mm)"
+    )
+    base_height: float = _length(1.0, "Thickness of the plate under the modules (at least 0.8)")
+    module_height: float = _length(
+        0.6, "How far the dark modules and the label rise; change filament there (at least 0.4)"
+    )
+    label_band: float = _length(6.0, "Depth of the label band under the code (at least 6)")
+
+
 PieceJSON = Annotated[
     TerrainPieceJSON
     | CanalPieceJSON
     | FloodgatePieceJSON
     | OwnerTokenPieceJSON
     | GrapeClusterPieceJSON
-    | DebtTokenPieceJSON,
+    | DebtTokenPieceJSON
+    | QrPlatePieceJSON,
     Field(discriminator="type"),
 ]
 """One printable piece, by `type`."""
@@ -1244,10 +1266,16 @@ PIECE_MODELS: dict[str, type[BaseModel]] = {
     "owner_token": OwnerTokenPieceJSON,
     "grape_cluster": GrapeClusterPieceJSON,
     "debt_token": DebtTokenPieceJSON,
+    "qr_plate": QrPlatePieceJSON,
 }
 """Each piece type and its shape, in the order of `acequias.cad.pieces.PIECE_TYPES`."""
 
-PIECE_VARIANT_FIELDS: dict[str, str] = {"terrain": "terrain", "canal": "kind", "debt_token": "value"}
+PIECE_VARIANT_FIELDS: dict[str, str] = {
+    "terrain": "terrain",
+    "canal": "kind",
+    "debt_token": "value",
+    "qr_plate": "language",
+}
 """The field that holds the variant, for the piece types that have one."""
 
 
@@ -1266,7 +1294,7 @@ class PlateEntryJSON(BaseModel):
     piece: PieceJSON = Field(
         description=(
             'The piece to print, chosen by its "type": "terrain", "canal", "floodgate", '
-            '"owner_token", "grape_cluster", or "debt_token". Sizes are in mm; any left '
+            '"owner_token", "grape_cluster", "debt_token", or "qr_plate". Sizes are in mm; any left '
             "out take their default."
         )
     )
@@ -1287,11 +1315,11 @@ class PlateEntryJSON(BaseModel):
     )
 
 
-def piece_variant(piece: BaseModel) -> Terrain | PieceKind | int | None:
+def piece_variant(piece: BaseModel) -> Terrain | PieceKind | int | str | None:
     """The variant of a piece as `acequias.cad.pieces.build_piece` takes it.
 
     A `Terrain` for a terrain, a canal `PieceKind` for a canal, the value for
-    a debt token, and None for the other types.
+    a debt token, the language for a QR plate, and None for the other types.
     """
     field = PIECE_VARIANT_FIELDS.get(piece.type)  # type: ignore[attr-defined]
     if field is None:
