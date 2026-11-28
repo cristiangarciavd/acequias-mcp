@@ -1,0 +1,61 @@
+name: Rulebook site
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "site/**"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Print the rulebooks to PDF
+        # google-chrome is preinstalled on ubuntu-latest. The virtual time
+        # budget lets the page scripts draw the diagrams before printing.
+        shell: bash
+        run: |
+          set -euo pipefail
+          print_pdf() {
+            local page="$1" pdf="$2"
+            rm -f "$pdf"
+            google-chrome --headless --no-sandbox --disable-gpu --no-pdf-header-footer \
+              --virtual-time-budget=10000 --print-to-pdf="$pdf" "file://$PWD/$page"
+            if [ ! -s "$pdf" ]; then
+              echo "::error::$pdf is missing or empty"
+              exit 1
+            fi
+            ls -l "$pdf"
+          }
+          print_pdf site/reglas/index.html site/reglas/acequias-reglas.pdf
+          print_pdf site/rules/index.html site/rules/acequias-rules.pdf
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

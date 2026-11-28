@@ -511,5 +511,11 @@ Each tool lives in `server/tools/` and is registered in `server/app.py` on the m
 - [Rules v3 rules sheet](_docs/rules-v3.md): the Rules v3 rules for players
 - [Varietal fact card](_docs/varietals.md): the 8 varietals, print colors, points, and sourced facts
 - [Action die](_docs/action-die.md): what each Rules v3 die face means in Mendoza, and its icon
+- [Player rulebooks](site/): Spanish (`site/reglas/`) and English (`site/rules/`), published at <https://cristiangarciavd.github.io/acequias-mcp/> with a PDF each, built by `.github/workflows/pages.yml`
 - [AGENTS.md](AGENTS.md): instructions for coding agents
 - `_docs/outdated/`: superseded documents kept for history only; this README and the GitHub issues replace them
+
+## License
+
+- Code: [PolyForm Noncommercial 1.0.0](LICENSE), © 2026 Cristian García.
+- Game content (rules, rulebooks, 3D models, art): [CC BY-NC-SA 4.0](LICENSE-GAME.md), © 2026 Cristian García.

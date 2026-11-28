@@ -11,6 +11,9 @@
   asking
 - "Do task N" means the full cycle in `_docs/process.md`: branch, implement,
   test, PR, merge, then a separate docs review
+- Everything in the repo is in English, except the player rulebooks under
+  `site/`: Spanish (`site/reglas/`) and English (`site/rules/`). Both must
+  stay in sync with each other and with `_docs/rules-v3.md` (same section ids)
 - MVP first: milestones 1 to 5 are the MVP (`README.md`, Roadmap > MVP).
   Do not pick up milestone 6 ("After the MVP") unless the user asks for it
 
