@@ -17,3 +17,6 @@ dist/
 
 # Files the server writes (ACEQUIAS_OUTPUT_DIR defaults to output/)
 output/
+
+# Rulebook PDFs are built in CI (.github/workflows/pages.yml)
+site/**/*.pdf

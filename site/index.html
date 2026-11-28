@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Acequias</title>
+<meta name="description" content="Reglamento de Acequias · Acequias rulebook">
+<link rel="alternate" hreflang="es" href="reglas/">
+<link rel="alternate" hreflang="en" href="rules/">
+<style>
+@font-face{font-family:"Fraunces";src:url("fonts/Fraunces.ttf") format("truetype");font-weight:100 900;font-display:swap}
+@font-face{font-family:"Figtree";src:url("fonts/Figtree.ttf") format("truetype");font-weight:300 900;font-display:swap}
+:root{--bg:#e9e3d6;--paper:#fbf9f4;--fg:#2a2420;--muted:#6e645a;--line:#d8cfc0;--accent:#7a2f55}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#171412;--paper:#26221e;--fg:#efe8dc;--muted:#aa9f92;--line:#3e3832;--accent:#d58ab1;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#171412;--paper:#26221e;--fg:#efe8dc;--muted:#aa9f92;--line:#3e3832;--accent:#d58ab1;color-scheme:dark}
+body{margin:0;min-height:100vh;display:grid;place-items:center;background:var(--bg);color:var(--fg);font-family:"Figtree",system-ui,sans-serif;padding:16px;box-sizing:border-box}
+main{background:var(--paper);border:1px solid var(--line);padding:clamp(24px,6vw,48px);display:grid;gap:1.2rem;max-width:520px;width:100%;box-sizing:border-box}
+h1{font-family:"Fraunces",Georgia,serif;font-weight:800;font-size:clamp(2.6rem,10vw,4rem);margin:0;line-height:1}
+.langs{display:grid;gap:.8rem;grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
+.langs a{display:grid;gap:.2rem;border:1px solid var(--line);border-radius:4px;padding:.9rem;color:var(--fg);text-decoration:none}
+.langs a:hover,.langs a:focus-visible{border-color:var(--accent)}
+.langs b{font-family:"Fraunces",Georgia,serif;font-size:1.3rem;color:var(--accent)}
+.langs span,p{color:var(--muted);font-size:.9rem;margin:0}
+p a{color:var(--muted)}
+</style>
+</head>
+<body>
+<main>
+  <h1>Acequias</h1>
+  <nav class="langs" aria-label="Idioma / Language">
+    <a href="reglas/" hreflang="es" lang="es"><b>Español</b><span>Reglamento</span></a>
+    <a href="rules/" hreflang="en" lang="en"><b>English</b><span>Rulebook</span></a>
+  </nav>
+  <p>PDF: <a href="reglas/acequias-reglas.pdf" lang="es">reglamento</a> · <a href="rules/acequias-rules.pdf" lang="en">rulebook</a></p>
+  <p>© 2026 Cristian García · <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/">CC BY-NC-SA 4.0</a></p>
+</main>
+</body>
+</html>

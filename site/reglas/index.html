@@ -1,0 +1,523 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Reglamento de Acequias</title>
+<meta name="description" content="Reglamento de Acequias, un juego de agua y viñas de Mendoza.">
+<link rel="alternate" hreflang="es" href="../reglas/">
+<link rel="alternate" hreflang="en" href="../rules/">
+<link rel="alternate" hreflang="x-default" href="../">
+<style>
+@font-face{font-family:"Fraunces";src:url("../fonts/Fraunces.ttf") format("truetype");font-weight:100 900;font-style:normal;font-display:swap}
+@font-face{font-family:"Figtree";src:url("../fonts/Figtree.ttf") format("truetype");font-weight:300 900;font-style:normal;font-display:swap}
+@font-face{font-family:"JetBrains Mono";src:url("../fonts/JetBrainsMono.ttf") format("truetype");font-weight:100 800;font-style:normal;font-display:swap}
+</style>
+<style>
+/* Layout: a stack of A4 sheets (rules booklet); on screen they are cards in one column, in print each sheet is one page. */
+:root{
+  --bg:#e9e3d6; --paper:#fbf9f4; --fg:#2a2420; --muted:#6e645a; --line:#d8cfc0;
+  --soil:#e4d6bc; --river:#6fa8cf; --river2:#5a95c0; --water:#3f86c6; --dry:#b89a6c;
+  --tile:#cfc4b0; --gate:#3a302a; --p1:#c0392b; --p2:#2f8a4e; --p3:#d9a520; --p4:#2a2420; --p5:#f6f2ea;
+  --accent:#7a2f55; --tag:#f0e2b6;
+  --display:"Fraunces", Georgia, serif; --body:"Figtree", system-ui, sans-serif; --mono:"JetBrains Mono", ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#171412; --paper:#26221e; --fg:#efe8dc; --muted:#aa9f92; --line:#3e3832;
+  --soil:#4a3f31; --river:#3d7096; --river2:#335f82; --water:#5aa3e0; --dry:#9c8258;
+  --tile:#6b6152; --gate:#efe8dc; --p1:#e0604f; --p2:#4fb873; --p3:#e8bb3a; --p4:#111; --p5:#f6f2ea;
+  --accent:#d58ab1; --tag:#4d4125; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#171412; --paper:#26221e; --fg:#efe8dc; --muted:#aa9f92; --line:#3e3832;
+  --soil:#4a3f31; --river:#3d7096; --river2:#335f82; --water:#5aa3e0; --dry:#9c8258;
+  --tile:#6b6152; --gate:#efe8dc; --p1:#e0604f; --p2:#4fb873; --p3:#e8bb3a; --p4:#111; --p5:#f6f2ea;
+  --accent:#d58ab1; --tag:#4d4125; color-scheme:dark}
+@media print{:root,:root[data-theme],:root:not([data-theme="light"]){
+  --bg:#fff; --paper:#fff; --fg:#2a2420; --muted:#5e554c; --line:#cfc6b6;
+  --soil:#e4d6bc; --river:#6fa8cf; --river2:#5a95c0; --water:#3f86c6; --dry:#b89a6c;
+  --tile:#cfc4b0; --gate:#3a302a; --p1:#c0392b; --p2:#2f8a4e; --p3:#d9a520; --p4:#2a2420; --p5:#f6f2ea;
+  --accent:#7a2f55; --tag:#f0e2b6; color-scheme:light}}
+@page{size:A4;margin:12mm}
+*{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:14.5px;line-height:1.5;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:1.5rem 3rem}
+.book{max-width:820px;margin:0 auto;display:grid;gap:1.5rem}
+.sheet{background:var(--paper);border:1px solid var(--line);padding:clamp(18px,5vw,48px);display:grid;gap:1.1rem;align-content:start;position:relative}
+@media print{body{padding:0;background:#fff}table,figure,svg,.box,.card,.face,.scroll{break-inside:avoid}.book{gap:0;max-width:none}.sheet{border:0;padding:0;break-after:page}.noprint{display:none!important}}
+h1,h2,h3{font-family:var(--display);text-wrap:balance;margin:0;line-height:1.12}
+h1{font-size:clamp(3rem,11vw,5.2rem);font-weight:800;letter-spacing:-.01em}
+h2{font-size:1.75rem;font-weight:800;color:var(--accent)}
+h3{font-size:1.1rem;font-weight:600}
+p{margin:0;max-width:70ch}
+.muted{color:var(--muted)}
+.folio{font-family:var(--mono);font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);display:flex;justify-content:space-between;border-bottom:1px solid var(--line);padding-bottom:.4rem}
+.tune{font-family:var(--mono);font-size:.68rem;font-weight:700;background:var(--tag);color:var(--fg);padding:.05rem .35rem;border-radius:3px;white-space:nowrap;vertical-align:1px}
+svg{display:block;max-width:100%;height:auto}
+.scroll{overflow-x:auto}
+.grid{display:grid;gap:.9rem;grid-template-columns:repeat(auto-fill,minmax(130px,1fr))}
+.card{display:grid;gap:.3rem;justify-items:center;text-align:center;align-content:start}
+.card b{font-weight:700}
+.card small{color:var(--muted);font-size:.78rem;line-height:1.35}
+table{border-collapse:collapse;width:100%;font-size:.88rem;font-variant-numeric:tabular-nums}
+th,td{border-bottom:1px solid var(--line);padding:.35rem .45rem;text-align:left;vertical-align:top}
+th{font-family:var(--mono);font-size:.68rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:500}
+td.n,th.n{text-align:right}
+ol,ul{margin:0;padding-left:1.2rem;display:grid;gap:.3rem;max-width:70ch}
+.cols{display:grid;gap:1.2rem;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));align-items:start}
+.box{border:1px solid var(--line);border-radius:4px;padding:.8rem;display:grid;gap:.5rem;align-content:start;min-width:0}
+.face{display:grid;grid-template-columns:64px minmax(0,1fr);gap:.8rem;align-items:start}
+.vcard{border:1px solid var(--line);border-radius:4px;padding:.8rem;display:grid;gap:.45rem;align-content:start;min-width:0;break-inside:avoid}
+.vhead{display:flex;align-items:center;gap:.6rem}
+.vhead h3{flex:1}
+.pts{font-family:var(--mono);font-weight:700;font-size:.85rem}
+.src{font-size:.74rem;color:var(--muted)}
+.src a{color:var(--muted)}
+.steps{display:grid;gap:.9rem;grid-template-columns:repeat(auto-fill,minmax(min(100%,330px),1fr))}
+.step{border:1px solid var(--line);border-radius:4px;padding:.6rem;display:grid;gap:.4rem;break-inside:avoid;min-width:0}
+.step header{display:flex;align-items:center;gap:.5rem;font-weight:700}
+.step p{font-size:.8rem;line-height:1.4}
+.step .sc{font-family:var(--mono);font-size:.72rem;color:var(--muted)}
+.dot{width:11px;height:11px;border-radius:50%;display:inline-block;border:1px solid var(--line);vertical-align:-1px}
+.cover{min-height:min(1000px,140vw);align-content:space-between}
+.formula{font-family:var(--display);font-size:1.25rem;font-weight:600;border-top:2px solid var(--fg);border-bottom:2px solid var(--fg);padding:.5rem 0;text-align:center}
+a{color:var(--accent)}
+.toc{display:grid;gap:.15rem;font-size:.9rem}
+.toc span{display:flex;justify-content:space-between;border-bottom:1px dotted var(--line)}
+.bar{max-width:820px;margin:0 auto 1rem;display:flex;flex-wrap:wrap;gap:.4rem 1.2rem;justify-content:flex-end;font-size:.9rem}
+.legal{font-size:.78rem;color:var(--muted);max-width:none}
+.legal a{color:var(--muted)}
+.warn{font-size:.85rem;border:2px solid var(--fg);border-radius:4px;padding:.5rem .7rem;max-width:none}
+</style>
+</head>
+<body>
+
+<nav class="bar noprint" aria-label="Idioma y descarga"><a href="../rules/" hreflang="en" lang="en">English</a><a href="acequias-reglas.pdf">Descargar PDF</a></nav>
+
+<div class="book">
+
+<!-- 1 · Portada -->
+<section class="sheet cover" id="cover">
+  <div class="folio"><span>Reglamento · Rules v3</span><span>Edición de prueba</span></div>
+  <div style="display:grid;gap:.8rem">
+    <div class="muted" style="font-family:var(--mono);font-size:.8rem;letter-spacing:.1em;text-transform:uppercase">Un juego de agua y viñas de Mendoza</div>
+    <h1>Acequias</h1>
+    <p style="font-size:1.1rem">Llevá el agua del río por tus acequias, plantá viñas en sus esquinas, armá tus cortes y construí tu bodega antes de que se acaben las viñas. Pero cuidado: una compuerta bien puesta puede dejar seca media finca.</p>
+  </div>
+  <div class="scroll"><svg id="coverStrip" role="img" aria-label="Tira de río con acequias y viñas"></svg></div>
+  <div class="cols">
+    <div class="toc">
+      <span><b>Jugadores</b><i>2 a 5 (Flash: 2 o 3)</i></span>
+      <span><b>Duración</b><i>15 a 30 min (Flash: 10 a 20)</i></span>
+      <span><b>Edad</b><i>8+</i></span>
+    </div>
+    <p class="warn"><b>⚠ Atención:</b> contiene piezas pequeñas. No apto para menores de 3 años.</p>
+  </div>
+  <p class="legal">© 2026 Cristian García. Reglamento bajo licencia <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/deed.es">CC BY-NC-SA 4.0</a>.</p>
+</section>
+
+<!-- 2 · Componentes -->
+<section class="sheet" id="components">
+  <div class="folio"><span>Acequias</span><span>Componentes</span></div>
+  <h2 id="components-list">Componentes</h2>
+  <div class="box">
+    <h3>La tira de río</h3>
+    <p>Un tramo base para 2 jugadores y un tramo que encastra por cada jugador extra. Cada tramo tiene 5 hexágonos de río. El resto de la mesa queda libre: no hay piedras ni parcelas impresas.</p>
+    <div class="scroll"><svg id="segments" role="img" aria-label="Tramos de río para 2 a 5 jugadores"></svg></div>
+  </div>
+  <div class="box">
+    <h3>Piezas de acequia (neutras)</h3>
+    <p>Seis formas, que salen de la bolsa: 16 piezas por jugador. La bolsa lleva aproximadamente 44% rectas, 22% curvas suaves, 17% curvas cerradas, 6% Y, 6% T y 5% garras.</p>
+    <div class="grid" id="canals"></div>
+  </div>
+  <div class="grid" id="tokens"></div>
+</section>
+
+<!-- 3 · Preparación y turno -->
+<section class="sheet" id="setup-turn">
+  <div class="folio"><span>Acequias</span><span>Preparación y turno</span></div>
+  <h2 id="goal">Objetivo</h2>
+  <p>Construir acequias que lleven agua desde el río, plantar viñas junto a ellas y tener más puntos que nadie cuando termine la partida.</p>
+  <h2 id="setup">Preparación</h2>
+  <ol>
+    <li><b>Río.</b> Armá la tira de río con el tramo base y un tramo más por cada jugador después del segundo. Toda el agua sale del río.</li>
+    <li><b>Bolsa.</b> Poné en la bolsa 16 acequias por jugador y mezclalas. En la bolsa no hay compuertas.</li>
+    <li><b>Reserva de racimos.</b> Armá la reserva compartida: 2 racimos de cada varietal que tiene dos sectores en la ruleta y 1 de Bonarda y 1 de Cabernet Franc (14 en total). En Normal con 4 o 5 jugadores van 3 de cada uno y 1 de Bonarda y Cabernet Franc (20 en total).</li>
+    <li><b>Mercado.</b> Sacá 4 piezas y dejalas boca arriba al lado del río: es el mercado.</li>
+    <li><b>Jugadores.</b> Cada uno toma sus pincitos de dueño y su ficha de bodega. Las compuertas, las fichas de deuda, la ruleta y el dado van al centro.</li>
+    <li><b>Primer jugador.</b> Elijan quién empieza. En cada ronda empieza el siguiente jugador, como los <i>turnos de riego</i> de las acequias de Mendoza.</li>
+  </ol>
+  <h2 id="turn">El turno</h2>
+  <p>En cada ronda todos juegan un turno, en orden. El turno tiene dos pasos: <b>1. tirar el dado</b> (siempre) y <b>2. hacer tu acción</b>.</p>
+  <div class="box">
+    <h3>1 · Tirá el dado y cumplí lo que sale</h3>
+    <div style="display:grid;gap:.7rem" id="faces"></div>
+    <p class="muted" style="font-size:.82rem">La coima de las compuertas cuesta 2 de deuda en Normal y 1 en Flash. Se paga solo si ponés o sacás la compuerta: si no la usás, no cuesta nada.</p>
+  </div>
+  <div class="box">
+    <h3>2 · Hacé tu acción</h3>
+    <p>Salvo que te haya salido sequía, hacés <b>una</b> acción (dos con buena temporada):</p>
+    <ul>
+      <li><b>Colocar una acequia.</b> Tomá una pieza del mercado y ponela en un hexágono vacío, con tu pincito. Al menos una de sus bocas tiene que dar al río o a la boca de una acequia que ya esté en la mesa, aunque esté seca o cerrada por una compuerta. Las demás bocas pueden dar a cualquier lado. Reponé el mercado desde la bolsa; cuando la bolsa se vacía, el mercado se achica.</li>
+      <li><b>Plantar una viña</b> (ver "Plantar").</li>
+      <li><b>Construir tu bodega</b> (ver "Bodega"). Una vez por partida.</li>
+      <li><b>Pasar.</b> Siempre se puede.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- 4 · Agua y plantar -->
+<section class="sheet" id="water-planting">
+  <div class="folio"><span>Acequias</span><span>Agua y siembra</span></div>
+  <h2 id="water">El agua</h2>
+  <div class="cols">
+    <ul>
+      <li>El agua entra a una acequia por una boca que da al río.</li>
+      <li>Pasa de una acequia a la vecina solo donde las <b>dos</b> tienen una boca enfrentada.</li>
+      <li>Dentro de una pieza, el agua llega a todas sus bocas.</li>
+      <li>Una <b>compuerta</b> cierra una boca: el agua no cruza ese borde en ningún sentido. Si cierra la entrada, seca esa pieza y todo lo que está aguas abajo. Si cierra una salida, corta solo ese camino. En cada borde entra una sola compuerta.</li>
+    </ul>
+    <div class="box"><svg id="waterDiag" role="img" aria-label="Ejemplo de agua y compuerta"></svg>
+      <p class="muted" style="font-size:.8rem">Rojo toma agua del río y se la pasa a su segunda pieza por las bocas enfrentadas. A la recta de Verde la seca una compuerta en su toma.</p></div>
+  </div>
+  <h2 id="planting">Plantar</h2>
+  <div class="cols">
+    <ul>
+      <li>Las viñas no van en los hexágonos: van en las <b>esquinas</b>, donde se juntan 3 hexágonos.</li>
+      <li>Podés plantar en una esquina libre que toque <b>una acequia tuya con agua</b>. La esquina toca la acequia si la acequia está en uno de sus 3 hexágonos, sin importar hacia dónde miran las bocas.</li>
+      <li>Los otros dos hexágonos pueden ser cualquier cosa: acequias de rivales, el río o mesa vacía.</li>
+      <li>Girá la ruleta: tomá de la reserva un racimo de ese varietal y ponelo con tu pincito arriba. La viña es tuya. Si la reserva está vacía, ya no se puede plantar.</li>
+      <li><b>Volver a girar.</b> Si sale un varietal que ya no tiene racimos en la reserva, girá de nuevo, hasta <b>3 giros</b> en total. En la resiembra el racimo viejo vuelve primero a la reserva, así que su propio varietal siempre sirve.</li>
+      <li><b>Turno perdido.</b> Si fallan los 3 giros no plantás nada (una resiembra fallida conserva su varietal) y perdés el resto del turno. Solo cuenta como turno perdido si en ese turno no plantaste ni resembraste nada antes.</li>
+    </ul>
+    <div class="box"><svg id="plantDiag" role="img" aria-label="Esquinas donde se puede plantar"></svg>
+      <p class="muted" style="font-size:.8rem">Las 6 esquinas de una acequia tuya con agua son lugares para plantar.</p></div>
+  </div>
+</section>
+
+<!-- 5 · Puntaje y final -->
+<section class="sheet" id="scoring-end">
+  <div class="folio"><span>Acequias</span><span>Puntaje y final</span></div>
+  <h2 id="scoring">Una viña se reparte en tercios</h2>
+  <p>Una viña vale <b>6</b>, o <b>9</b> si es Bonarda o Cabernet Franc. Su valor se divide en tres tercios, uno por cada hexágono de su esquina:</p>
+  <ul>
+    <li>Cada tercio lo cobra el <b>dueño de la acequia</b> de ese hexágono, solo si esa acequia tiene agua al final. No importa quién plantó la viña.</li>
+    <li>Un tercio sobre el río, sobre un hexágono vacío o sobre una acequia seca no lo cobra nadie.</li>
+  </ul>
+  <div class="grid" id="thirds" style="grid-template-columns:repeat(auto-fill,minmax(170px,1fr))"></div>
+  <h2 id="cortes">Cortes</h2>
+  <p>Tenés un varietal si cobrás <b>al menos un tercio con agua</b> de una viña de ese varietal, la haya plantado quien sea, tal como está al final. Cada corte cuyos varietales tenés todos suma una vez. Una misma viña puede contar para varios cortes.</p>
+  <div class="scroll"><table>
+    <thead><tr><th>Corte</th><th class="n">Puntos</th></tr></thead>
+    <tbody>
+    <tr><td>Malbec + Cabernet Sauvignon · Malbec + Bonarda · Malbec + Syrah</td><td class="n">2 c/u</td></tr>
+    <tr><td>Malbec + Cabernet Franc · Torrontés + Chardonnay · Malbec + Torrontés</td><td class="n">3 c/u</td></tr>
+    <tr><td>Malbec + Cabernet Sauvignon + Merlot, + Cabernet Franc o + Bonarda</td><td class="n">4 c/u</td></tr>
+    <tr><td>Malbec + Cabernet Sauvignon + Merlot + Cabernet Franc</td><td class="n">5</td></tr>
+    </tbody>
+  </table></div>
+  <h2 id="bodega">Bodega</h2>
+  <p>Una vez por partida podés usar una acción para <b>construir tu bodega</b>: poné tu ficha de bodega en una esquina libre donde podrías plantar. Necesitás haber plantado <b>2 tintos distintos y 1 blanco</b> (Torrontés o Chardonnay). La bodega vale <b>12</b> y se reparte en tercios como una viña: 4 por cada tercio con agua, para el dueño de cada acequia. No tiene varietal y nunca se muda ni se resiembra.</p>
+  <h2 id="end">Fin de la partida</h2>
+  <p>La partida termina con lo primero que pase de estas tres cosas:</p>
+  <ul>
+    <li><b>Se vacía la reserva:</b> alguien toma el último racimo. Se termina la ronda.</li>
+    <li><b>Meta de puntos:</b> alguien llega al puntaje meta. Se termina la ronda.</li>
+    <li><b>Turnos muertos:</b> todos los jugadores perdieron <b>2 turnos seguidos</b> porque fallaron los giros. La partida termina en ese momento.</li>
+  </ul>
+  <div class="scroll"><table>
+    <thead><tr><th>Modo</th><th class="n">2 jug.</th><th class="n">3 jug.</th><th class="n">4 jug.</th><th class="n">5 jug.</th></tr></thead>
+    <tbody><tr><td><b>Normal</b> · racimos</td><td class="n">14</td><td class="n">14</td><td class="n">20</td><td class="n">20</td></tr>
+    <tr><td><b>Normal</b> · meta</td><td class="n">50</td><td class="n">50</td><td class="n">55</td><td class="n">40</td></tr>
+    <tr><td><b>Flash</b> · racimos</td><td class="n">14</td><td class="n">14</td><td class="n">—</td><td class="n">—</td></tr>
+    <tr><td><b>Flash</b> · meta</td><td class="n">30</td><td class="n">35</td><td class="n">—</td><td class="n">—</td></tr></tbody>
+  </table></div>
+  <p class="muted" style="font-size:.85rem">Con 2 jugadores y en Flash la partida suele terminar por la meta; con 3 a 5 en Normal, porque se acaban los racimos. Flash es la partida corta, para 2 o 3 jugadores, con las mismas reglas y una meta más baja.</p>
+  <div class="formula">Puntaje = tercios con agua + cortes + bodega − deuda</div>
+  <p>Gana el que tiene más puntos. Si hay empate, gana el que tiene más viñas regadas (viñas con al menos un tercio suyo con agua). Si siguen empatados, comparten la victoria.</p>
+</section>
+
+<!-- 6 · Partida de ejemplo -->
+<section class="sheet" id="example">
+  <div class="folio"><span>Acequias</span><span>Partida de ejemplo</span></div>
+  <h2 id="example-turns">Ocho turnos de ejemplo</h2>
+  <p class="muted">Rojo y Verde juegan en Normal con el tramo base. Las tiradas están elegidas para mostrar las 6 caras del dado; el agua, los cortes y el puntaje de cada cuadro siguen las reglas.</p>
+  <div class="steps" id="steps"></div>
+</section>
+
+<!-- 7 · El dado -->
+<section class="sheet" id="die">
+  <div class="folio"><span>Acequias</span><span>El dado y su historia</span></div>
+  <h2 id="die-history">Por qué el dado tiene estas caras</h2>
+  <p>Mendoza es un desierto: casi toda el agua que usa viene del deshielo de la nieve y los glaciares de los Andes<sup>1</sup>. El agua se reparte por canales y acequias. Cada <i>Inspección de Cauce</i> arma un <i>cuadro de turno</i> que dice a cada regante cuándo le llega el agua, con un tiempo proporcional a su tierra<sup>2</sup>. Según la Ley de Aguas, el inspector de cauce controla las compuertas y tomas, y el <i>tomero repartidor</i> entrega el agua según ese turno<sup>3</sup>. Cada regante debe tener su toma y su compuerta, y respetar su turno<sup>4</sup>.</p>
+  <div style="display:grid;gap:.9rem" id="lore"></div>
+  <ol class="src" style="gap:.15rem">
+    <li>Departamento General de Irrigación, Aquabook, <i>Los ríos mendocinos</i>. <a href="https://aquabook.irrigacion.gov.ar/388_0">aquabook.irrigacion.gov.ar/388_0</a></li>
+    <li>Gobierno de Mendoza, <i>Irrigación impulsará nuevas maneras de repartir el agua de riego con las Inspecciones de Cauce</i>. <a href="https://www.mendoza.gov.ar/prensa/irrigacion-impulsara-nuevas-maneras-de-repartir-el-agua-de-riego-con-las-inspecciones-de-cauce/">mendoza.gov.ar</a></li>
+    <li>Gobierno de Mendoza, <i>Ley de Aguas</i>, arts. 189 bis y 225. <a href="https://www.mendoza.gov.ar/wp-content/uploads/sites/15/2021/04/LEY-DE-AGUAS.pdf">mendoza.gov.ar (PDF)</a></li>
+    <li>Gobierno de Mendoza, <i>Irrigación recuerda derechos y obligaciones para un mejor uso del agua</i>. <a href="https://www.mendoza.gov.ar/prensa/irrigacion-recuerda-derechos-y-obligaciones-para-un-mejor-uso-del-agua/">mendoza.gov.ar</a></li>
+    <li>Universidad Nacional de Cuyo, <i>Probabilidades de daño por viento Zonda en la floración de frutales, vid y olivos</i>. <a href="https://bdigital.uncuyo.edu.ar/82">bdigital.uncuyo.edu.ar/82</a></li>
+    <li>Gobierno de Mendoza, <i>Recomendaciones por el viento Zonda</i>. <a href="https://www.mendoza.gov.ar/prensa/recomendaciones-por-el-viento-zonda/">mendoza.gov.ar</a></li>
+  </ol>
+</section>
+
+<!-- 8 · Varietales -->
+<section class="sheet" id="varietals">
+  <div class="folio"><span>Acequias</span><span>Los varietales</span></div>
+  <h2 id="varietals-list">Los ocho varietales</h2>
+  <div class="cols" style="grid-template-columns:minmax(0,220px) minmax(0,1fr);align-items:center">
+    <svg id="wheel" viewBox="0 0 320 320" role="img" aria-label="Ruleta de 14 sectores"></svg>
+    <p>La ruleta tiene 14 sectores iguales. Bonarda y Cabernet Franc tienen un sector cada una y valen 9; las demás tienen dos y valen 6. Los racimos se imprimen en tres colores: <b>violeta</b>, <b>rojo</b> y <b>verde flúor</b> para las blancas. La sigla en el costado del racimo dice qué varietal es. Las superficies son hectáreas de viña al 31 de diciembre de 2024, según el INV.</p>
+  </div>
+  <div class="cols" id="varietals" style="grid-template-columns:repeat(auto-fit,minmax(min(100%,330px),1fr))"></div>
+</section>
+
+<!-- 9 · Fuentes -->
+<section class="sheet" id="sources">
+  <div class="folio"><span>Acequias</span><span>Fuentes de los varietales</span></div>
+  <h2 id="sources-list">Fuentes</h2>
+  <ul class="src" style="gap:.3rem;font-size:.8rem">
+    <li><b>INV 2024</b>: Instituto Nacional de Vitivinicultura, <i>Informe Anual de Superficie 2024</i>. <a href="https://argentina.gob.ar/sites/default/files/2018/10/anuario_superficie_2024.pdf">argentina.gob.ar (PDF)</a></li>
+    <li><b>INV Syrah</b>: <i>Informe de variedad: Syrah</i> (2026) e <i>Informe de variedades: Syrah</i> (2025). <a href="https://www.argentina.gob.ar/noticias/informe-de-variedad-syrah-0">argentina.gob.ar</a></li>
+    <li><b>INV Bonarda</b>: <i>Informe de variedad: Bonarda</i> (2024). <a href="https://www.argentina.gob.ar/noticias/informe-de-variedad-bonarda-0">argentina.gob.ar</a></li>
+    <li><b>INV Cabernet Sauvignon</b>: <i>Informe de variedad</i> (2024). <a href="https://www.argentina.gob.ar/noticias/informe-de-variedad-cabernet-sauvignon-0">argentina.gob.ar</a></li>
+    <li><b>INV Merlot</b>: <i>Informe de variedad</i> (2024). <a href="https://www.argentina.gob.ar/noticias/informe-de-variedad-merlot-0">argentina.gob.ar</a></li>
+    <li><b>INV Cabernet Franc</b>: <i>Informe de variedad</i> (2024). <a href="https://www.argentina.gob.ar/noticias/informe-de-variedad-cabernet-franc-0">argentina.gob.ar</a></li>
+    <li><b>INV Torrontés</b>: <i>Informe de variedad: Torrontés y su actualidad en Argentina</i> (2021). <a href="https://www.argentina.gob.ar/noticias/informe-de-variedad-torrontes-y-su-actualidad-en-argentina">argentina.gob.ar</a></li>
+    <li><b>INV Chardonnay</b>: <i>Informe de variedad</i> (2024). <a href="https://www.argentina.gob.ar/noticias/informe-de-variedad-chardonnay">argentina.gob.ar</a></li>
+    <li><b>Agüero et al. 2003</b>: <i>Identity and parentage of some South American grapevine cultivars present in Argentina</i>, AJEV 54(4). <a href="https://www.argentina.gob.ar/sites/default/files/identity_and_parentage_of_some_south_american_grapevine_cultivars_present_in_argentina.pdf">argentina.gob.ar (PDF)</a></li>
+    <li><b>UNCuyo</b>: <i>¿Qué une a Sarmiento con el Malbec y la UNCUYO?</i> (2022). <a href="https://www.uncuyo.edu.ar/prensa/que-une-a-sarmiento-con-el-malbec-y-la-uncuyo-te-contamos-su-historia">uncuyo.edu.ar</a></li>
+    <li><b>Bodegas de Argentina</b>: <i>Día del Malbec</i>. <a href="https://bodegasdeargentina.org/dia-del-malbec/noticias/">bodegasdeargentina.org</a></li>
+  </ul>
+  <p class="muted" style="font-size:.8rem">Las superficies del INV varían un poco entre sus informes; este reglamento usa el informe anual 2024.</p>
+  <p class="legal">© 2026 Cristian García. Reglamento bajo licencia <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/deed.es">CC BY-NC-SA 4.0</a>.</p>
+</section>
+
+</div>
+
+<script>
+const NS="http://www.w3.org/2000/svg";
+const v=n=>`var(--${n})`;
+function el(p,tag,a={},txt){const e=document.createElementNS(NS,tag);for(const k in a)e.setAttribute(k,a[k]);if(txt!=null)e.textContent=txt;p.appendChild(e);return e;}
+const DIRS={E:[1,0,0],NE:[1,-1,-60],NW:[0,-1,-120],W:[-1,0,180],SW:[-1,1,120],SE:[0,1,60]};
+const OPP={E:"W",W:"E",NE:"SW",SW:"NE",NW:"SE",SE:"NW"};
+const rad=d=>d*Math.PI/180;
+const hexPts=(cx,cy,R)=>[...Array(6)].map((_,i)=>{const a=rad(60*i-30);return (cx+R*Math.cos(a)).toFixed(1)+","+(cy+R*Math.sin(a)).toFixed(1)}).join(" ");
+const key=(q,r)=>q+","+r;
+
+/* Varietals */
+const VIOLET="#7b3fa0",RED="#c4303c",FLUO="#9be22d";
+const VAR=[
+ {n:"Malbec",ab:"Ma",s:2,p:6,c:VIOLET,facts:[
+  ["Llegó a Mendoza con las cepas francesas de la Quinta Agronómica, que dirigía el agrónomo francés Michel Aimé Pouget, contratado por Sarmiento. El proyecto se presentó a la Legislatura el 17 de abril de 1853.","UNCuyo; Bodegas de Argentina"],
+  ["Esa fecha es el Día Mundial del Malbec, elegido por Wines of Argentina en 2011.","UNCuyo; Bodegas de Argentina"],
+  ["Es la uva más plantada de Argentina: 47.064 ha, una de cada cuatro viñas del país. Mendoza tiene 39.856 ha, cerca del 85%.","INV 2024"],
+  ["Su zona más grande es el Valle de Uco; Luján de Cuyo es el departamento con más superficie.","INV 2024"]]},
+ {n:"Syrah",ab:"Sy",s:2,p:6,c:VIOLET,facts:[
+  ["Se cultiva en toda Europa y es famosa en el Ródano francés. El INV aclara que su origen es incierto: la tradición la vincula con Shiraz, en la antigua Persia.","INV Syrah"],
+  ["Da vinos expresivos, con mora, ciruela, cereza y cuero, más especias y hierbas como tomillo y romero.","INV Syrah"],
+  ["10.420 ha en Argentina y 7.700 en Mendoza, con San Juan en segundo lugar. En Mendoza pesa más en el Este cálido, en San Martín.","INV 2024"]]},
+ {n:"Bonarda",ab:"Bo",s:1,p:9,c:VIOLET,facts:[
+  ["Viene de Saboya, en Francia, junto a Italia. En Estados Unidos se llama Charbono.","INV Bonarda"],
+  ["Llegó a la Argentina con los inmigrantes de fines del siglo XIX.","INV Bonarda"],
+  ["Es la segunda tinta del país: 16.774 ha, 14.027 en Mendoza (cerca del 84%), sobre todo en el Este: San Martín, Rivadavia, Santa Rosa y Junín.","INV 2024"],
+  ["Por mucho tiempo fue uva de corte por su rendimiento y su color. Con menos rendimiento hoy da varietales finos.","INV Bonarda"]]},
+ {n:"Cabernet Sauvignon",ab:"CS",s:2,p:6,c:RED,facts:[
+  ["Viene de Burdeos, Francia: es un cruce natural de Cabernet Franc y Sauvignon Blanc.","INV Cabernet Sauvignon"],
+  ["Sus bayas tienen hollejo grueso, muy oscuro y rico en taninos.","INV Cabernet Sauvignon"],
+  ["Cuarta uva del país con 12.727 ha (9.787 en Mendoza), pero en baja: 2.832 ha menos que en 2015.","INV 2024"],
+  ["En Mendoza crece sobre todo en el Valle de Uco y en Luján de Cuyo.","INV 2024"]]},
+ {n:"Merlot",ab:"Me",s:2,p:6,c:RED,facts:[
+  ["Probablemente del sudoeste de Francia; su nombre vendría del mirlo (<i>merle</i>).","INV Merlot"],
+  ["Vinos con cuerpo y taninos elegantes: ciruela y guinda, rosa, especias, pimienta negra y canela.","INV Merlot"],
+  ["4.348 ha en Argentina y 3.449 en Mendoza; la zona principal es el Valle de Uco (Tupungato y Tunuyán).","INV 2024"]]},
+ {n:"Cabernet Franc",ab:"CF",s:1,p:9,c:RED,facts:[
+  ["Nativa de Burdeos y muy cultivada en el Loira. Argentina tenía apenas 76 ha hasta 1990; el boom llegó después del 2000.","INV Cabernet Franc"],
+  ["Rojo rubí, con pimiento verde, eucalipto, mentol, especias y frutos rojos; elegante y estructurada.","INV Cabernet Franc"],
+  ["2.009 ha en Argentina y 1.661 en Mendoza, más del doble que en 2015. Más de la mitad de lo mendocino está en el Valle de Uco.","INV 2024"],
+  ["Su día es el 4 de diciembre.","INV Cabernet Franc"]]},
+ {n:"Torrontés",ab:"To",s:2,p:6,c:FLUO,facts:[
+  ["Es una uva argentina: el Torrontés Riojano y el Sanjuanino son cruces de Moscatel de Alejandría y Criolla Chica. El tercero es el Torrontés Mendocino.","INV Torrontés; Agüero et al. 2003"],
+  ["Es aromática pero da un vino seco, con un sabor moscatel característico.","INV Torrontés"],
+  ["El Torrontés Riojano ocupa 6.867 ha; Mendoza tiene 3.207, más que cualquier otra provincia, sobre todo en el Este y Lavalle.","INV 2024"]]},
+ {n:"Chardonnay",ab:"Ch",s:2,p:6,c:FLUO,facts:[
+  ["Es la gran blanca de Francia, de Borgoña, Chablis y Champagne.","INV Chardonnay"],
+  ["En Argentina es la base de la mayoría de los espumantes.","INV Chardonnay"],
+  ["5.542 ha en Argentina y 4.606 en Mendoza (cerca del 83%); Tupungato, en el Valle de Uco, es el departamento con más superficie.","INV 2024"],
+  ["Versátil y de aromas complejos, con buen potencial de guarda.","INV Chardonnay"]]}
+];
+const VBY=Object.fromEntries(VAR.map(x=>[x.n,x]));
+const ink=c=>c===FLUO?"#1d2a0a":"#fff";
+
+/* Die icons */
+const ICONS={
+  floodgate:g=>{el(g,"rect",{x:-14,y:-16,width:28,height:32,rx:2,fill:"none",stroke:"currentColor","stroke-width":4});el(g,"rect",{x:-5,y:-8,width:10,height:8,fill:"currentColor"});},
+  release:g=>{ICONS.floodgate(g);el(g,"line",{x1:-20,y1:20,x2:20,y2:-20,stroke:"currentColor","stroke-width":4.5,"stroke-linecap":"round"});},
+  resow:g=>{for(let i=0;i<3;i++){const s=el(g,"g",{transform:`rotate(${i*120})`});el(s,"path",{d:"M -6 -15 A 16 16 0 0 1 13 -7",fill:"none",stroke:"currentColor","stroke-width":4,"stroke-linecap":"round"});el(s,"path",{d:"M 8 -12 L 16 -4 L 5 -2 Z",fill:"currentColor"});}},
+  move:g=>{el(g,"rect",{x:-20,y:-12,width:24,height:18,rx:2,fill:"currentColor"});el(g,"path",{d:"M 6 -6 L 14 -6 L 20 1 L 20 6 L 6 6 Z",fill:"currentColor"});
+    [-12,12].forEach(x=>el(g,"circle",{cx:x,cy:9,r:4.5,fill:"var(--paper)",stroke:"currentColor","stroke-width":3}));},
+  season:g=>el(g,"path",{d:"M 0 -20 C 8 -8 14 0 14 7 A 14 14 0 0 1 -14 7 C -14 0 -8 -8 0 -20 Z",fill:"currentColor"}),
+  drought:g=>[-10,0,10].forEach((y,i)=>el(g,"path",{d:`M -18 ${y} q 6 -6 12 0 t 12 0 ${i===1?"t 8 0":""}`,fill:"none",stroke:"currentColor","stroke-width":3.5,"stroke-linecap":"round"}))
+};
+const FACES=[
+ {k:"floodgate",n:"Compuerta",cost:"Coima: 2 de deuda (Flash: 1), solo si la ponés",rule:"<b>Si querés</b>, ponés una compuerta en una boca abierta de cualquier acequia.",
+  lore:"La compuerta deja entrar el agua a un canal o la corta. Quien maneja la compuerta decide quién riega: un tomero o un vecino que la cierra en el momento justo puede dejar seca una finca todo un turno. En el juego cuesta una coima: pagás para que cierren la compuerta donde le duele al rival, o donde te protege a vos."},
+ {k:"release",n:"Quitar compuerta",cost:"Coima: 2 de deuda (Flash: 1), solo si la sacás",rule:"<b>Si querés</b>, sacás una compuerta de la mesa, de quien sea. Sale del juego.",
+  lore:"El trato contrario: pagás para que abran una compuerta cerrada y la saquen, y el agua vuelve a correr por el canal hasta las viñas que dependen de ella."},
+ {k:"resow",n:"Resiembra",cost:"Gratis",rule:"<b>Si querés</b>, primero elegís una viña plantada, tuya o de otro, y recién después girás la ruleta: el varietal que sale reemplaza al anterior, aunque sea peor. La viña queda en su lugar y con su dueño.",
+  lore:"El productor que reinjerta o replanta una parcela con otra variedad. En Mendoza las viñas cambian con los gustos y los mercados: en los últimos años creció mucho el Cabernet Franc, mientras bajaban el Cabernet Sauvignon y el Syrah."},
+ {k:"move",n:"Traslado",cost:"Gratis",rule:"<b>Si querés</b>, mudás una viña <b>tuya</b> (con tu pincito) a otra esquina donde podrías plantar. Conserva su varietal.",
+  lore:"El productor que deja una parcela y vuelve a empezar donde hay mejor agua: la viña se muda a una esquina junto a una acequia tuya con agua."},
+ {k:"season",n:"Buena temporada",cost:"Gratis",rule:"Este turno hacés <b>2 acciones</b>: plantar y plantar, o acequia y plantar, en cualquier orden. Nunca 2 acequias.",
+  lore:"Un buen invierno de nieve en los Andes trae un buen deshielo: ríos y canales llenos, y tiempo para hacer más. Los ríos de Mendoza se alimentan casi solo de nieve y glaciares<sup>1</sup>."},
+ {k:"drought",n:"Sequía",cost:"Gratis",rule:"Perdés tu acción este turno. Solo te afecta a vos.",
+  lore:"Un año seco, o un día de Zonda: un viento caliente y seco<sup>6</sup> que daña las fincas. En un estudio largo, casi la mitad de los días de Zonda cayeron en agosto y principios de septiembre, cuando florecen los frutales y la vid<sup>5</sup>. No se puede hacer nada: perdés la acción."}
+];
+function dieFace(parent,k,size=56){const s=el(parent,"svg",{viewBox:"-36 -36 72 72",width:size,height:size,role:"img","aria-label":k});
+  el(s,"rect",{x:-34,y:-34,width:68,height:68,rx:12,fill:v("paper"),stroke:v("fg"),"stroke-width":2.5});
+  ICONS[k](el(s,"g",{style:"color:var(--fg)"}));return s;}
+
+/* Canal piece */
+function drawCanal(g,cx,cy,R,openings,{wet=true,owner=null}={}){
+  el(g,"polygon",{points:hexPts(cx,cy,R*.94),fill:v("tile"),stroke:v("line"),"stroke-width":1.5});
+  const W=Math.sqrt(3)*R;
+  openings.forEach(d=>{const a=rad(DIRS[d][2]);el(g,"line",{x1:cx,y1:cy,x2:cx+W/2*Math.cos(a)*.98,y2:cy+W/2*Math.sin(a)*.98,stroke:wet?v("water"):v("dry"),"stroke-width":R*.32});});
+  el(g,"circle",{cx,cy,r:R*.16,fill:wet?v("water"):v("dry")});
+  el(g,"circle",{cx,cy,r:R*.13,fill:owner?v(owner):v("paper"),stroke:v("fg"),"stroke-width":owner?1.5:1,"stroke-dasharray":owner?"0":"2 2"});
+}
+function vineToken(g,cx,cy,r,vname,by){const vr=VBY[vname];
+  el(g,"circle",{cx,cy,r,fill:vr.c,stroke:by?v(by):v("fg"),"stroke-width":by?r*.33:1});
+  el(g,"text",{x:cx,y:cy+r*.33,"text-anchor":"middle","font-size":r*.85,"font-family":"var(--mono)","font-weight":700,fill:ink(vr.c)},vr.ab);}
+
+/* Generic board renderer */
+function water(st){const by={};st.canals.forEach(c=>by[key(...c.h)]=c);const isR=(q,r)=>st.river.some(([a,b])=>a===q&&b===r);
+  const gated=(h,d)=>st.gates.some(g=>g.h[0]===h[0]&&g.h[1]===h[1]&&g.d===d);const wet=new Set(),qu=[];
+  st.canals.forEach(c=>c.o.forEach(d=>{const n=[c.h[0]+DIRS[d][0],c.h[1]+DIRS[d][1]];if(isR(...n)&&!gated(c.h,d)&&!wet.has(key(...c.h))){wet.add(key(...c.h));qu.push(c);}}));
+  while(qu.length){const c=qu.shift();c.o.forEach(d=>{const n=[c.h[0]+DIRS[d][0],c.h[1]+DIRS[d][1]],nc=by[key(...n)];
+    if(nc&&!wet.has(key(...n))&&nc.o.includes(OPP[d])&&!gated(c.h,d)&&!gated(n,OPP[d])){wet.add(key(...n));qu.push(nc);}});}
+  return wet;}
+function drawBoard(svg,st,{R=30,cols=5,spots=[]}={}){svg.replaceChildren();const W=Math.sqrt(3)*R;const wet=water(st);
+  const xs=st.river.map(([q,r])=>W*(q+r/2));const minX=Math.min(...xs);const rows=Math.max(...st.river.map(x=>x[1]))+1;
+  const X=(q,r)=>R+8+W*(q+r/2)-minX,Y=r=>R+8+r*1.5*R;
+  svg.setAttribute("viewBox",`0 0 ${W*(cols+1.6)+(Math.max(...xs)-minX)} ${Y(rows-1)+R+8}`);
+  st.river.forEach(([rq,r])=>{for(let k=0;k<=cols;k++){el(svg,"polygon",{points:hexPts(X(rq+k,r),Y(r),R),fill:k?v("soil"):v("river"),stroke:v("paper"),"stroke-width":2,opacity:k===cols?.45:1});}});
+  st.canals.forEach(c=>drawCanal(svg,X(...c.h),Y(c.h[1]),R,c.o,{wet:wet.has(key(...c.h)),owner:c.p}));
+  st.gates.forEach(gt=>{const a=rad(DIRS[gt.d][2]);const cx=X(...gt.h)+W/2*Math.cos(a),cy=Y(gt.h[1])+W/2*Math.sin(a);
+    el(svg,"rect",{x:-R*.13,y:-R*.45,width:R*.26,height:R*.9,rx:2,fill:v("gate"),transform:`translate(${cx} ${cy}) rotate(${DIRS[gt.d][2]})`});});
+  spots.forEach(([x,y])=>el(svg,"circle",{cx:X(x[0],x[1])+y[0]*R,cy:Y(x[1])+y[1]*R,r:R*.22,fill:"none",stroke:v("accent"),"stroke-width":2,"stroke-dasharray":"3 2"}));
+  st.vines.forEach(vn=>{const cx=vn.hx.reduce((a,h)=>a+X(...h),0)/3,cy=vn.hx.reduce((a,h)=>a+Y(h[1]),0)/3;vineToken(svg,cx,cy,R*.36,vn.v,vn.by);});
+  return wet;}
+
+/* Cover + segments */
+function riverPath(rows,amp){const mid=(rows-1)/2;let q=0,x=0;const out=[[0,0]];
+  for(let r=1;r<rows;r++){const t=mid?((r-mid)/mid):0;const target=amp*t*t-amp;const se=x+1,sw=x-1;
+    const useSE=Math.abs(se-target)<Math.abs(sw-target)||(Math.abs(se-target)===Math.abs(sw-target)&&r%2===1);
+    if(useSE)x+=1;else{x-=1;q-=1;}out.push([q,r]);}return out;}
+(()=>{const s=document.getElementById("segments");const R=12,W=Math.sqrt(3)*R;let ox=10;const parts=[];
+  [2,3,4,5].forEach(P=>{const rows=(P-1)*5,path=riverPath(rows,[0,0,2.2,3,3.6,4][P]);const minX=Math.min(...path.map(([q,r])=>W*(q+r/2)));
+    path.forEach(([q,r],i)=>el(s,"polygon",{points:hexPts(ox+W*(q+r/2)-minX+W/2,R+4+r*1.5*R,R),fill:Math.floor(i/5)%2?v("river2"):v("river"),stroke:v("paper"),"stroke-width":1.5}));
+    el(s,"text",{x:ox+W,y:R+4+rows*1.5*R+12,"text-anchor":"middle","font-size":11,"font-family":"var(--mono)",fill:v("muted")},`${P} jug.`);
+    ox+=W*5;});
+  s.setAttribute("viewBox",`0 0 ${ox} ${R+4+20*1.5*R+20}`);s.setAttribute("height",260);})();
+
+/* Canals + tokens */
+const SHAPES=[["Recta",["E","W"]],["Curva suave",["E","NW"]],["Curva cerrada",["E","NE"]],["Y simétrica",["E","NW","SW"]],["T",["E","W","NE"]],["Garra",["E","NE","NW"]]];
+(()=>{const box=document.getElementById("canals");SHAPES.forEach(([n,o])=>{const c=document.createElement("div");c.className="card";
+  const s=el(c,"svg",{viewBox:"-50 -50 100 100",width:84,height:84,role:"img","aria-label":n});drawCanal(s,0,0,46,o);
+  c.insertAdjacentHTML("beforeend",`<b>${n}</b><small>${o.length} bocas</small>`);box.appendChild(c);});})();
+(()=>{const box=document.getElementById("tokens");
+  const add=(name,desc,draw)=>{const c=document.createElement("div");c.className="card";const s=el(c,"svg",{viewBox:"-40 -40 80 80",width:72,height:72,role:"img","aria-label":name});draw(s);
+    c.insertAdjacentHTML("beforeend",`<b>${name}</b><small>${desc}</small>`);box.appendChild(c);};
+  add("Pincitos de dueño","Del color de cada jugador. Uno en cada acequia y uno en cada racimo que plantás.",s=>["p1","p2","p3","p4","p5"].forEach((p,i)=>{el(s,"rect",{x:-27+i*12,y:-4,width:5,height:14,fill:v(p),stroke:v("fg"),"stroke-width":.8});el(s,"ellipse",{cx:-24.5+i*12,cy:-5,rx:5,ry:2.4,fill:v(p),stroke:v("fg"),"stroke-width":.8});}));
+  add("Racimos","Reserva compartida de 14 (20 en Normal con 4 o 5 jugadores), del color del varietal, con la sigla en un costado y un agujero arriba para el pincito.",s=>{
+    [[-12,-6],[0,-6],[12,-6],[-6,5],[6,5],[0,16]].forEach(([x,y])=>el(s,"circle",{cx:x,cy:y,r:8,fill:VIOLET,stroke:v("fg"),"stroke-width":.8}));
+    el(s,"rect",{x:-11,y:-4,width:22,height:13,rx:2,fill:VIOLET,stroke:v("paper"),"stroke-width":1});
+    el(s,"text",{x:0,y:6.5,"text-anchor":"middle","font-size":10,"font-family":"var(--mono)",fill:"#fff","font-weight":700},"Ma");
+    el(s,"rect",{x:-3,y:-28,width:6,height:12,fill:v("p1"),stroke:v("fg"),"stroke-width":1});el(s,"ellipse",{cx:0,cy:-29,rx:7,ry:3,fill:v("p1"),stroke:v("fg"),"stroke-width":1});});
+  add("Compuertas","Cierran una boca de acequia. Salen solo del dado.",s=>{el(s,"rect",{x:-6,y:-24,width:12,height:48,rx:2,fill:v("gate")});el(s,"rect",{x:-3,y:-8,width:6,height:8,fill:v("paper")});});
+  add("Ficha de bodega","Una por jugador. Se construye una vez por partida en una esquina y vale 12.",s=>{el(s,"path",{d:"M -22 22 L -22 -4 L 0 -22 L 22 -4 L 22 22 Z",fill:v("accent"),stroke:v("fg"),"stroke-width":1.5});el(s,"rect",{x:-6,y:6,width:12,height:16,fill:v("paper")});});
+  add("Fichas de deuda","Una por cada coima. Cada una resta 1 punto al final.",s=>{el(s,"circle",{r:18,fill:v("dry"),stroke:v("fg"),"stroke-width":1.5});el(s,"text",{x:0,y:6,"text-anchor":"middle","font-size":17,"font-family":"var(--mono)",fill:v("fg")},"−1");});
+  add("Ruleta","14 sectores. Decide el varietal de cada viña nueva y de la resiembra.",s=>{for(let i=0;i<14;i++){const a0=rad(i*360/14),a1=rad((i+1)*360/14);el(s,"path",{d:`M0 0 L${30*Math.cos(a0)} ${30*Math.sin(a0)} A30 30 0 0 1 ${30*Math.cos(a1)} ${30*Math.sin(a1)} Z`,fill:[VIOLET,RED,FLUO][i%3],stroke:v("paper"),"stroke-width":1});}el(s,"circle",{r:7,fill:v("paper")});});
+  add("Dado de acción","Un dado de 6 caras: compuerta, quitar compuerta, resiembra, traslado, buena temporada y sequía.",s=>{const g=el(s,"g",{transform:"scale(.9)"});el(g,"rect",{x:-34,y:-34,width:68,height:68,rx:12,fill:v("paper"),stroke:v("fg"),"stroke-width":2.5});ICONS.season(el(g,"g",{style:"color:var(--fg)"}));});
+})();
+
+/* Faces (rules) and lore */
+(()=>{const box=document.getElementById("faces");FACES.forEach(f=>{const d=document.createElement("div");d.className="face";dieFace(d,f.k,56);
+  d.insertAdjacentHTML("beforeend",`<div><b>${f.n}</b> <span class="muted" style="font-size:.8rem">· ${f.cost}</span><br>${f.rule}</div>`);box.appendChild(d);});
+  const lb=document.getElementById("lore");FACES.forEach(f=>{const d=document.createElement("div");d.className="face";dieFace(d,f.k,52);
+  d.insertAdjacentHTML("beforeend",`<div><b>${f.n}</b><p style="font-size:.88rem">${f.lore}</p></div>`);lb.appendChild(d);});})();
+
+/* Water + planting diagrams */
+const RIV=[[0,0],[0,1],[-1,2],[-1,3],[-2,4]];
+drawBoard(document.getElementById("waterDiag"),{river:RIV.slice(0,3),canals:[{h:[1,1],o:["W","SE"],p:"p1"},{h:[1,2],o:["NW","E"],p:"p1"},{h:[1,0],o:["W","E"],p:"p2"}],gates:[{h:[1,0],d:"W"}],vines:[]},{R:30,cols:4});
+(()=>{const corners=[...Array(6)].map((_,i)=>{const a=rad(60*i-30);return [[1,1],[Math.cos(a),Math.sin(a)]];});
+  drawBoard(document.getElementById("plantDiag"),{river:RIV.slice(0,3),canals:[{h:[1,1],o:["W","E"],p:"p1"}],gates:[],vines:[]},{R:30,cols:4,spots:corners});})();
+
+/* Thirds examples */
+(()=>{const box=document.getElementById("thirds");
+  const EX=[["Toda tuya","Malbec entre 3 acequias tuyas con agua",[["p1",1],["p1",1],["p1",1]],"Rojo 6","Malbec"],
+    ["Compartida","Bonarda: 2 acequias tuyas y 1 de un rival",[["p1",1],["p1",1],["p2",1]],"Rojo 6 · Verde 3","Bonarda"],
+    ["Con compuerta","La misma Bonarda, con tus 2 acequias secas",[["p1",0],["p1",0],["p2",1]],"Rojo 0 · Verde 3","Bonarda"],
+    ["Junto al río","Syrah con un tercio sobre el río",[["p1",1],["river",0],["p2",1]],"Rojo 2 · Verde 2 · se pierden 2","Syrah"]];
+  EX.forEach(([t,d,hexes,res,vn])=>{const c=document.createElement("div");c.className="card";
+    const s=el(c,"svg",{viewBox:"-70 -62 140 124",width:150,height:133,role:"img","aria-label":t});const R=34,W=Math.sqrt(3)*R;
+    [[0,-R],[-W/2,R/2],[W/2,R/2]].forEach(([x,y],i)=>{const [o,wet]=hexes[i];
+      if(o==="river"){el(s,"polygon",{points:hexPts(x,y,R*.97),fill:v("river")});return;}
+      el(s,"polygon",{points:hexPts(x,y,R*.94),fill:v("tile"),stroke:v("line")});const a=Math.atan2(y,x);
+      el(s,"line",{x1:x,y1:y,x2:x+Math.cos(a)*W/2,y2:y+Math.sin(a)*W/2,stroke:wet?v("water"):v("dry"),"stroke-width":10});
+      el(s,"circle",{cx:x,cy:y,r:6,fill:v(o),stroke:v("fg"),"stroke-width":1});});
+    vineToken(s,0,0,13,vn,null);
+    c.insertAdjacentHTML("beforeend",`<b>${t}</b><small>${d}</small><small style="color:var(--fg);font-weight:700">${res}</small>`);box.appendChild(c);});})();
+
+/* Example game */
+const NAMES={p1:"Rojo",p2:"Verde"};
+const STEPS=[
+  {who:"p1",die:"resow",text:"Resiembra, pero todavía no hay viñas. Coloca una garra junto al río: la boca oeste toma agua.",do:s=>s.canals.push({h:[1,1],o:["W","SW","SE"],p:"p1"})},
+  {who:"p2",die:"season",text:"Buena temporada: coloca una recta con toma en el río y planta junto a la garra de Rojo. Sale Malbec (6): Verde 2, Rojo 2, y el tercio vacío se pierde.",
+    do:s=>{s.canals.push({h:[0,2],o:["W","E"],p:"p2"});s.vines.push({id:"A",hx:[[0,2],[1,1],[1,2]],v:"Malbec",by:"p2"});}},
+  {who:"p1",die:"floodgate",text:"Compuerta: paga 2 de deuda y cierra la toma de Verde, que se seca. Coloca una curva cerrada pegada a su garra: el Malbec ahora da Rojo 4, Verde 0.",
+    do:s=>{s.debt.p1+=2;s.gates.push({h:[0,2],d:"W"});s.canals.push({h:[1,2],o:["NW","NE"],p:"p1"});}},
+  {who:"p2",die:"release",text:"Quitar compuerta: paga 2 de deuda y su acequia vuelve a tener agua. Coloca otra recta junto al río.",
+    do:s=>{s.debt.p2+=2;s.gates=[];s.canals.push({h:[0,3],o:["W","E"],p:"p2"});}},
+  {who:"p1",die:"season",text:"Buena temporada: coloca una curva suave y planta entre 3 acequias suyas. Sale Bonarda (9): los 9 son de Rojo, y Malbec + Bonarda le da su primer corte.",
+    do:s=>{s.canals.push({h:[2,1],o:["SW","E"],p:"p1"});s.vines.push({id:"B",hx:[[1,1],[2,1],[1,2]],v:"Bonarda",by:"p1"});}},
+  {who:"p2",die:"resow",text:"Resiembra sobre la Bonarda de Rojo: sale Torrontés (6) y Rojo pierde 3. Planta entre sus 2 rectas y la curva de Rojo: Chardonnay, Verde 4, Rojo 2.",
+    do:s=>{s.vines.find(x=>x.id==="B").v="Torrontés";s.vines.push({id:"C",hx:[[0,2],[1,2],[0,3]],v:"Chardonnay",by:"p2"});}},
+  {who:"p1",die:"move",text:"Traslado: no le conviene mudar nada. Planta junto a 2 acequias suyas: Cabernet Sauvignon, Rojo 4. Ya suma 3 cortes: Malbec + Cabernet Sauvignon, Malbec + Torrontés y Torrontés + Chardonnay.",
+    do:s=>s.vines.push({id:"D",hx:[[1,2],[2,1],[2,2]],v:"Cabernet Sauvignon",by:"p1"})},
+  {who:"p2",die:"drought",text:"Sequía: Verde pierde la acción. Fin del ejemplo.",do:s=>{}}
+];
+const CORTES=[[["Malbec","Cabernet Sauvignon"],2],[["Malbec","Bonarda"],2],[["Malbec","Syrah"],2],[["Malbec","Cabernet Franc"],3],[["Torrontés","Chardonnay"],3],[["Malbec","Torrontés"],3],
+  [["Malbec","Cabernet Sauvignon","Merlot"],4],[["Malbec","Cabernet Sauvignon","Cabernet Franc"],4],[["Malbec","Cabernet Sauvignon","Bonarda"],4],[["Malbec","Cabernet Sauvignon","Merlot","Cabernet Franc"],5]];
+const cortes=vars=>CORTES.reduce((a,[c,p])=>a+(c.every(x=>vars.has(x))?p:0),0);
+(()=>{const box=document.getElementById("steps");const s={river:RIV,canals:[],gates:[],vines:[],debt:{p1:0,p2:0}};
+  STEPS.forEach((st,i)=>{st.do(s);const d=document.createElement("div");d.className="step";
+    const head=document.createElement("header");dieFace(head,st.die,30);
+    head.insertAdjacentHTML("beforeend",`<span>Turno ${i+1} · ${NAMES[st.who]}</span><i class="dot" style="background:var(--${st.who})"></i>`);d.appendChild(head);
+    const svg=el(d,"svg",{role:"img","aria-label":`Tablero después del turno ${i+1}`});const wet=drawBoard(svg,s,{R:24,cols:4});
+    const by={};s.canals.forEach(c=>by[key(...c.h)]=c);const res={p1:{pts:0,vars:new Set()},p2:{pts:0,vars:new Set()}};
+    s.vines.forEach(vn=>{const val=VBY[vn.v].p;vn.hx.forEach(h=>{const c=by[key(...h)];if(c&&wet.has(key(...h))){res[c.p].pts+=val/3;res[c.p].vars.add(vn.v);}});});
+    const line=["p1","p2"].map(p=>{const b=cortes(res[p].vars);return `${NAMES[p]} ${res[p].pts}${b?" + cortes "+b:""}${s.debt[p]?" − "+s.debt[p]:""} = ${res[p].pts+b-s.debt[p]}`;}).join(" · ");
+    d.insertAdjacentHTML("beforeend",`<p>${st.text}</p><div class="sc">${line}</div>`);box.appendChild(d);});})();
+
+/* Cover illustration: final state of the example on a longer strip */
+(()=>{const s=document.getElementById("coverStrip");const st={river:RIV,canals:[{h:[1,1],o:["W","SW","SE"],p:"p1"},{h:[0,2],o:["W","E"],p:"p2"},{h:[1,2],o:["NW","NE"],p:"p1"},{h:[0,3],o:["W","E"],p:"p2"},{h:[2,1],o:["SW","E"],p:"p1"},{h:[-1,4],o:["W","NE"],p:"p2"}],
+  gates:[{h:[2,1],d:"E"}],vines:[{hx:[[0,2],[1,1],[1,2]],v:"Malbec",by:"p2"},{hx:[[1,1],[2,1],[1,2]],v:"Torrontés",by:"p1"},{hx:[[0,2],[1,2],[0,3]],v:"Chardonnay",by:"p2"},{hx:[[1,2],[2,1],[2,2]],v:"Cabernet Franc",by:"p1"}]};
+  drawBoard(s,st,{R:34,cols:6});})();
+
+/* Varietals */
+(()=>{const w=document.getElementById("wheel");const sectors=VAR.flatMap(x=>Array(x.s).fill(x));const n=sectors.length;
+  const order=[0,2,4,6,8,10,12,1,3,5,7,9,11,13].map(i=>sectors[i]);
+  order.forEach((x,i)=>{const a0=rad(i*360/n-90),a1=rad((i+1)*360/n-90),R=150;
+    el(w,"path",{d:`M160 160 L${160+R*Math.cos(a0)} ${160+R*Math.sin(a0)} A${R} ${R} 0 0 1 ${160+R*Math.cos(a1)} ${160+R*Math.sin(a1)} Z`,fill:x.c,stroke:v("paper"),"stroke-width":2});
+    const am=(a0+a1)/2;el(w,"text",{x:160+112*Math.cos(am),y:160+112*Math.sin(am)+4,"text-anchor":"middle","font-size":13,"font-family":"var(--mono)",fill:ink(x.c),"font-weight":700},x.ab+(x.p===9?"·9":""));});
+  el(w,"circle",{cx:160,cy:160,r:22,fill:v("paper"),stroke:v("fg"),"stroke-width":2});
+  const box=document.getElementById("varietals");const cname={[VIOLET]:"violeta",[RED]:"rojo",[FLUO]:"verde flúor"};
+  VAR.forEach(x=>{const d=document.createElement("div");d.className="vcard";
+    const h=document.createElement("div");h.className="vhead";const s=el(h,"svg",{viewBox:"-20 -20 40 40",width:36,height:36});vineToken(s,0,0,16,x.n,null);
+    h.insertAdjacentHTML("beforeend",`<h3>${x.n}</h3><span class="pts">${x.p} pts${x.p===9?" · rara":""}</span>`);d.appendChild(h);
+    d.insertAdjacentHTML("beforeend",`<div class="src">Racimo ${cname[x.c]} · ${x.s} sector${x.s>1?"es":""} en la ruleta</div><ul style="font-size:.84rem">${x.facts.map(([t,src])=>`<li>${t} <span class="src">(${src})</span></li>`).join("")}</ul>`);
+    box.appendChild(d);});})();
+</script>
+</body>
+</html>
+
