@@ -1329,10 +1329,183 @@ Decision: `v3_best_base` moves to optional floodgate faces with bribe 2 in Norma
 
 ## Rules v3 seat bias and end conditions (#163)
 
-Sweep `v3end`, `score_aware`, 500 games per row, seed 163001, around `v3_best_base` (the best #160/#166/#168 setup in `scripts/tune.py`): `uv run python scripts/tune.py --sweep v3end`. Rows: the base; seats rotated and shuffled per game; an unlimited bag; `bag_empty`, `vineyards_out` (default markers 6 / 9 / 7 / 6, Flash 3) and `score_target` (#160's winning scores x1 / x1.5 / x2), each with `finish_round` on and off. Games whose trigger never fires end after twice the shipped rounds, and the table reports their share.
+Sweep `v3end`, `score_aware`, 500 games per row, seed 163001, around `v3_best_base` (cortes `each_once`, bodega building 12 with 2 reds + 1 white, optional floodgate faces with bribe 2 Normal / 1 Flash): `uv run python scripts/tune.py --sweep v3end`. Raw output `output/tuning-163/v3end.md`, summary `output/tuning-163/v3end.summary.md`. Rows: the base; seats rotated and shuffled per game; an unlimited bag; `bag_empty`, `vineyards_out` (markers 6 / 9 / 7 / 6 for 2-5p, Flash 3) and `score_target` (#160's winning scores x1 / x1.5 / x2), each with the finish-the-round rule on and off. Games whose trigger never fires end after twice the shipped rounds ("cap ended"). 95% margin: +-0.09 / 0.12 / 0.15 / 0.18 at 2p / 3p / 4p / 5p.
 
-Status: the full run is for an overnight run on request; the numbers and the verdict (which option removes the seat bias, which end condition keeps the length near today's) go here then. A 10-game smoke run (Flash 2p) only checks the runner, but it already shows three things that do not depend on the sample:
+Normal, advantage (finish round / ends at once), turns (finish round):
 
-- The river strip has no segment owned by a seat, and the bots are the same in every seat, so rotating or shuffling the seats plays the same games by position (identical rows by position, different by seat). The bias follows the turn position, not the seat; the seat rows are a control.
-- The bag rarely runs out: a 4p Normal game of the base left 41 of 64 pieces in the bag after 12 rounds, so `bag_empty` mostly ends by the cap and the unlimited bag is expected to change little.
-- Flash with 3 vineyard markers never builds a bodega (2 reds + 2 whites need 4 vineyards), so `vineyards_out` needs more Flash markers if the building stays.
+| Candidate | 2p | 3p | 4p | 5p | Turns 2p / 3p / 4p / 5p |
+| --- | --- | --- | --- | --- | --- |
+| base (also seats rotated, shuffled, unlimited bag) | 0.004 | 0.193 | **0.468** | **0.660** | 20 / 45 / 48 / 50 |
+| bag_empty | 0.012 | **0.263** | **0.375** | **0.580** | 40 / 90 / 96 / 100 |
+| vineyards_out | 0.022 / 0.050 | 0.038 / 0.014 | 0.076 / 0.064 | **0.155** / **0.180** | 24 / 47 / 50 / 54 |
+| score_target x1 | 0.018 / 0.024 | 0.089 / 0.074 | **0.120** / **0.104** | **0.135** / 0.070 | 22 / 48 / 49 / 50 |
+| score_target x1.5 | 0.020 / 0.038 | **0.286** / **0.280** | 0.044 / 0.092 | **0.180** / **0.290** | 30 / 75 / 74 / 73 |
+| score_target x2 | 0.012 / 0.004 | **0.304** / **0.281** | **0.317** / **0.245** | **0.315** / **0.285** | 35 / 88 / 92 / 94 |
+
+Bold marks a miss of the 0.10 target (a miss inside the margin is not separable from 0.10). Length targets: 45-60 turns in Normal (2p about 20, accepted), 10-20 in Flash.
+
+Flash (2p / 3p), advantage and turns, finish round:
+
+| Candidate | Advantage 2p / 3p | Turns | Bodega rate |
+| --- | --- | --- | --- |
+| base | 0.012 / **0.268** | 12 / 18 | 0.27 / 0.28 |
+| bag_empty | 0.010 / **0.256** | 24 / 36 (both fail) | 0.68 / 0.75 |
+| vineyards_out | 0.030 / 0.082 | 10.9 / 15.2 | 0.04 / 0.03 |
+| score_target x1 (14) | 0.008 / 0.060 | 11.7 / 15.9 | 0.26 / 0.21 |
+| score_target x1.5 (21) | 0.020 / 0.032 | 15.4 / 21.4 (3p fails) | 0.49 / 0.42 |
+| score_target x2 (28) | 0.028 / 0.100 | 18.6 / 26.4 (3p fails) | 0.61 / 0.61 |
+
+Ends at once, Flash 3p: vineyards_out 0.196 (within margin), x1 0.091, x1.5 0.014, x2 0.145 (within margin).
+
+### Findings
+
+- Seat rotation and shuffling change nothing: the four base-like rows (base, rotated, shuffled, unlimited bag) have the same advantage, turns and scores in every cell, and differ only in the best / worst seat split (noise). The bias follows the turn position, not the seat. The unlimited bag also changes nothing, so the bag never limits a game
+- `bag_empty` is not an end condition: it ends 100% of games at the cap, doubling the length (96 turns at 4p, 100 at 5p) and not fixing the bias (0.58 at 5p, 0.26 at 3p, worse than base)
+- `vineyards_out` is the strongest fix in Normal: 4p drops from 0.468 to 0.076 (finish round) / 0.064 (ends at once), 3p from 0.193 to 0.038 / 0.014, both under 0.10. The drop at 4p (0.39) is well beyond the margin (+-0.15). Lengths stay in target (47 / 50 / 54 turns at 3p / 4p / 5p), with at most 0.4% of games hitting the cap at 3-5p (7% at 2p). Winning scores fall a little (4p 36.4 to 33.6, 5p 33.0 to 30.1) and the bodega rate drops 0.02-0.05 (5p 0.746 to 0.710) but the building stays reachable
+- 5p is not solved: `vineyards_out` gives 0.155 (finish round) / 0.180 (ends at once) from 0.660. The drop is real, but the margin (+-0.175) covers 0.10, so 5p is neither confirmed under the target nor confirmed above it. The two options are within noise of each other
+- `score_target` x1 (the #160 winning scores) is within noise of `vineyards_out` at 3-5p (3p 0.089 / 0.074, 4p 0.120 / 0.104, 5p 0.135 / 0.070) and its lengths are in target (48 / 49 / 50 turns), but its 4p point estimate sits just above 0.10 in both variants. It makes winning scores higher (4p 42.9 / 48.3) and is less consistent across counts
+- `score_target` x1.5 and x2 are not usable: 3p stays at 0.28-0.30, lengths reach 73-94 turns, and x1.5 swings between counts (4p 0.044 but 3p 0.286), which looks like noise, not a trend
+- Finish round on or off: within noise in every Normal cell. Finishing the round gives every player the same number of turns, so it is the safer default for a seat-bias fix; no candidate depends on it
+- 2p: every candidate passes (<= 0.05). `vineyards_out` lengthens 2p from 20 to 24 turns, still short of the 45-60 band as before (accepted gap)
+- Flash: `vineyards_out` with 3 markers ends games at 10-11 turns and the bodega rate falls to 0.03-0.04 (base 0.27), so the building disappears; it needs more markers if used (not swept). `score_target` x1 (14) passes at 2p / 3p (0.008 / 0.060) with 11.7 / 15.9 turns and a bodega rate within 0.07 of the base. x1.5 and x2 push 3p past the 20-turn target. At 3p, `bag_empty` leaves the bias at 0.26
+- Flash 3p base bias (0.268) is fixed by `score_target` x1 and x1.5 and by `vineyards_out` with finish round; ends-at-once `vineyards_out` (0.196) is within noise of both
+
+Decision: end condition per mode and count, proposed to the owner (no preset is changed here): Normal 2-4p `vineyards_out` with finish round (default markers 6 / 9 / 7); Normal 5p `vineyards_out` (marker 6) with finish round, as best known but unconfirmed (0.155 +- 0.175); Flash 2-3p `score_target` x1 (14 points), finish round. Not recommended: `bag_empty`, `score_target` x1.5 / x2, Flash `vineyards_out` at 3 markers. Open: 5p, and whether Flash `vineyards_out` with more markers beats `score_target`.
+
+## Rules v3 shared supply, respins and combined end (#181)
+
+Sweep `v3end2`, `score_aware`, 500 games per row (the issue said 300), seed 181001, raw output `output/tuning-181/v3end2.md`, summary `output/tuning-181/v3end2.summary.md`: `uv run python scripts/tune.py --sweep v3end2`. Base: `v3_best_base` with the combined end (supply empty, score target, dead turns, cap as a net). Each mode and player count: 3 supply levels x 3 score targets x `max_spins` 2 / 3, plus the control (the `v3end` base, round count end). Supply `m` (pieces = 14 x m): Normal 2p 1 / 2 / 3, Normal 3-5p 2 / 3 / 4, Flash 1 / 2 / 3. Targets: Normal 2p 40 / 50 / 60, 3p 55 / 65 / 75, 4p 45 / 55 / 65, 5p 40 / 50 / 60, Flash 24 / 30 / 36. Turn targets (total turns, owner's table): Flash 2p 16-24, 3p 24-30; Normal 2p 24-36, 3p 30-40, 4p 36-48, 5p 40-50. Minutes assume 35 s per turn.
+
+95% margin of the seat advantage at 500 games: 2p +-0.088, 3p +-0.124, 4p +-0.152, 5p +-0.175. Only the 2p rows (and Flash 2p) can be told apart from 0.10 at all.
+
+Normal, recommended row per count (supply m / target / spins):
+
+| Count | Row | Advantage | Winning score | Turns (target) | Turns / P | Minutes | Bodega rate | Ended by supply / target / dead / cap | Lost turns |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 2p | m 2 / 40 / 3 | 0.006 | 40.2 | 27.1 (24-36) pass | 13.5 | 16 | 0.745 | 0.00 / 0.87 / 0.00 / 0.13 | 0.10 |
+| 2p, supply as a real end | m 1 / 50 / 3 | 0.018 | 38.1 | 28.9 (24-36) pass | 14.4 | 17 | 0.731 | 0.43 / 0.37 / 0.12 / 0.09 | 2.97 |
+| 3p | m 2 / 55 / 3 | 0.044 | 48.8 | 47.7 (30-40) FAIL | 15.9 | 28 | 0.794 | 0.30 / 0.68 / 0.02 / 0.00 | 3.00 |
+| 4p | m 3 / 45 / 3 | 0.068 | 46.0 | 49.7 (36-48) FAIL by 1.7 | 12.4 | 29 | 0.802 | 0.02 / 0.98 / 0.00 / 0.00 | 0.47 |
+| 4p, strict turn pass | m 2 / 45 / 3 | 0.128 (margin +-0.152) | 42.8 | 47.9 (36-48) pass | 12.0 | 28 | 0.787 | 0.18 / 0.81 / 0.01 / 0.00 | 2.21 |
+| 5p | m 2 / 40 / 3 | 0.060 | 38.6 | 51.0 (40-50) FAIL by 1.0 | 10.2 | 30 | 0.723 | 0.16 / 0.83 / 0.00 / 0.00 | 2.52 |
+
+Flash:
+
+| Count | Row | Advantage | Winning score | Turns (target) | Turns / P | Minutes | Bodega rate | Ended by supply / target / dead / cap | Lost turns |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 2p | m 2 / 30 / 3 | 0.032 | 29.9 | 19.4 (16-24) pass | 9.7 | 11 | 0.631 | 0.00 / 0.78 / 0.00 / 0.22 | 0.01 |
+| 3p | m 2 / 30 / 3 | 0.067 | 30.7 | 26.9 (24-30) pass | 9.0 | 16 | 0.633 | 0.00 / 0.92 / 0.00 / 0.08 | 0.07 |
+
+Control (round count end), for comparison: advantage 0.034 / 0.199 / 0.424 / 0.405 at Normal 2p / 3p / 4p / 5p; Flash 2p / 3p winning score 16.0 / 17.2, bodega rate 0.27 / 0.30, turns 12 / 18 (both FAIL the Flash turn target).
+
+Turn target by count (rows that pass):
+
+- Normal 2p: all 18 rows pass (25.9 to 35.9 turns, 15 to 21 min)
+- Normal 3p: none (lowest 47.7 turns, 28 min; target 40)
+- Normal 4p: one, supply lo / target lo / spins 3 (47.9). The next four are 49.7 to 50.4
+- Normal 5p: none (lowest 51.0, then 51.2, 52.1; target 50)
+- Flash 2p: all 18 rows pass (16.5 to 21.2 turns, 10 to 12 min)
+- Flash 3p: 8 of 18 pass. Fails: every target-24 row except lo supply spins 2 (23.0 to 23.6 turns, below 24; they also give 7.7 to 7.9 turns per player, under the floor of 8), and the target-36 rows at supply mid / hi and lo supply spins 2 (30.4 to 31.0, above 30)
+
+Findings:
+
+- The combined end works against the control. Seat advantage at 4p / 5p falls from 0.42 / 0.41 (round count end) to a mean over the 18 rows of 0.09 / 0.12, and 3p from 0.20 to 0.08. The 3p-5p rows are inside their margins, so single rows cannot be ranked; the means over 6 rows are the usable figure
+- 5p: a tighter supply goes with less seat advantage. Mean over 6 rows by supply m 2 / 3 / 4: 0.079 / 0.117 / 0.172 (hi supply rows reach 0.24 to 0.26). The gap lo to hi is 0.09 against a margin of about 0.10 for that difference, so it is suggestive and not settled. Score target and spins show no clean pattern (5p mean by target 40 / 50 / 60: 0.091 / 0.136 / 0.142). At 2p-4p the supply and spins means are all within noise of each other
+- Flash: the target is what ends the game (45% to 97% of games), the cap takes the rest (3% to 43%), the supply only matters at m = 1 in 3p (4% to 34%), the dead-turn end is near 0. Winning scores follow the target (25 / 30 / 33 at 24 / 30 / 36), all well above 14. The bodega stays reachable everywhere: bodega rate 0.48 to 0.71, against 0.27 / 0.30 in the control. Targets 36 push 3p past 30 turns and add cap endings (20% to 43%), and target 24 gives 7.7 to 8.5 turns per player, so 30 is the middle that fits both
+- Normal 2p: supply m >= 2 never ends the game (0.00); the target (50% to 87%) and the cap (13% to 50%) do. The cap share grows with the target (13% / 27% / 50% at 40 / 50 / 60 and m = 3), so 40 ends most games by the target. Only m = 1 makes the supply an ending (18% to 61% by target), at the price of 2 to 5.5 lost turns per game and 5% to 23% dead-turn endings
+- 3p-5p Normal: the target ends 68% to 100% of games at the low targets; the supply ends 16% to 30% at the lowest supply (m = 2) and 0% to 5% above. Dead-turn endings reach 10% or more only at 3p with the lowest supply (up to 15%), and so mark a too-tight setup. Cap endings appear at the highest targets (3p 20% to 27%, 4p up to 12%, 5p up to 10%)
+- Normal 3p / 4p / 5p turn counts are about 20% / 4% / 2% above the target even at the lowest targets tried, because the lowest target was too high, so the grid never reached the target range. Turns fall about 0.6 to 0.8 per point of target (3p, supply m = 2: 55 -> 65 -> 75 gives 50.4 -> 58.2 -> 62.6 turns, spins 2), so about 40 to 45 is the range for 3p
+- Spins: 2 and 3 are within noise on advantage everywhere. With a tight supply spins 3 cuts the lost turns by about 35% to 45% (3p lo / lo 5.01 -> 3.00; 5p lo / lo 4.38 -> 2.52) and the length by 2 to 5 turns (5p lo / lo 53.8 -> 51.0), which helps the turn target. With supply m >= mid (Normal) or m >= 2 (Flash) they are the same game (lost turns below 0.6 per game at spins 2). Spins 3 stays
+- Turns per player (floor 8 to 10): Normal 10.0 to 24.3 everywhere; Flash 7.7 to 10.6, with the floor missed only in the 3p target-24 rows
+- Real time at 35 s: Normal 2p 15 to 21 min, 3p 28 to 42 (the owner's early note was about 20), 4p 28 to 43, 5p 30 to 45 (the owner's cap was 30); the lowest rows are the only ones near it. Flash 2p 10 to 12, 3p 13 to 18
+
+Noise and sample size:
+
+- A 500-game row at 3p / 4p / 5p cannot show a seat advantage of 0.10 from one of 0.17; every "FAIL (within margin)" in the tables is undecided, and so are most passes. The 2000-game confirmation (below) has a margin of about +-0.088 at 5p, still too wide to prove "under 0.10" unless the estimate comes out near 0.01. About 9,600 games per row would give +-0.04 at 5p; about 7,200 per row would give +-0.04 at 4p
+- Differences of 0.1 to 0.2 between rows at 5p, and of 0.1 between 3p rows, are noise
+- 2p (Normal and Flash) is settled with 500 games: every row is at 0.002 to 0.100 with a margin of 0.088
+
+5p confirmation (`v3end2c`, 2000 games per row, seed 181002, margin +-0.088, `output/tuning-181/v3end2c.summary.md`):
+
+| Row (supply m / target / spins) | Advantage | Winning score | Turns | Minutes | Supply / target / dead / cap | Lost turns |
+| --- | --- | --- | --- | --- | --- | --- |
+| m 2 / 40 / 3 | 0.095 (passes) | 38.06 | 50.7 (FAIL by 0.7) | 30 | 0.16 / 0.84 / 0.00 / 0.00 | 2.26 |
+| m 3 / 40 / 3 | 0.115 (within margin) | 40.44 | 51.6 (FAIL) | 30 | 0.00 / 1.00 / 0.00 / 0.00 | 0.26 |
+| m 2 / 50 / 3 | 0.074 (passes) | 40.85 | 59.2 (FAIL by 9) | 35 | 0.51 / 0.48 / 0.00 / 0.00 | 4.43 |
+
+- The three rows are within noise of each other on advantage (0.074 to 0.115). The 500-game reading of m 2 / 40 (0.060) and the 2000-game one (0.095) agree inside the margin. No row meets both targets at 5p, so lower targets go to a second sweep (`v3end3`)
+
+Decision: Flash 2p and 3p (m 2, 30, 3) and Normal 2p (m 2, 40, 3) pass in `v3end2`. Normal 3p-5p have no row that meets both the turn target and the seat advantage; the grid's lowest targets were still too high. Next: `v3end3` with lower targets and, at 3p-5p, supply m 1. The shipped presets are unchanged.
+
+## Rules v3 lower targets, Normal 3-5p (#181, sweep `v3end3`)
+
+1000 games per row, seed 181003, `score_aware`, spins 3, raw output `output/tuning-181/v3end3-{3p,4p,5p}.md`, summaries `v3end3-*.summary.md`: `uv run python scripts/tune.py --sweep v3end3`. Supply m 1 (14 pieces) and m 2 x target lo / mid / hi (3p 40 / 45 / 50, 4p 35 / 40 / 45, 5p 30 / 35 / 40), plus the control (round count end). Margin: 3p +-0.088, 4p +-0.107, 5p +-0.124. Turn targets: 3p 30-40, 4p 36-48, 5p 40-50.
+
+| Count | Row (supply / target) | Advantage | Winning score | Turns | Bodega rate | Supply / target / dead / cap | Lost turns |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 3p | m 1 / 40 | 0.036 | 29.58 | 32.8 pass | 0.665 | 0.65 / 0.33 / 0.02 / 0.00 | 3.76 |
+| 3p | m 2 / 45 | 0.036 | 44.64 | 39.3 pass | 0.780 | 0.08 / 0.91 / 0.01 / 0.00 | 1.11 |
+| 3p | m 2 / 50 | 0.031 | 47.43 | 42.9 FAIL | 0.799 | 0.14 / 0.84 / 0.01 / 0.00 | 1.73 |
+| 4p | m 1 / 45 | 0.089 | 24.80 | 36.5 pass | 0.529 | 0.95 / 0.04 / 0.00 / 0.00 | 4.63 |
+| 4p | m 2 / 35 | 0.041 | 36.45 | 39.1 pass | 0.704 | 0.03 / 0.97 / 0.00 / 0.00 | 0.68 |
+| 4p | m 2 / 40 | 0.092 | 40.60 | 43.2 pass | 0.764 | 0.06 / 0.94 / 0.00 / 0.00 | 1.17 |
+| 4p | m 2 / 45 | 0.082 | 44.02 | 47.0 pass | 0.793 | 0.13 / 0.87 / 0.00 / 0.00 | 1.87 |
+| 5p | m 2 / 30 | 0.155 (within margin) | 30.47 | 40.0 pass | 0.546 | 0.02 / 0.98 / 0.00 / 0.00 | 0.55 |
+| 5p | m 2 / 35 | 0.053 | 34.80 | 45.5 pass | 0.649 | 0.07 / 0.93 / 0.00 / 0.00 | 1.25 |
+| 5p | m 2 / 40 | 0.065 | 37.99 | 51.1 FAIL | 0.725 | 0.17 / 0.82 / 0.00 / 0.00 | 2.32 |
+
+Control (round count end): advantage 0.244 / 0.472 / 0.530 at 3p / 4p / 5p (all FAIL), turns 45.0 / 48.0 / 50.0.
+
+- Every row at 3p is 0.009 to 0.045 and at 4p 0.041 to 0.093, under 0.10 and inside the margin. 5p ranges 0.053 to 0.155; the rows above 0.10 (0.105 to 0.155) are within margin and cannot be told from 0.10
+- The turn target is now reachable: 3p 32.8 to 42.9 turns (m 2 / 50 fails by 2.9), 4p 35.0 to 47.0 (m 1 with targets 35 / 40 fail low at 35.0 / 35.9), 5p 36.1 to 51.1 (m 1 rows 36.1 to 37.5 fail low, m 2 / 40 fails by 1.1)
+- Supply m 1 ends the game by supply (65% to 96%) and costs 3.8 to 4.8 lost turns per game. Winning scores fall to about 29.5 (3p), 25 (4p) and 20 (5p), and the bodega rate to 0.33 to 0.34 at 5p and about 0.5 at 4p. Supply m 2 keeps the target as the main end (82% to 98%) with 0.55 to 2.3 lost turns
+- 5p m 2 / 35 (45.5 turns, 27 min) is the only 5p row under 0.10 with a mid-band length and a normal score (34.80); it is within margin of the others, so the pick rests on length and score, not on advantage
+
+Decision: the 3p-5p turn targets are reachable with lower targets and m 1 or m 2. A finer supply step (fractional multiplier) is swept next (`v3end4`). The shipped presets are unchanged.
+
+Owner decisions (#181):
+
+- 2026-11-26: a lost turn (nothing planted) stands as it is; a bodega is always built on a new spot
+- 2026-11-27: 2p and Flash end mainly by the score target; dead turns stay as an end (kept)
+
+## Rules v3 fractional supply and the final end table (#188)
+
+Sweep `v3end4`, `score_aware`, 500 games per row, seed 181004, spins 3, raw output `output/tuning-181/v3end4-*.md`, summaries `v3end4-*.summary.md`: `uv run python scripts/tune.py --sweep v3end4`. Adds the fractional vineyard supply multiplier: m 1 (14 pieces), m 1.25 (20 pieces), m 1.5 (22 pieces), each with 3 targets: Normal 2p 40 / 45 / 50, 3p 45 / 50 / 55, 4p 45 / 50 / 55, 5p 35 / 40 / 45, Flash (2p and 3p) 30 / 35 / 40; plus the control (round count end). Margin: 2p +-0.088, 3p +-0.124, 4p +-0.152, 5p +-0.175. Turn targets: Flash 2p 16-24, 3p 24-30; Normal 2p 24-36, 3p 30-40, 4p 36-48, 5p 40-50.
+
+The six rows of the final table in the sweep (500 games):
+
+| Count | Row (supply / target) | Advantage | Winning score | Turns | Minutes | Bodega rate | Supply / target / dead / cap | Lost turns |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Flash 2p | m 1 / 30 | 0.054 | 30.44 | 18.9 pass | 11 | 0.648 | 0.01 / 0.83 / 0.00 / 0.16 | 0.40 |
+| Flash 3p | m 1 / 35 | 0.044 | 30.62 | 28.9 pass | 17 | 0.634 | 0.33 / 0.54 / 0.01 / 0.12 | 2.37 |
+| Normal 2p | m 1 / 50 | 0.018 | 39.74 | 28.5 pass | 17 | 0.745 | 0.45 / 0.41 / 0.08 / 0.06 | 2.85 |
+| Normal 3p | m 1 / 50 | 0.077 | 29.54 | 34.5 pass | 20 | 0.673 | 0.90 / 0.08 / 0.02 / 0.00 | 4.29 |
+| Normal 4p | m 1.25 / 55 | 0.140 (within margin) | 34.12 | 46.9 pass | 27 | 0.752 | 0.92 / 0.07 / 0.00 / 0.00 | 4.62 |
+| Normal 5p | m 1.25 / 40 | 0.095 | 29.70 | 47.4 pass | 28 | 0.618 | 0.76 / 0.24 / 0.00 / 0.00 | 4.54 |
+
+Control (round count end): advantage 0.002 / 0.254 / 0.444 / 0.575 at Normal 2p / 3p / 4p / 5p and 0.044 / 0.164 at Flash 2p / 3p; turns 20 / 45 / 48 / 50 and Flash 12 / 18 (both Flash fail).
+
+Confirmation (`v3end4c-*`, 1000 games per row and seating, seed 20002, seatings `score_aware` / `lookahead` / `greedy`). Its Turns column is the round cap (rounds x players), not played turns, so its Length verdict says nothing about length (Normal 2p shows FAIL for that reason); played turns are the `v3end4` ones above. Advantage:
+
+| Count | Row | score_aware | lookahead | greedy | Margin |
+| --- | --- | --- | --- | --- | --- |
+| Flash 2p | m 1 / 30 | 0.026 | 0.009 | 0.011 | +-0.062 |
+| Flash 3p | m 1 / 35 | 0.086 | 0.020 | 0.099 | +-0.088 |
+| Normal 2p | m 1 / 50 | 0.005 | 0.069 | 0.019 | +-0.062 |
+| Normal 3p | m 1 / 50 | 0.029 | 0.022 | 0.047 | +-0.088 |
+| Normal 4p | m 1.25 / 55 | 0.060 | 0.020 | 0.063 | +-0.107 |
+| Normal 4p | m 1 / 55 (not chosen) | 0.134 | 0.134 | 0.034 | +-0.107 |
+| Normal 5p | m 1.25 / 40 | 0.068 | 0.037 | 0.059 | +-0.124 |
+| Normal 5p | m 1.25 / 45 (not chosen) | 0.057 | 0.105 | 0.059 | +-0.124 |
+
+Findings:
+
+- All 18 confirmation cells of the six final rows are at or under 0.10 (the closest is Flash 3p `greedy`, 0.099, inside its margin). `score_aware` winning scores in the confirmation: 30.24 / 30.39 / 38.68 / 30.22 / 34.30 / 29.84 (Flash 2p, Flash 3p, Normal 2p-5p)
+- Supply m 1 does not hold at 4p-5p: 4p m 1 / 55 is 0.044 to 0.060 at 500 games but 0.134 in two seatings of the confirmation (within margin); 5p m 1 stays at 0.190 to 0.230 (within margin) with winning scores near 20 and a bodega rate of 0.36. m 1.25 (20 pieces) fixes both: 5p 0.040 to 0.105, 4p 0.060 in the confirmation, bodega rate 0.58 to 0.75
+- Normal 3p: m 1 rows are 0.076 to 0.083 and in the length band (33.7 to 34.9 turns); m 1.25 mid / hi and m 1.5 mid / hi run over 40 turns (40.3 to 44.7). 4p m 1.5 mid / hi run over 48 (49.1 / 51.0)
+- Normal 2p: every row is 0.000 to 0.050 and 25.2 to 31.1 turns; m 1 / 50 (28.5 turns, 17 min) keeps the supply as an end in 45% of games, with 8% dead-turn endings
+- Flash 2p: all nine rows pass advantage (0.004 to 0.054) and length (18.9 to 22.0 turns). Flash 3p: m 1 / 35 gives 0.044 and 28.9 turns; m 1.5 / 35 and 40 give 0.157 / 0.178 (within margin) and the target-40 rows run past 30 turns (30.7 to 32.0)
+- Differences between most rows at 4p and 5p are inside the margins (+-0.152 / +-0.175); the final rows rest on length and the 1000-game confirmation, not on the 500-game ranking
+- Real time at 35 s: Flash 11 / 17 min, Normal 2p 17, 3p 20, 4p 27, 5p 28 min
+
+Decision (owner, 2026-11-28): approved final table: Flash 2p m 1 / 30, 3p m 1 / 35; Normal 2p m 1 / 50, 3p m 1 / 50, 4p m 1.25 (20 pieces) / 55, 5p m 1.25 / 40; 3 spins. Adopted as opt-in v3 presets in #182. The shipped presets are unchanged until #182 lands.
