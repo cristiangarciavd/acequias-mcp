@@ -1104,6 +1104,72 @@ FLASH = Preset(
 
 _PRESETS: Mapping[Mode, Preset] = MappingProxyType({Mode.NORMAL: NORMAL, Mode.FLASH: FLASH})
 
+V3_BAG_PER_PLAYER = 16
+"""Rules v3 bag: pieces per player (#160)."""
+V3_BRIBE: Mapping[Mode, int] = MappingProxyType({Mode.NORMAL: 2, Mode.FLASH: 1})
+"""Rules v3 bribe (``action_die_cost``, optional floodgate faces; #168)."""
+V3_MAX_SPINS = 3
+"""Rules v3 spins per plant or resow (#181, #188)."""
+V3_END_CONDITIONS: tuple[EndCondition, ...] = (
+    EndCondition.SUPPLY_EMPTY,
+    EndCondition.SCORE_TARGET,
+    EndCondition.DEAD_TURNS,
+)
+"""Rules v3 end: the shared supply runs out, a player reaches the score target, or every player
+has a dead turn twice in a row; the round cap is the safety net (#181)."""
+V3_SUPPLY: Mapping[Mode, Mapping[int, int | float]] = MappingProxyType({
+    Mode.NORMAL: MappingProxyType({2: 1, 3: 1, 4: 1.25, 5: 1.25}),
+    Mode.FLASH: MappingProxyType({2: 1, 3: 1}),
+})
+"""Rules v3 shared supply multipliers per player count: m1 is 14 pieces, m1.25 is 20 (#188,
+approved by the owner on #182)."""
+V3_SCORE_TARGET: Mapping[Mode, Mapping[int, int]] = MappingProxyType({
+    Mode.NORMAL: MappingProxyType({2: 50, 3: 50, 4: 55, 5: 40}),
+    Mode.FLASH: MappingProxyType({2: 30, 3: 35}),
+})
+"""Rules v3 score targets per player count (#188, approved by the owner on #182)."""
+
+
+def _v3(p: Preset) -> Preset:
+    """``p`` (a Rules v2 preset) under the tuned Rules v3 rules."""
+    return dataclasses.replace(
+        p,
+        planting=PlantingRules.VERTICES,
+        vertex_needs_three_canals=False,
+        board_shape=BoardShape.RIVER_STRIP,
+        river_hexes_per_segment=RIVER_HEXES_PER_SEGMENT,
+        bag_size={n: V3_BAG_PER_PLAYER * n for n in p.player_counts},
+        varietal_points=V3_POINTS,
+        action_die=V3_DIE_FACES,
+        varietal_bodega=False,
+        blends=DEFAULT_BLENDS,
+        blend_rule=BlendRule.EACH_ONCE,
+        bodega_building=True,
+        bodega_placement=BodegaPlacement.NEW_SPOT,
+        bodega_building_points=12,
+        bodega_min_reds=2,
+        bodega_min_whites=1,
+        bribe_optional=True,
+        action_die_cost=V3_BRIBE[p.mode],
+        end_conditions=V3_END_CONDITIONS,
+        finish_round=True,
+        vineyard_supply=V3_SUPPLY[p.mode],
+        score_target=V3_SCORE_TARGET[p.mode],
+        max_spins=V3_MAX_SPINS,
+    )
+
+
+# Rules v3 (#182): opt-in, not shipped; ``preset`` still returns Rules v2. The
+# tuned setup of ``scripts/tune.py`` (``v3_best_base`` with sweep ``v3end4``'s
+# combined end, approved by the owner on #182); ``tests/test_config_v3.py``
+# proves both agree.
+NORMAL_V3 = _v3(NORMAL)
+FLASH_V3 = _v3(FLASH)
+
+RULES_V3: Mapping[Mode, Preset] = MappingProxyType({Mode.NORMAL: NORMAL_V3, Mode.FLASH: FLASH_V3})
+"""The Rules v3 presets (opt-in): river strip, vertex planting, split scoring, blends and the
+bodega building, the optional bribe, and the combined end (#182)."""
+
 _V1_BAG = {
     PieceKind.STRAIGHT: 40,
     PieceKind.GENTLE_CURVE: 20,
