@@ -14,7 +14,7 @@ from typing import Annotated
 from pydantic import BaseModel, ConfigDict, Field
 
 from acequias.config import preset as shipped_preset
-from acequias.config import with_overrides
+from acequias.config import PlantingRules, with_overrides
 from acequias.model import MAX_PLAYERS, MIN_PLAYERS, Board, GameState
 from acequias.scoring import calculate_score as score_state
 from acequias.scoring import winners as winners_of
@@ -100,8 +100,10 @@ def calculate_score(
         list[ClaimJSON],
         Field(
             description=(
-                "Vineyard claims, at most one per vineyard; any order. Under roulette rules "
-                "each gives the varietal planted there."
+                "Rules v2 hex vineyard claims, at most one per vineyard; any order. Under "
+                "roulette rules each gives the varietal planted there. The shipped Rules v3 "
+                'presets plant on vertices (give planted), so claims need Rules v2 overrides '
+                '(planting "hexes", board_shape "field", and the other Rules v2 values).'
             )
         ),
     ] = [],
@@ -109,8 +111,8 @@ def calculate_score(
         list[PlantedVineyardJSON],
         Field(
             description=(
-                'Rules v3 (overrides planting "vertices"): the vineyards planted on hex '
-                "vertices, at most one per vertex; any order."
+                "The vineyards planted on hex vertices (Rules v3, the shipped game), at most "
+                "one per vertex; any order."
             )
         ),
     ] = [],
@@ -118,8 +120,9 @@ def calculate_score(
         list[BodegaBuildingJSON],
         Field(
             description=(
-                "Rules v3 bodega buildings (overrides bodega_building, #166): the bodegas "
-                "built on hex vertices, at most one per vertex and none on a planted one; any order."
+                "Rules v3 bodega buildings (bodega_building, on in the shipped presets, #166): the "
+                "bodegas built on hex vertices, at most one per vertex and none on a planted one; "
+                "any order."
             )
         ),
     ] = [],
@@ -127,8 +130,8 @@ def calculate_score(
         RiverStripJSON | None,
         Field(
             description=(
-                'Rules v3 open board (overrides board_shape "river_strip"): the river strip, '
-                "as generate_board returns it; then hexes must be empty."
+                'The river strip of a Rules v3 open board (board_shape "river_strip", the shipped '
+                "game), as generate_board returns it; then hexes must be empty."
             )
         ),
     ] = None,
@@ -136,10 +139,10 @@ def calculate_score(
         PresetOverridesJSON,
         Field(
             description=(
-                "Optional preset values to replace (default: none, the mode's shipped "
+                "Optional preset values to replace (default: none, the mode's shipped Rules v3 "
                 "preset), in the shape of simulate_game's preset without mode; e.g. "
-                '{"varietal_rules": "roulette", "varietal_points": {...}} scores a '
-                "roulette board."
+                '{"score_target": {...}} or, with claims, the Rules v2 values '
+                '({"planting": "hexes", "board_shape": "field", ...}).'
             ),
         ),
     ] = {},  # noqa: B006 - never mutated; overrides_from_json copies it
@@ -150,10 +153,11 @@ def calculate_score(
     debt + season + seat_bonus - drought (the action die's good season gains and drought
     losses; drought never takes a total below 0; seat_bonus from the preset's seat_bonus,
     seat 1 being round 1's start player); every term is in points, and each rival on a vineyard's water path
-    gets water_right_points (3 in the shipped presets). Every watered claimed
+    gets water_right_points (Rules v2 hex vineyards only). Every watered claimed
     vineyard is listed with the canal path its water takes and the rivals its
     claimant pays, so the water rights can be checked by hand. The state is scored as given, finished or not.
-    Rules v3 boards give their planted vineyards in planted (and a river strip in strip). A
+    The shipped Rules v3 boards give their planted vineyards in planted (and the river strip in
+    strip); hex claims need Rules v2 overrides. A
     vertex vineyard is scored split: its value is split in thirds among its 3 hexes, and each
     third whose hex holds a canal carrying water scores for that canal's owner, whoever planted
     it (value x thirds / 3, rounded down; no water rights). It is listed for every player with
@@ -184,6 +188,12 @@ def calculate_score(
     preset = with_overrides(shipped_preset(game_mode), **overrides_from_json(overrides))
     game_players = players_from_json(players)
     preset.check_players(len(game_players))
+    if claims and preset.planting is PlantingRules.VERTICES:
+        raise ValueError(
+            "claims are Rules v2 hex vineyards, but the preset plants on vertices (the shipped "
+            "Rules v3 presets do): give planted vineyards in planted, or pass Rules v2 overrides "
+            '(planting "hexes", board_shape "field", and the other Rules v2 values) to score claims'
+        )
     first = game_players[0].id if game_players else ""
     # Scoring reads only the board, the players, the preset, and round 1's start
     # player (for the seat bonus). The fields the input does not carry get fixed

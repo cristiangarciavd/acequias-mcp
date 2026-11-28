@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import importlib.util
 import random
 import sys
@@ -13,11 +14,13 @@ from mcp import Client
 from acequias.bots import greedy_bot, lookahead_bot, score_aware_bot
 from acequias.config import (
     CONSTRUCTIVE_DIE_FACES,
-    NORMAL,
+    NORMAL_V2,
+    RULES_V2,
     V3_DIE_FACES,
     V3_POINTS,
     BoardShape,
     PlantingRules,
+    Preset,
     with_overrides,
 )
 from acequias.flow import can_plant, plantable_spots, vertex_thirds
@@ -45,7 +48,13 @@ from server.schemas import watered_vineyard_to_json
 
 pytestmark = pytest.mark.anyio
 
-V3 = with_overrides(NORMAL, planting=PlantingRules.VERTICES, varietal_points=V3_POINTS)
+V3 = with_overrides(NORMAL_V2, planting=PlantingRules.VERTICES, varietal_points=V3_POINTS)
+
+
+def v2_overrides(mode: Mode) -> dict:
+    """Every Rules v2 value of ``mode`` (``RULES_V2``) as ``SimRules`` overrides (#192)."""
+    return {f.name: getattr(RULES_V2[mode], f.name) for f in dataclasses.fields(Preset) if f.name != "mode"}
+
 THREE = with_overrides(V3, vertex_needs_three_canals=True)
 
 # River on (0, -1) and (0, 0). Canals on L = (1, -1), M = (1, 0), N = (2, 0) and
@@ -112,7 +121,7 @@ def anyio_backend():
 def test_v3_values_are_6_and_rare_9_and_split_in_whole_thirds():
     assert V3_POINTS[Varietal.BONARDA] == V3_POINTS[Varietal.CABERNET_FRANC] == 9
     assert {p for v, p in V3_POINTS.items() if v not in (Varietal.BONARDA, Varietal.CABERNET_FRANC)} == {6}
-    assert set(V3_POINTS) == set(NORMAL.varietal_points)
+    assert set(V3_POINTS) == set(NORMAL_V2.varietal_points)
     assert [split_points(9, k) for k in range(4)] == [0, 3, 6, 9]
     assert [split_points(7, k) for k in range(4)] == [0, 2, 4, 7]  # other values round down
 
@@ -221,7 +230,7 @@ def test_planting_still_needs_an_own_watered_canal():
 
 def test_three_canals_needs_vertex_planting():
     with pytest.raises(ValueError, match="needs vertex planting"):
-        with_overrides(NORMAL, vertex_needs_three_canals=True)
+        with_overrides(NORMAL_V2, vertex_needs_three_canals=True)
 
 
 # --- Move face ----------------------------------------------------------------------
@@ -259,7 +268,7 @@ def test_sim_counts_move_rolls_only_under_v3():
     result = simulate_game(v3, 3, 1)
     assert "move" in result.die_faces_per_game and result.die_faces_per_game["move"] > 0
     assert "move" in result.actions_per_game
-    v2 = simulate_game(SimRules(Mode.FLASH, 2, ("greedy",) * 2), 1, 1)
+    v2 = simulate_game(SimRules(Mode.FLASH, 2, ("greedy",) * 2, v2_overrides(Mode.FLASH)), 1, 1)
     assert "move" not in v2.die_faces_per_game
 
 
@@ -319,15 +328,15 @@ def test_tune_v3split_sweep_covers_the_options():
         assert {o["action_die"] for o in overrides} == {V3_DIE_FACES, CONSTRUCTIVE_DIE_FACES}
         assert {o["bag_size"][2] // 2 for o in overrides} == {16, 20, 24}
         assert {o["river_hexes_per_segment"] for o in overrides} == {5, 6}
-        assert {o.get("bodega_points", NORMAL.bodega_points if mode is Mode.NORMAL else 3)
+        assert {o.get("bodega_points", NORMAL_V2.bodega_points if mode is Mode.NORMAL else 3)
                 for o in overrides} == {3, 6, 9}
-        shipped = tune.shipped_preset(mode).rounds
+        shipped = tune.RULES_V2[mode].rounds
         steps = {o["rounds"][2] - shipped[2] if "rounds" in o else 0 for o in overrides}
         assert steps == {-2, 0, 2}
         assert all(o["varietal_points"] == V3_POINTS for o in overrides)
         for label, changes in sweep.candidates[mode]:
             job = tune.Job(label, mode, 2, "score_aware", {**sweep.base[mode], **changes}, 1, 1)
-            p = with_overrides(tune.shipped_preset(mode), **dict(tune.rules_of(job).overrides))
+            p = with_overrides(tune.default_preset(mode), **dict(tune.rules_of(job).overrides))
             assert p.planting is PlantingRules.VERTICES and tune.is_v3(job.overrides)
 
 

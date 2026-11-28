@@ -107,9 +107,9 @@ def test_defaults_keep_todays_rules_and_options_are_checked():
         with_overrides(V3, end_condition=EndCondition.BAG_EMPTY, end_conditions=(EndCondition.DEAD_TURNS,))
     with pytest.raises(ValueError, match="max_spins"):
         with_overrides(V3, max_spins=0)
-    from acequias.config import NORMAL
+    from acequias.config import NORMAL_V2
     with pytest.raises(ValueError, match="vertex planting"):
-        with_overrides(NORMAL, vineyard_supply={2: 1})
+        with_overrides(NORMAL_V2, vineyard_supply={2: 1})
 
 
 V3END_MAIN = {

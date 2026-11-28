@@ -20,7 +20,7 @@ import json
 import pstats
 import time
 
-from acequias.config import NORMAL, Preset, action_die_rules, roulette_rules, scaled
+from acequias.config import NORMAL_V2, Preset, action_die_rules, roulette_rules, scaled
 from acequias.model import Mode
 from acequias.sim import SimRules, simulate_game
 
@@ -31,12 +31,14 @@ def as_overrides(p: Preset) -> dict[str, object]:
     return {f.name: getattr(p, f.name) for f in dataclasses.fields(p) if f.name != "mode"}
 
 
-DIE_PRESET = scaled(action_die_rules(roulette_rules(NORMAL)), 3)
+DIE_PRESET = scaled(action_die_rules(roulette_rules(NORMAL_V2)), 3)
 """The B3 and B4 preset: roulette, the action die, and the score scale x3 (#111)."""
+V2 = as_overrides(NORMAL_V2)
+"""B1 and B2 play the Rules v2 preset, shipped when they were written (#192 made v3 the default)."""
 
 BENCHMARKS = (
-    ("B1", SimRules(Mode.NORMAL, 5, ("greedy",) * 5), 20),
-    ("B2", SimRules(Mode.NORMAL, 5, ("saboteur", "greedy", "saboteur", "greedy", "saboteur")), 10),
+    ("B1", SimRules(Mode.NORMAL, 5, ("greedy",) * 5, V2), 20),
+    ("B2", SimRules(Mode.NORMAL, 5, ("saboteur", "greedy", "saboteur", "greedy", "saboteur"), V2), 10),
     ("B3", SimRules(Mode.NORMAL, 5, ("score_aware",) * 5, as_overrides(DIE_PRESET)), 10),
     (
         "B4",

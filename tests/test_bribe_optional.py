@@ -5,7 +5,7 @@ import random
 import pytest
 
 from acequias.bots import greedy_bot, lookahead_bot, score_aware_bot
-from acequias.config import DEFAULT_BLENDS, NORMAL, V3_DIE_FACES, PlantingRules, with_overrides
+from acequias.config import DEFAULT_BLENDS, NORMAL_V2, V3_DIE_FACES, PlantingRules, with_overrides
 from acequias.game import game_rngs, play_game, replay
 from acequias.model import ActionsLeft, DieFace, Mode
 from acequias.setup import new_game
@@ -43,9 +43,9 @@ MANDATORY = with_overrides(V3, action_die_cost=2)
 
 
 def test_the_option_is_off_by_default_and_needs_vertex_planting():
-    assert not NORMAL.bribe_optional and not V3.bribe_optional
+    assert not NORMAL_V2.bribe_optional and not V3.bribe_optional
     with pytest.raises(ValueError, match="bribe_optional needs vertex planting"):
-        with_overrides(NORMAL, bribe_optional=True)
+        with_overrides(NORMAL_V2, bribe_optional=True)
     with pytest.raises(TypeError, match="bribe_optional"):
         with_overrides(V3, bribe_optional=1)
 
@@ -165,7 +165,7 @@ def test_tune_v3bribe_sweep_covers_off_and_on_by_bribe():
         assert base["blends"] == DEFAULT_BLENDS and base["action_die"] == V3_DIE_FACES
         for label, changes in candidates.items():
             job = tune.Job(label, mode, 2, "score_aware", {**base, **changes}, 1, 1)
-            p = with_overrides(tune.shipped_preset(mode), **dict(tune.rules_of(job).overrides))
+            p = with_overrides(tune.default_preset(mode), **dict(tune.rules_of(job).overrides))
             assert p.planting is PlantingRules.VERTICES and not p.vertex_needs_three_canals
             assert p.bribe_optional is changes["bribe_optional"]
 

@@ -1,6 +1,7 @@
-"""The shipped Rules v2 presets (#126): Flash is for 2 or 3 players only, and
-the library, the MCP tools, and ``scripts/tune.py`` say so with a clear error
-(or skip those counts); a shipped game of each mode plays to the end."""
+"""The Rules v2 presets (#126; ``RULES_V2`` since Rules v3 shipped in #192) and
+the shipped presets: Flash is for 2 or 3 players only, and the library, the MCP
+tools, and ``scripts/tune.py`` say so with a clear error (or skip those counts);
+a Rules v2 game of each mode plays to the end."""
 
 from __future__ import annotations
 
@@ -12,7 +13,7 @@ import pytest
 from mcp import Client
 
 from acequias.board import generate_board
-from acequias.config import FLASH, NORMAL, BribeRules, VarietalRules, preset
+from acequias.config import FLASH_V2, NORMAL_V2, RULES_V2, BribeRules, VarietalRules, preset
 from acequias.model import Mode, Terrain
 from acequias.setup import new_game
 from acequias.sim import SimRules, play_one, simulate_game
@@ -24,6 +25,11 @@ sys.path.insert(0, str(SCRIPTS))
 tune = importlib.import_module("tune")
 
 FLASH_ERROR = "flash mode is for 2 to 3 players, got {}"
+def v2(mode: Mode) -> dict:
+    """Overrides that turn the shipped preset of ``mode`` into Rules v2 (``RULES_V2``)."""
+    return tune.diff_from(preset(mode), RULES_V2[mode])
+
+
 APPROVED = {Mode.NORMAL: "constructive die, cost 1, season roll every 3",
             Mode.FLASH: "constructive die, cost 1, season roll every 2"}
 
@@ -48,15 +54,15 @@ def test_every_supported_count_gets_a_game(mode, players):
 
 
 def test_overrides_can_give_flash_4_players_back():
-    rules = SimRules(Mode.FLASH, 4, ("greedy",) * 4, {"rounds": {2: 6, 3: 6, 4: 4}})
+    rules = SimRules(Mode.FLASH, 4, ("greedy",) * 4, {**v2(Mode.FLASH), "rounds": {2: 6, 3: 6, 4: 4}})
     assert len(play_one(rules, 1).log) >= 16
 
 
 @pytest.mark.parametrize(("mode", "players"), [(Mode.NORMAL, 3), (Mode.FLASH, 2)])
 def test_a_shipped_game_plays_rules_v2_to_the_end(mode, players):
-    p = preset(mode)
+    p = RULES_V2[mode]
     assert p.varietal_rules is VarietalRules.ROULETTE and p.bribe_rules is BribeRules.ACTION_DIE
-    record = play_one(SimRules(mode, players, ("score_aware",) * players), 3)
+    record = play_one(SimRules(mode, players, ("score_aware",) * players, v2(mode)), 3)
     start = record.start
     assert all(t.varietal is None for t in start.board.tiles if t.terrain is Terrain.VINEYARD)
     assert "FLOODGATE" not in {k.name for k in start.market + start.bag}
@@ -110,7 +116,9 @@ async def test_simulate_game_rounds_override_sets_the_player_counts():
     async with Client(app) as client:
         result = await client.call_tool(
             "simulate_game",
-            {"players": 5, "mode": "normal", "games": 1, "seed": 1, "overrides": {"rounds": {"2": 5, "3": 5}}}
+            {"players": 5, "mode": "normal", "games": 1, "seed": 1, "overrides": {
+                "rounds": {"2": 5, "3": 5}, "bag_size": {"2": 32, "3": 48},
+                "vineyard_supply": {"2": 1, "3": 1}, "score_target": {"2": 50, "3": 50}}}
         )
     assert result.is_error
     assert "normal mode is for 2 to 3 players, got 5" in text_of(result)
@@ -127,7 +135,7 @@ def test_shipped_presets_are_the_approved_b5_candidate(mode):
     _, approved = tune.find_candidate(sweeps, "b5", APPROVED[mode], [mode])
     candidate = tune.with_overrides(tune.V1_PRESET[mode], **approved[mode])
     expected = {} if mode is Mode.NORMAL else {"rounds": {2: 6, 3: 6}}  # Flash: 2-3 players only
-    assert {k: dict(v) if k == "rounds" else v for k, v in tune.diff_from(candidate, preset(mode)).items()} == expected
+    assert {k: dict(v) if k == "rounds" else v for k, v in tune.diff_from(candidate, RULES_V2[mode]).items()} == expected
 
 
 def test_shipped_sweep_line_and_jobs_skip_flash_4_and_5(capsys):
@@ -140,7 +148,7 @@ def test_shipped_sweep_line_and_jobs_skip_flash_4_and_5(capsys):
     assert "skipped flash 4p score_aware shipped (Rules v2)" in err and "flash is for 2 to 3 players" in err
     for job in jobs:
         p = tune.with_overrides(preset(job.mode), **tune.rules_of(job).overrides)
-        assert p == preset(job.mode)
+        assert p == RULES_V2[job.mode]
 
 
 def test_candidate_with_an_unsupported_player_count_is_an_argument_error(capsys):
@@ -157,5 +165,5 @@ def test_rules_v1_jobs_still_play_flash_with_5_players():
     assert tune.with_overrides(preset(Mode.FLASH), **tune.rules_of(jobs[0]).overrides) == tune.V1_PRESET[Mode.FLASH]
 
 
-def test_flash_and_normal_constants_are_the_shipped_presets():
-    assert preset(Mode.NORMAL) is NORMAL and preset(Mode.FLASH) is FLASH
+def test_rules_v2_constants_are_kept():
+    assert RULES_V2[Mode.NORMAL] is NORMAL_V2 and RULES_V2[Mode.FLASH] is FLASH_V2

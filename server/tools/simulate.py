@@ -103,7 +103,7 @@ class SimResultJSON(BaseModel):
             "Mean number of each action per game; they add up to turns_per_game. Under "
             'action_die rules "die" counts rolls, "release", "resow" and "decline" the '
             'resolutions, and a die floodgate counts as "floodgate". Under Rules v3 (planting '
-            '"vertices") "plant" counts plantings and "move" the resow face\'s moves.'
+            '"vertices", the shipped game) "plant" counts plantings and "move" the resow face\'s moves.'
         )
     )
     games_with_bribe: float = Field(description="Share of games with at least one bribe.")
@@ -177,8 +177,9 @@ def simulate_game(
         PresetOverridesJSON,
         Field(
             description=(
-                "Optional preset values to replace (default: none), in the shape of the "
-                "result's preset without mode, so a preset from one result can be passed back."
+                "Optional preset values to replace (default: none, the mode's shipped Rules v3 "
+                "preset), in the shape of the result's preset without mode, so a preset from one "
+                "result can be passed back."
             ),
         ),
     ] = {},  # noqa: B006 - never mutated; overrides_from_json copies it
@@ -186,7 +187,8 @@ def simulate_game(
     """Simulate many Acequias games between bots and return balance statistics.
 
     Plays `games` complete games of one mode with the bot policies given
-    (default all "greedy") and the mode's preset with any `overrides`, and
+    (default all "greedy") and the mode's shipped preset (Rules v3: the river
+    strip, vertex planting, the optional bribe, and the combined end) with any `overrides`, and
     returns win rates by turn position, seat, and policy, the turn-order
     advantage, score spreads, action counts, and the inputs used (including
     every preset value and the seed). The same input and seed always give the

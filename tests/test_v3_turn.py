@@ -7,7 +7,7 @@ from dataclasses import replace
 import pytest
 
 from acequias.board import planting_spots
-from acequias.config import NORMAL, V3_DIE_FACES, PlantingRules, BribeRules, with_overrides
+from acequias.config import NORMAL_V2, V3_DIE_FACES, PlantingRules, BribeRules, with_overrides
 from acequias.flow import plantable_spots
 from acequias.game import act, game_rngs, play_game, replay
 from acequias.hex import Direction, Hex
@@ -47,7 +47,7 @@ from acequias.turn import (
     legal_actions,
 )
 
-V3 = with_overrides(NORMAL, planting=PlantingRules.VERTICES)
+V3 = with_overrides(NORMAL_V2, planting=PlantingRules.VERTICES)
 V3_MOVE = with_overrides(V3, action_die=V3_DIE_FACES)
 
 # River on (0, 0); a row of empty hexes east of it. Canals A (p1), B (p2),
@@ -337,7 +337,7 @@ def test_hex_rules_actions_are_illegal_under_v3_and_back():
     for action in (Bribe(C, Direction.E), Resow(A), PlaceFloodgate(A, Direction.E), DeclineFace()):
         with pytest.raises(IllegalAction):
             apply(s, "p1", action, Rigged())
-    v2 = new_game(2, 1, Mode.NORMAL)
+    v2 = new_game(2, 1, Mode.NORMAL, preset=NORMAL_V2)
     for action in (Plant(NORTH_OF_A), ResowVineyard(NORTH_OF_A), MoveVineyard(NORTH_OF_A, A_AND_B)):
         with pytest.raises(IllegalAction, match="vertex planting"):
             apply(v2, v2.current_player, action, Rigged())
@@ -350,15 +350,15 @@ def test_v3_options_are_checked():
     with pytest.raises(ValueError, match="action_die bribe rules"):
         with_overrides(V3, bribe_rules=BribeRules.D6)
     with pytest.raises(ValueError, match="needs vertex planting"):
-        with_overrides(NORMAL, vertex_needs_three_canals=True)
+        with_overrides(NORMAL_V2, vertex_needs_three_canals=True)
     with pytest.raises(ValueError, match="MOVE face needs vertex planting"):
-        with_overrides(NORMAL, action_die=V3_DIE_FACES)
+        with_overrides(NORMAL_V2, action_die=V3_DIE_FACES)
     with pytest.raises(TypeError):
         with_overrides(V3, vertex_needs_three_canals=1)
     with pytest.raises(ValueError, match="unknown preset field"):
         with_overrides(V3, resow_can_move=True)  # replaced by the move face (#160)
-    assert NORMAL.vertex_needs_three_canals is False
-    assert NORMAL.is_season_round(3) and not V3.is_season_round(3)
+    assert NORMAL_V2.vertex_needs_three_canals is False
+    assert NORMAL_V2.is_season_round(3) and not V3.is_season_round(3)
 
 
 def test_actions_left_is_checked():
@@ -366,7 +366,7 @@ def test_actions_left_is_checked():
         ActionsLeft(1, 2)
     with pytest.raises(ValueError):
         ActionsLeft(-1, 0)
-    hex_board = new_game(2, 1, Mode.NORMAL)
+    hex_board = new_game(2, 1, Mode.NORMAL, preset=NORMAL_V2)
     with pytest.raises(ValueError, match="only under vertex planting"):
         replace(hex_board, actions_left=ActionsLeft(1, 1))
     with pytest.raises(ValueError, match="follows a roll"):
@@ -374,7 +374,7 @@ def test_actions_left_is_checked():
 
 
 def test_preset_values_write_vertex_needs_three_canals_only_when_set():
-    assert "vertex_needs_three_canals" not in _preset_values(NORMAL)
+    assert "vertex_needs_three_canals" not in _preset_values(NORMAL_V2)
     assert "vertex_needs_three_canals" not in _preset_values(V3)
     three = with_overrides(V3, vertex_needs_three_canals=True)
     assert _preset_values(three)["vertex_needs_three_canals"] is True

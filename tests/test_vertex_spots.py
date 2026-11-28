@@ -7,9 +7,10 @@ import pytest
 
 from acequias.board import generate_board, planting_spots
 from acequias.config import (
-    FLASH,
-    NORMAL,
+    FLASH_V2,
+    NORMAL_V2,
     RULES_V1,
+    RULES_V2,
     PlantingRules,
     VarietalRules,
     preset,
@@ -43,7 +44,7 @@ from server.schemas import (
     watered_vineyard_to_json,
 )
 
-V3 = with_overrides(NORMAL, planting=PlantingRules.VERTICES)
+V3 = with_overrides(NORMAL_V2, planting=PlantingRules.VERTICES)
 
 # River on (0, 0); a row of empty hexes east of it, and a stone south.
 RIVER = Hex(0, 0)
@@ -141,7 +142,7 @@ def test_hex_vertex_rejects_a_bad_corner():
 
 
 def test_shipped_and_v1_presets_plant_on_hexes():
-    for p in (NORMAL, FLASH, *RULES_V1.values()):
+    for p in (NORMAL_V2, FLASH_V2, *RULES_V1.values()):
         assert p.planting is PlantingRules.HEXES
         assert "planting" not in _preset_values(p)
     assert _preset_values(V3)["planting"] == "vertices"
@@ -152,7 +153,7 @@ def test_vertex_planting_needs_roulette_rules():
         with_overrides(RULES_V1[Mode.NORMAL], planting=PlantingRules.VERTICES)
     assert V3.varietal_rules is VarietalRules.ROULETTE
     assert V3.vineyard_tiles_per_player == 0
-    assert NORMAL.vineyard_tiles_per_player == NORMAL.vineyards_per_player
+    assert NORMAL_V2.vineyard_tiles_per_player == NORMAL_V2.vineyards_per_player
 
 
 @pytest.mark.parametrize("players", [2, 3, 5])
@@ -215,7 +216,7 @@ def test_state_checks_planting_rules():
     with pytest.raises(ValueError, match="unknown player"):
         state(board((vineyard(A_AND_B, "p9"),)))
     with pytest.raises(ValueError, match="no planting spots"):
-        replace(state(board()), preset=NORMAL)
+        replace(state(board()), preset=NORMAL_V2)
     vineyard_tile = Board(tiles=(*TILES, Tile(Hex(5, 0), Terrain.VINEYARD)))
     with pytest.raises(ValueError, match="no vineyard tiles"):
         state(vineyard_tile)
@@ -351,6 +352,6 @@ def test_watered_vertex_vineyard_json():
 
 def test_planting_override_from_json():
     changes = overrides_from_json({"planting": "vertices"})
-    assert with_overrides(preset(Mode.NORMAL), **changes) == V3
+    assert with_overrides(RULES_V2[Mode.NORMAL], **changes) == V3
     with pytest.raises(ValueError):
         overrides_from_json({"planting": "edges"})

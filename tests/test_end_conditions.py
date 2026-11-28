@@ -5,7 +5,7 @@ import dataclasses
 import pytest
 
 import acequias.game as game_module
-from acequias.config import NORMAL, EndCondition, PlantingRules, with_overrides
+from acequias.config import NORMAL_V2, EndCondition, PlantingRules, with_overrides
 from acequias.game import act, end_fired, game_over, game_rngs, turn_order
 from acequias.model import Mode
 from acequias.scoring import calculate_score, winners
@@ -48,25 +48,25 @@ def turns_by_player(record):
 
 
 def test_defaults_are_the_round_count_end():
-    assert NORMAL.end_condition is EndCondition.ROUNDS
-    assert NORMAL.finish_round and not NORMAL.unlimited_bag
-    assert NORMAL.round_cap(4) == NORMAL.rounds_for(4)
-    v3 = with_overrides(NORMAL, planting=PlantingRules.VERTICES)
+    assert NORMAL_V2.end_condition is EndCondition.ROUNDS
+    assert NORMAL_V2.finish_round and not NORMAL_V2.unlimited_bag
+    assert NORMAL_V2.round_cap(4) == NORMAL_V2.rounds_for(4)
+    v3 = with_overrides(NORMAL_V2, planting=PlantingRules.VERTICES)
     for name in ("end_condition", "finish_round", "vineyard_markers", "score_target", "unlimited_bag"):
         assert name not in _preset_values(v3)
 
 
 def test_options_are_checked():
     with pytest.raises(ValueError, match="needs vertex planting"):
-        with_overrides(NORMAL, end_condition=EndCondition.BAG_EMPTY)
+        with_overrides(NORMAL_V2, end_condition=EndCondition.BAG_EMPTY)
     with pytest.raises(TypeError, match="end_condition"):
-        with_overrides(NORMAL, end_condition="bag_empty")
+        with_overrides(NORMAL_V2, end_condition="bag_empty")
     with pytest.raises(TypeError, match="finish_round"):
-        with_overrides(NORMAL, finish_round=1)
+        with_overrides(NORMAL_V2, finish_round=1)
     with pytest.raises(ValueError, match="score_target gives player counts"):
-        with_overrides(NORMAL, score_target={6: 10})
+        with_overrides(NORMAL_V2, score_target={6: 10})
     with pytest.raises(ValueError, match="vineyard_markers"):
-        with_overrides(NORMAL, vineyard_markers={2: 0})
+        with_overrides(NORMAL_V2, vineyard_markers={2: 0})
 
 
 def test_markers_and_targets_default_by_mode_and_cap_is_twice_the_rounds():
