@@ -89,6 +89,7 @@ from pydantic import (
     ConfigDict,
     Field,
     StrictBool,
+    StrictFloat,
     StrictInt,
     model_validator,
     with_config,
@@ -600,13 +601,13 @@ _SEASON_ROLL_DESCRIPTION = (
 
 
 _PLANTING_DESCRIPTION = (
-    'Where vineyards grow: "hexes" (vineyard tiles, the shipped game) or "vertices" '
-    "(Rules v3, opt-in: no vineyard tiles; vineyards are planted on hex vertices next "
+    'Where vineyards grow: "hexes" (vineyard tiles, Rules v1 and v2) or "vertices" '
+    "(Rules v3, the shipped game: no vineyard tiles; vineyards are planted on hex vertices next "
     "to the planter's own watered canal). \"vertices\" needs varietal_rules \"roulette\"."
 )
 _BOARD_SHAPE_DESCRIPTION = (
-    'What the board is: "field" (the generated hex board, the shipped game) or "river_strip" '
-    "(Rules v3, opt-in: only a river strip, a base segment for 2 players plus one per extra "
+    'What the board is: "field" (the generated hex board, Rules v1 and v2) or "river_strip" '
+    "(Rules v3, the shipped game: only a river strip, a base segment for 2 players plus one per extra "
     'player, with an open table east of it; no stones). "river_strip" needs planting '
     '"vertices" and a bag_size for every player count.'
 )
@@ -831,7 +832,7 @@ class PresetJSON(BaseModel):
     unlimited_bag: bool | None = Field(
         default=None, exclude_if=_is_none, description=_UNLIMITED_BAG_DESCRIPTION + " Left out when false."
     )
-    vineyard_supply: dict[PlayerCountName, int] | None = Field(
+    vineyard_supply: dict[PlayerCountName, int | float] | None = Field(
         default=None, exclude_if=_is_none, description=_SUPPLY_DESCRIPTION + " Left out when {}."
     )
     max_spins: int | None = Field(
@@ -975,8 +976,8 @@ class PresetOverridesJSON(TypedDict, total=False):
     ]
     unlimited_bag: Annotated[StrictBool, Field(description=_UNLIMITED_BAG_DESCRIPTION)]
     vineyard_supply: Annotated[
-        dict[PlayerCountName, StrictInt],
-        Field(description=_SUPPLY_DESCRIPTION + " Each value is 1 or more."),
+        dict[PlayerCountName, StrictInt | StrictFloat],
+        Field(description=_SUPPLY_DESCRIPTION + " Each value is above 0, an integer or not (e.g. 1.25)."),
     ]
     max_spins: Annotated[StrictInt, Field(description=_MAX_SPINS_DESCRIPTION + " 1 or more.")]
     end_conditions: Annotated[list[TriggerName], Field(description=_END_CONDITIONS_DESCRIPTION)]

@@ -11,8 +11,8 @@ import pytest
 
 from acequias.board import RIVER_BEND, generate_board, river_strip
 from acequias.config import (
-    FLASH,
-    NORMAL,
+    FLASH_V2,
+    NORMAL_V2,
     RIVER_HEXES_PER_SEGMENT,
     BoardShape,
     PlantingRules,
@@ -41,7 +41,7 @@ from acequias.turn import PlaceCanal, _canal_candidates, _connecting_dirs, apply
 from server.schemas import overrides_from_json, strip_from_json, strip_to_json
 
 BAGS = {2: 30, 3: 45, 4: 60, 5: 75}
-V3 = with_overrides(NORMAL, planting=PlantingRules.VERTICES)
+V3 = with_overrides(NORMAL_V2, planting=PlantingRules.VERTICES)
 STRIP = with_overrides(V3, board_shape=BoardShape.RIVER_STRIP, bag_size=BAGS)
 
 
@@ -119,7 +119,7 @@ def test_land_is_every_hex_east_of_the_river_on_its_rows():
 
 
 def test_shipped_presets_keep_the_field_board():
-    for p in (NORMAL, FLASH):
+    for p in (NORMAL_V2, FLASH_V2):
         assert p.board_shape is BoardShape.FIELD
         assert p.river_hexes_per_segment == RIVER_HEXES_PER_SEGMENT == 5
         assert dict(p.bag_size) == {}
@@ -127,18 +127,18 @@ def test_shipped_presets_keep_the_field_board():
 
 def test_river_strip_needs_vertex_planting_and_a_bag_per_player_count():
     with pytest.raises(ValueError, match="vertex planting"):
-        with_overrides(NORMAL, board_shape=BoardShape.RIVER_STRIP, bag_size=BAGS)
+        with_overrides(NORMAL_V2, board_shape=BoardShape.RIVER_STRIP, bag_size=BAGS)
     with pytest.raises(ValueError, match="bag_size"):
         with_overrides(V3, board_shape=BoardShape.RIVER_STRIP, bag_size={2: 30})
     with pytest.raises(ValueError, match="bag_size"):
-        with_overrides(FLASH, bag_size={4: 30})  # Flash is for 2 or 3 players
+        with_overrides(FLASH_V2, bag_size={4: 30})  # Flash is for 2 or 3 players
     with pytest.raises(ValueError):
-        with_overrides(NORMAL, bag_size={2: 0})
+        with_overrides(NORMAL_V2, bag_size={2: 0})
     with pytest.raises(ValueError):
         with_overrides(STRIP, river_hexes_per_segment=0)
     with pytest.raises(TypeError):
-        with_overrides(NORMAL, board_shape="river_strip")
-    assert list(with_overrides(NORMAL, bag_size={5: 9, 2: 7}).bag_size) == [2, 5]
+        with_overrides(NORMAL_V2, board_shape="river_strip")
+    assert list(with_overrides(NORMAL_V2, bag_size={5: 9, 2: 7}).bag_size) == [2, 5]
 
 
 # --- Board and setup --------------------------------------------------------------
@@ -172,17 +172,17 @@ def test_bag_size_sets_the_bag(players):
     s = new_game(players, 3, Mode.NORMAL, preset=STRIP)
     assert len(s.market) + len(s.bag) == BAGS[players]
     # bag_size works on the field board too; a count it does not list keeps the board's capacity.
-    field = new_game(players, 3, Mode.NORMAL, preset=with_overrides(NORMAL, bag_size={players: 11}))
+    field = new_game(players, 3, Mode.NORMAL, preset=with_overrides(NORMAL_V2, bag_size={players: 11}))
     assert len(field.market) + len(field.bag) == 11
-    other = new_game(3, 3, Mode.NORMAL, preset=with_overrides(NORMAL, bag_size={2: 11}))
-    assert len(other.market) + len(other.bag) == len(new_game(3, 3, Mode.NORMAL).bag) + 4
+    other = new_game(3, 3, Mode.NORMAL, preset=with_overrides(NORMAL_V2, bag_size={2: 11}))
+    assert len(other.market) + len(other.bag) == len(new_game(3, 3, Mode.NORMAL, preset=NORMAL_V2).bag) + 4
 
 
 def test_a_strip_board_needs_vertex_planting():
     b = generate_board(2, 1, Mode.NORMAL, preset=STRIP)
     with pytest.raises(ValueError, match="vertex planting"):
         GameState(board=b, players=(Player("p1", 1), Player("p2", 2)), mode=Mode.NORMAL,
-                  round=1, start_player="p1", current_player="p1", market=(), preset=NORMAL)
+                  round=1, start_player="p1", current_player="p1", market=(), preset=NORMAL_V2)
 
 
 # --- Placement on the open table -------------------------------------------------------
@@ -276,7 +276,7 @@ def test_strip_json_round_trips():
     assert data == {"segments": [[[h.q, h.r] for h in seg] for seg in b.strip.segments]}
     assert len(data["segments"]) == 2 and len(data["segments"][0]) == 5
     assert strip_from_json(data) == b
-    assert strip_to_json(generate_board(2, 1, Mode.NORMAL)) is None
+    assert strip_to_json(generate_board(2, 1, Mode.NORMAL, preset=NORMAL_V2)) is None
     with pytest.raises(ValueError):
         strip_from_json({"segments": [[[0, 0]]], "extra": 1})
 
@@ -292,7 +292,7 @@ def test_new_options_in_overrides_and_sim_json():
     values = _preset_values(with_overrides(STRIP, river_hexes_per_segment=6))
     assert values["board_shape"] == "river_strip" and values["river_hexes_per_segment"] == 6
     assert dict(values["bag_size"]) == BAGS
-    shipped = _preset_values(NORMAL)
+    shipped = _preset_values(NORMAL_V2)
     assert not {"board_shape", "river_hexes_per_segment", "bag_size"} & set(shipped)
 
 

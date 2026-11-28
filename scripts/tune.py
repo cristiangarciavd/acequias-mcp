@@ -45,12 +45,12 @@ folder (e.g. ``rm -r output/tune-checkpoints``) when a report is done or
 after code changes. ``--smoke`` saves and loads nothing.
 
 Every sweep is defined against the Rules v1 presets (``V1_PRESET``, the
-presets shipped before #126), not the shipped Rules v2 ones, so each command
+presets shipped before #126), not the Rules v2 or v3 ones, so each command
 in ``_docs/tuning-results.md`` still plays the games it reported: a job's
 overrides are applied over ``V1_OVERRIDES`` (``rules_of``). Sweep
-``shipped`` plays the shipped presets themselves (``--candidate shipped
-"shipped (Rules v2)"`` validates them). A player count a job's preset is not
-for (its ``rounds`` has no entry: shipped Flash is for 2 or 3 players) is
+``shipped`` plays the Rules v2 presets (``RULES_V2``, shipped until #192;
+``--candidate shipped "shipped (Rules v2)"`` validates them). A player count a job's preset is not
+for (its ``rounds`` has no entry: Flash is for 2 or 3 players) is
 skipped with a note on stderr; with ``--players`` it is an error.
 
 A *configuration* is a mode, a player count (2 to 5), and a seating:
@@ -252,7 +252,8 @@ from acequias.config import (
     with_overrides,
 )
 from acequias.config import ROULETTE_SECTORS, players_text
-from acequias.config import preset as shipped_preset
+from acequias.config import RULES_V2
+from acequias.config import preset as default_preset
 from acequias.model import DieFace, GameState, Mode, PieceKind, Varietal
 from acequias.sim import GameRecord, SimRules, game_seed, play_one, summarize
 from acequias.sim import _bots, _preset
@@ -352,9 +353,10 @@ def diff_from(base: Preset, p: Preset) -> dict[str, object]:
 
 
 V1_OVERRIDES: Mapping[Mode, Mapping[str, object]] = {
-    mode: diff_from(shipped_preset(mode), V1_PRESET[mode]) for mode in Mode
+    mode: diff_from(default_preset(mode), V1_PRESET[mode]) for mode in Mode
 }
-"""``V1_PRESET`` as overrides of the shipped presets: what ``rules_of`` puts under a job's overrides."""
+"""``V1_PRESET`` as overrides of the default presets (``acequias.config.preset``, which the
+simulator applies overrides over): what ``rules_of`` puts under a job's overrides."""
 
 LOW_ROUNDS = {mode: rounds_for_turns(mode, "low") for mode in Mode}
 HIGH_ROUNDS = {mode: rounds_for_turns(mode, "high") for mode in Mode}
@@ -419,8 +421,9 @@ V2_PRESET: Mapping[Mode, Preset] = {mode: action_die_rules(roulette_rules(V1_PRE
 """The Rules v1 preset with ``roulette_rules`` and then ``action_die_rules`` (bag without floodgates)."""
 V2_BASE: Mapping[Mode, Mapping[str, object]] = {mode: _diff(V2_PRESET[mode]) for mode in Mode}
 """The overrides every Rules v2 sweep starts from: ``V2_PRESET`` as overrides of the Rules v1 preset."""
-SHIPPED_V2: Mapping[Mode, Mapping[str, object]] = {mode: _diff(shipped_preset(mode)) for mode in Mode}
-"""The shipped presets (Rules v2, #126) as overrides of the Rules v1 presets."""
+SHIPPED_V2: Mapping[Mode, Mapping[str, object]] = {mode: _diff(RULES_V2[mode]) for mode in Mode}
+"""The Rules v2 presets (``RULES_V2``, shipped from #126 until #192) as overrides of the Rules v1
+presets. The v2-based sweeps build on them, so shipping Rules v3 (#192) changes none of them."""
 RARE_VARIETALS = (Varietal.BONARDA, Varietal.CABERNET_FRANC)
 """The varietals worth a bit more under roulette rules (owner goal 5 of #103)."""
 COMMON_POINTS = min(ROULETTE_POINTS.values())
@@ -764,11 +767,11 @@ STRIP_BAG_PER_PLAYER = (12, 16, 20)
 
 
 def strip_overrides(mode: Mode, river_hexes: int, bag_per_player: int) -> dict[str, object]:
-    """The shipped preset of ``mode`` under Rules v3 on the river strip board,
+    """The Rules v2 preset of ``mode`` under Rules v3 on the river strip board,
     as overrides of the Rules v1 preset: vertex planting, ``river_hexes``
     per segment, and a bag of ``bag_per_player`` pieces per player for each
     of the mode's player counts."""
-    counts = shipped_preset(mode).player_counts
+    counts = RULES_V2[mode].player_counts
     return {
         **SHIPPED_V2[mode],
         "planting": PlantingRules.VERTICES,
@@ -812,7 +815,7 @@ V3_BODEGA_POINTS = (3, 9, 12)
 def v3_points(mode: Mode, common: int, rare: int) -> dict[str, object]:
     """Vineyard points ``common`` (``rare`` for ``RARE_VARIETALS``), with the shipped
     bodega and water rights scaled by ``common`` over the shipped common points."""
-    p = shipped_preset(mode)
+    p = RULES_V2[mode]
     shipped_common = min(p.varietal_points.values())
     return {
         "varietal_points": {v: rare if v in RARE_VARIETALS else common for v in p.varietal_points},
@@ -827,7 +830,7 @@ def v3_sweeps(river_hexes: int = V3_RIVER_HEXES, bag_per_player: int = V3_BAG_PE
     base = {mode: strip_overrides(mode, river_hexes, bag_per_player) for mode in Mode}
 
     def candidates(mode: Mode) -> tuple[tuple[str, dict], ...]:
-        p = shipped_preset(mode)
+        p = RULES_V2[mode]
         rounds = tuple(
             (f"rounds {step:+d} ({rounds_label({n: r + step for n, r in p.rounds.items()})})",
              {"rounds": {n: r + step for n, r in p.rounds.items()}})
@@ -887,7 +890,7 @@ def v3split_sweeps() -> tuple[Sweep, ...]:
     }
 
     def candidates(mode: Mode) -> tuple[tuple[str, dict], ...]:
-        p = shipped_preset(mode)
+        p = RULES_V2[mode]
         changes = (
             ("base", {}),
             *((f"bag {per}/player", {"bag_size": {n: per * n for n in p.player_counts}})
@@ -956,7 +959,7 @@ def v3blends_sweeps() -> tuple[Sweep, ...]:
         return tuple(Blend(b.varietals, _times(b.points, factor)) for b in DEFAULT_BLENDS)
 
     def candidates(mode: Mode) -> tuple[tuple[str, dict], ...]:
-        bodega = shipped_preset(mode).bodega_points
+        bodega = RULES_V2[mode].bodega_points
         rows: list[tuple[str, dict]] = []
         for factor in V3BLENDS_FACTORS:
             x = _factor_label(factor)
@@ -1005,8 +1008,8 @@ def v3_best_base(mode: Mode) -> dict[str, object]:
     per player, split scoring, any-vertex planting, the move die, ``each_once`` blends
     (``DEFAULT_BLENDS``) with the old bodega bonus off, and the bodega building (a new spot,
     ``V3BLENDS_BUILDING_POINTS[0]`` points, ``V3BLENDS_REDS`` reds + ``V3BLENDS_WHITES[1]`` whites),
-    and optional floodgate faces with bribe ``V3_BEST_BRIBE``. The opt-in presets
-    ``acequias.config.RULES_V3`` must match it (``tests/test_config_v3.py``)."""
+    and optional floodgate faces with bribe ``V3_BEST_BRIBE``. The presets
+    ``acequias.config.RULES_V3`` (shipped since #192) must match it (``tests/test_config_v3.py``)."""
     return {
         **strip_overrides(mode, V3SPLIT_RIVER_HEXES[0], V3SPLIT_BAG_PER_PLAYER[0]),
         "varietal_points": V3_SPLIT_POINTS,
@@ -1074,7 +1077,7 @@ def v3end_sweeps() -> tuple[Sweep, ...]:
         rows: list[tuple[str, dict]] = [("base", {})]
         rows += [(f"seats {a}", {SEAT_KEY: a}) for a in SEAT_ASSIGNMENTS[1:]]
         rows.append(("unlimited bag", {"unlimited_bag": True}))
-        counts = shipped_preset(mode).player_counts
+        counts = RULES_V2[mode].player_counts
         for finish in (True, False):
             tail = "finish round" if finish else "ends at once"
             rows.append((f"bag_empty, {tail}", {"end_condition": EndCondition.BAG_EMPTY, "finish_round": finish}))

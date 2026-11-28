@@ -5,7 +5,7 @@ Rules v1 presets (``acequias.config.RULES_V1``: fixed varietals, the d6
 bribe, floodgates in the bag, Flash for 2 to 5 players), the shipped presets
 before #126. For the whole module, ``acequias.config.preset`` returns them,
 so every game, board, and simulation that uses the shipped preset uses them.
-Those rules are still options of the engine; the shipped Rules v2 values are
+Those rules are still options of the engine; the Rules v2 values are
 pinned by ``test_config.py`` and ``test_shipped_rules.py``.
 """
 

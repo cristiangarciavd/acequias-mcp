@@ -3,12 +3,12 @@
 Rules v3 (#149) is the redesign of Acequias: every turn starts with a roll of the
 action die, and players **plant** their own vineyards where three hexes meet, next to
 canals they have brought water to. These are the rules for players. The technical
-summary is the README's [Rules v3](../README.md#rules-v3-opt-in-not-shipped) section,
+summary is the README's [Rules v3](../README.md#rules-v3-the-shipped-game) section,
 and the engine is `acequias/` (`planting = vertices`, `board_shape = river_strip`).
 
-> **Status:** Rules v3 is opt-in, not the shipped game yet. Its tuned values are the
-> presets `NORMAL_V3` and `FLASH_V3` (`acequias.config.RULES_V3`, #182); the shipped
-> presets stay Rules v2 until the owner makes v3 the default.
+> **Status:** Rules v3 is the shipped game since #192. Its tuned values are the
+> presets `NORMAL_V3` and `FLASH_V3` (`acequias.config.RULES_V3`, #182), which the
+> engine and the MCP tools use by default; Rules v2 stays as `NORMAL_V2` / `FLASH_V2`.
 
 ## Goal
 
@@ -22,7 +22,7 @@ the most points when the game ends.
 | River strip | A short chain of river hexes along the west side of the table. The rest of the table is open: no stones, no printed vineyards |
 | Canal pieces (neutral) | Six shapes: straight, gentle curve, sharp curve, symmetric Y, T branch, claw. The bag mix is about 44% straight, 22% gentle curve, 17% sharp curve, 6% Y, 6% T, 5% claw |
 | Owner tokens | One on each canal you place, in your color |
-| Vineyards | Grape clusters in your color, planted on hex corners (see [Planting](#planting)) |
+| Vineyards | Grape clusters colored by varietal family (violet, red or fluorescent green, with the varietal's initials), taken from the shared vineyard supply and planted on hex corners, with your owner peg on top (see [Planting](#planting)) |
 | Floodgates | Small gates that close one opening of a canal; they come only from the action die |
 | Action die | Six faces: Floodgate, Release, Resow, Move, Good season, Drought (see [The action die](#1-roll-the-action-die-mandatory) and [`action-die.md`](action-die.md)) |
 | Roulette | 14 equal sectors that pick a planted vineyard's varietal (see [Varietals](#varietals-and-points)) |

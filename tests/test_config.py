@@ -13,11 +13,14 @@ from acequias.config import (
     PlantingRules,
     ACTION_DIE_FACES,
     CONSTRUCTIVE_DIE_FACES,
-    FLASH,
-    NORMAL,
+    FLASH_V2,
+    FLASH_V3,
+    NORMAL_V2,
+    NORMAL_V3,
     ROULETTE_POINTS,
     ROULETTE_SECTORS,
     RULES_V1,
+    RULES_V2,
     SHIPPED_POINTS,
     BribeRules,
     Preset,
@@ -31,7 +34,7 @@ from acequias.config import (
 )
 from acequias.model import MAX_PLAYERS, MIN_PLAYERS, DieFace, Mode, PieceKind, Varietal
 
-PRESETS = [NORMAL, FLASH]
+PRESETS = [NORMAL_V2, FLASH_V2]
 PLAYER_COUNTS = range(MIN_PLAYERS, MAX_PLAYERS + 1)
 V1 = RULES_V1[Mode.NORMAL]
 """The Rules v1 Normal preset: fixed varietals and the d6 bribe."""
@@ -228,8 +231,8 @@ def plain(p):
 
 
 @pytest.mark.parametrize("mode", list(Mode), ids=lambda m: m.name)
-def test_shipped_values_match_readme(mode):
-    p = preset(mode)
+def test_rules_v2_values_match_readme(mode):
+    p = RULES_V2[mode]
     assert p.mode is mode
     assert plain(p) == README_VALUES[mode]
 
@@ -242,34 +245,34 @@ def test_rules_v1_keeps_the_values_shipped_before_126(mode):
 
 
 def test_shipped_points_are_the_roulette_points_at_scale_3_with_rare_plus_1():
-    assert SHIPPED_POINTS == NORMAL.varietal_points == FLASH.varietal_points
+    assert SHIPPED_POINTS == NORMAL_V2.varietal_points == FLASH_V2.varietal_points
     rare = {Varietal.BONARDA, Varietal.CABERNET_FRANC}
     assert dict(SHIPPED_POINTS) == {v: 6 + (v in rare) for v in ROULETTE_POINTS}
 
 
 def test_readme_distances_need_the_readme_canal_counts():
     # A vineyard at distance d needs d - 1 canals: 3 in both modes (tuned in #20).
-    assert tuple(d - 1 for d in NORMAL.vineyard_distance) == (3, 3)
-    assert tuple(d - 1 for d in FLASH.vineyard_distance) == (3, 3)
+    assert tuple(d - 1 for d in NORMAL_V2.vineyard_distance) == (3, 3)
+    assert tuple(d - 1 for d in FLASH_V2.vineyard_distance) == (3, 3)
 
 
 def test_flash_has_fewer_rounds_for_every_player_count():
-    for players in FLASH.player_counts:
-        assert FLASH.rounds_for(players) < NORMAL.rounds_for(players)
+    for players in FLASH_V2.player_counts:
+        assert FLASH_V2.rounds_for(players) < NORMAL_V2.rounds_for(players)
 
 
 def test_flash_has_fewer_hexes_per_player():
-    assert FLASH.hexes_per_player < NORMAL.hexes_per_player
+    assert FLASH_V2.hexes_per_player < NORMAL_V2.hexes_per_player
 
 
 def test_flash_vineyards_sit_no_farther_from_the_river():
     # #20 moved Flash to Normal's distance: closer vineyards hand seat 1 most wins.
-    assert FLASH.vineyard_distance[1] <= NORMAL.vineyard_distance[0]
+    assert FLASH_V2.vineyard_distance[1] <= NORMAL_V2.vineyard_distance[0]
 
 
 @ids
 def test_preset_records_its_mode(p):
-    assert preset(p.mode) is p
+    assert RULES_V2[p.mode] is p
     assert isinstance(p.mode, Mode)
 
 
@@ -286,19 +289,19 @@ def test_bag_mix_is_keyed_by_piece_kind(p):
 
 
 def test_normal_is_for_2_to_5_players_and_flash_for_2_to_3():
-    assert NORMAL.player_counts == (2, 3, 4, 5)
-    assert FLASH.player_counts == (2, 3)
+    assert NORMAL_V2.player_counts == (2, 3, 4, 5)
+    assert FLASH_V2.player_counts == (2, 3)
 
 
 # --- preset() --------------------------------------------------------------
 
 
 def test_preset_returns_each_mode():
-    assert preset(Mode.NORMAL) is NORMAL
-    assert preset(Mode.FLASH) is FLASH
+    assert preset(Mode.NORMAL) is NORMAL_V3
+    assert preset(Mode.FLASH) is FLASH_V3
 
 
-@pytest.mark.parametrize("bad", ["normal", "NORMAL", None, 0, NORMAL])
+@pytest.mark.parametrize("bad", ["normal", "NORMAL", None, 0, NORMAL_V2])
 def test_preset_rejects_non_mode(bad):
     with pytest.raises(TypeError):
         preset(bad)
@@ -323,10 +326,10 @@ def test_rounds_for_out_of_range(p, players):
 @pytest.mark.parametrize("players", [4, 5])
 def test_flash_rejects_4_and_5_players_with_a_clear_error(players):
     with pytest.raises(ValueError, match=f"^flash mode is for 2 to 3 players, got {players}$"):
-        FLASH.check_players(players)
+        FLASH_V2.check_players(players)
     with pytest.raises(ValueError, match="flash mode is for 2 to 3 players"):
-        FLASH.rounds_for(players)
-    NORMAL.check_players(players)
+        FLASH_V2.rounds_for(players)
+    NORMAL_V2.check_players(players)
 
 
 @ids
@@ -344,7 +347,7 @@ def test_players_text(counts, text):
 
 
 def test_rounds_can_cover_some_player_counts_only():
-    p = with_overrides(NORMAL, rounds={5: 9, 2: 7})
+    p = with_overrides(NORMAL_V2, rounds={5: 9, 2: 7})
     assert p.player_counts == (2, 5)
     assert list(p.rounds.items()) == [(2, 7), (5, 9)]
     with pytest.raises(ValueError, match="normal mode is for 2 or 5 players, got 3"):
@@ -352,7 +355,7 @@ def test_rounds_can_cover_some_player_counts_only():
 
 
 def test_flash_can_be_given_4_and_5_players_back_by_overrides():
-    p = with_overrides(FLASH, rounds={2: 6, 3: 6, 4: 4, 5: 4})
+    p = with_overrides(FLASH_V2, rounds={2: 6, 3: 6, 4: 4, 5: 4})
     assert p.rounds_for(5) == 4
 
 
@@ -365,15 +368,15 @@ def test_board_capacity_is_checked_only_for_the_player_counts_played():
     # 2 hexes/player, 1 vineyard/player, 26% stone fills a 2-player board
     # (see test_board_capacity_rounds_stones_up) but not a 5-player one.
     with pytest.raises(ValueError, match="2 players"):
-        with_overrides(NORMAL, hexes_per_player=2, vineyards_per_player=1, stone_share=26)
-    p = with_overrides(NORMAL, hexes_per_player=2, vineyards_per_player=1, stone_share=26, rounds={5: 4})
+        with_overrides(NORMAL_V2, hexes_per_player=2, vineyards_per_player=1, stone_share=26)
+    p = with_overrides(NORMAL_V2, hexes_per_player=2, vineyards_per_player=1, stone_share=26, rounds={5: 4})
     assert p.player_counts == (5,)
 
 
 def test_seat_bonus_only_for_player_counts_in_rounds():
     with pytest.raises(ValueError, match=r"seat_bonus gives player counts \[4\]; rounds has only 2 to 3"):
-        with_overrides(FLASH, seat_bonus={4: (1, 1, 1, 0)})
-    assert with_overrides(FLASH, seat_bonus={3: (1, 0, 0)}).seat_bonus[3] == (1, 0, 0)
+        with_overrides(FLASH_V2, seat_bonus={4: (1, 1, 1, 0)})
+    assert with_overrides(FLASH_V2, seat_bonus={3: (1, 0, 0)}).seat_bonus[3] == (1, 0, 0)
 
 
 @ids
@@ -384,7 +387,7 @@ def test_rounds_for_non_int(p, players):
 
 
 def test_rounds_can_differ_per_player_count():
-    p = with_overrides(NORMAL, rounds={2: 14, 3: 13, 4: 12, 5: 11})
+    p = with_overrides(NORMAL_V2, rounds={2: 14, 3: 13, 4: 12, 5: 11})
     assert [p.rounds_for(n) for n in PLAYER_COUNTS] == [14, 13, 12, 11]
 
 
@@ -424,7 +427,7 @@ def test_vineyard_distance_is_a_tuple(p):
 def test_mutating_the_input_dicts_does_not_change_the_preset():
     rounds = {2: 9, 3: 9, 4: 9, 5: 9}
     mix = dict(README_BAG_MIX)
-    p = with_overrides(NORMAL, rounds=rounds, bag_mix=mix)
+    p = with_overrides(NORMAL_V2, rounds=rounds, bag_mix=mix)
     rounds[2] = 1
     mix[PieceKind.STRAIGHT] = 0
     assert p.rounds_for(2) == 9
@@ -432,7 +435,7 @@ def test_mutating_the_input_dicts_does_not_change_the_preset():
 
 
 def test_list_distance_is_stored_as_a_tuple():
-    p = with_overrides(NORMAL, vineyard_distance=[3, 6])
+    p = with_overrides(NORMAL_V2, vineyard_distance=[3, 6])
     assert p.vineyard_distance == (3, 6)
 
 
@@ -445,30 +448,30 @@ def test_with_no_changes_returns_an_equal_preset(p):
 
 
 def test_with_overrides_returns_a_new_preset_and_leaves_the_original():
-    before = fields_of(NORMAL)
-    p = with_overrides(NORMAL, hexes_per_player=20, market_size=5)
+    before = fields_of(NORMAL_V2)
+    p = with_overrides(NORMAL_V2, hexes_per_player=20, market_size=5)
     assert p.hexes_per_player == 20
     assert p.market_size == 5
     assert p.mode is Mode.NORMAL
-    assert p != NORMAL
-    assert fields_of(NORMAL) == before
-    assert NORMAL.hexes_per_player == 18
+    assert p != NORMAL_V2
+    assert fields_of(NORMAL_V2) == before
+    assert NORMAL_V2.hexes_per_player == 18
 
 
 def test_with_overrides_unknown_field():
     with pytest.raises(ValueError, match="hexes_per_playr"):
-        with_overrides(NORMAL, hexes_per_playr=10)
+        with_overrides(NORMAL_V2, hexes_per_playr=10)
 
 
 @pytest.mark.parametrize("mode", list(Mode))
 def test_with_overrides_cannot_change_mode(mode):
     with pytest.raises(ValueError, match="mode"):
-        with_overrides(FLASH, mode=mode)
+        with_overrides(FLASH_V2, mode=mode)
 
 
 def test_with_overrides_needs_a_preset():
     with pytest.raises(TypeError):
-        with_overrides(fields_of(NORMAL), market_size=5)
+        with_overrides(fields_of(NORMAL_V2), market_size=5)
 
 
 @ids
@@ -628,24 +631,24 @@ def test_board_must_keep_an_empty_hex(p):
 def test_board_capacity_rounds_stones_up():
     # 2 hexes/player, 1 vineyard/player, 10% stone: with 2 players, 4 hexes hold
     # 2 vineyards and ceil(0.4) = 1 stone, leaving 1 empty hex.
-    p = with_overrides(NORMAL, hexes_per_player=2, vineyards_per_player=1, stone_share=10)
+    p = with_overrides(NORMAL_V2, hexes_per_player=2, vineyards_per_player=1, stone_share=10)
     assert p.stone_share == 10
     # At 26%: 2 vineyards + ceil(1.04) = 2 stones fill all 4 hexes. Rounding
     # down would wrongly leave room.
     with pytest.raises(ValueError, match="2 players"):
-        with_overrides(NORMAL, hexes_per_player=2, vineyards_per_player=1, stone_share=26)
+        with_overrides(NORMAL_V2, hexes_per_player=2, vineyards_per_player=1, stone_share=26)
 
 
 def test_board_capacity_tight_but_valid():
     # 4 hexes/player, 1 vineyard/player, 45% stone: the fullest count is
     # 2 players, 8 hexes, 2 vineyards + ceil(3.6) = 4 stones, 2 empty.
-    p = with_overrides(NORMAL, hexes_per_player=4, vineyards_per_player=1, stone_share=45)
+    p = with_overrides(NORMAL_V2, hexes_per_player=4, vineyards_per_player=1, stone_share=45)
     assert p.stone_share == 45
 
 
 def test_one_hex_per_player_with_a_vineyard_is_full():
     with pytest.raises(ValueError, match="empty"):
-        with_overrides(NORMAL, hexes_per_player=1, vineyards_per_player=1, stone_share=0)
+        with_overrides(NORMAL_V2, hexes_per_player=1, vineyards_per_player=1, stone_share=0)
 
 
 @ids
@@ -761,7 +764,7 @@ def test_action_die_rules_on_a_die_without_resow_works_under_fixed_rules():
 
 
 def test_action_die_rejections():
-    die = NORMAL
+    die = NORMAL_V2
     assert_raises(die, ValueError, "FLOODGATE", bag_mix=V1_BAG_MIX)
     assert_raises(die, ValueError, "RESOW", varietal_rules=VarietalRules.FIXED,
                   varietal_points=V1_VARIETAL_POINTS)
@@ -783,7 +786,7 @@ def test_d6_rules_ignore_the_action_die_checks():
 
 def test_action_die_cost_zero_is_accepted_and_kept_by_scaled():
     # #128: cost 0 is for testing only; the shipped cost stays at least 1.
-    die = NORMAL
+    die = NORMAL_V2
     assert with_overrides(die, action_die_cost=0).action_die_cost == 0
     assert with_overrides(V1, action_die_cost=0).action_die_cost == 0
     assert scaled(with_overrides(die, action_die_cost=0), 3).action_die_cost == 0
@@ -796,7 +799,7 @@ def test_action_die_cost_zero_is_accepted_and_kept_by_scaled():
 @pytest.mark.parametrize("bad", [0, -1, True, 1.0])
 def test_water_right_points_rejects(bad):
     exc = ValueError if bad in (0, -1) and not isinstance(bad, (bool, float)) else TypeError
-    assert_raises(NORMAL, exc, "water_right_points", water_right_points=bad)
+    assert_raises(NORMAL_V2, exc, "water_right_points", water_right_points=bad)
 
 
 def test_scaled_doubles_every_scoring_value():
@@ -822,9 +825,9 @@ def test_scaled_triples_every_roulette_varietal():
 
 
 def test_scaled_keeps_the_action_die_cost():
-    p = scaled(NORMAL, 2)
+    p = scaled(NORMAL_V2, 2)
     assert p.action_die_cost == 1
-    assert p.die_faces == NORMAL.die_faces
+    assert p.die_faces == NORMAL_V2.die_faces
 
 
 @ids
@@ -838,7 +841,7 @@ def test_scaled_by_one_is_equal_and_leaves_the_original(p):
 @pytest.mark.parametrize(("bad", "exc"), [(0, ValueError), (-1, ValueError), (True, TypeError), (1.5, TypeError)])
 def test_scaled_rejects_bad_factors(bad, exc):
     with pytest.raises(exc, match="factor"):
-        scaled(NORMAL, bad)
+        scaled(NORMAL_V2, bad)
 
 
 def test_scaled_needs_a_preset():
